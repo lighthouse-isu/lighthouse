@@ -103,7 +103,7 @@ func RemoveContainer(w http.ResponseWriter, r *http.Request) {
 
 func GetDefaultClient() (*docker.Client, error) {
     return GetClientInstanceForIP("unix:///var/run/docker.sock", 
-        CertificateList{CertPem: "cert.pem", KeyPem: "key.pem", CaPem: "ca.pem"})
+        CertificateList{CertPem: "", KeyPem: "", CaPem: ""})
 }
 
 func GetClientInstanceForIP(ip string, certificates CertificateList) (*docker.Client, error) {
