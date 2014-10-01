@@ -44,14 +44,14 @@ func MakeContainer(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    pullConfig := docker.PullImageOptions{Repository: "themagicalkarp/docker-thing"}
+    pullConfig := docker.PullImageOptions{Repository: "training/webapp"}
     auth := docker.AuthConfiguration{Username: "", Password: "", Email: ""}
     client.PullImage(pullConfig, auth)
 
     port := docker.Port("5000/tcp")
     portMap := map[docker.Port]struct{}{port: struct{}{}}
 
-    config := docker.Config{Image: "themagicalkarp/docker-thing", Cmd: []string {"python", "app.py"}, ExposedPorts: portMap}
+    config := docker.Config{Image: "training/webapp", Cmd: []string {"python", "app.py"}, ExposedPorts: portMap}
     createConfig := docker.CreateContainerOptions{Name: "test_container", Config: &config}
 
     _, err = client.CreateContainer(createConfig)
