@@ -3,3 +3,7 @@
 *.pyc
 *.exe
 *.pem
+
+# front-end
+node_modules
+bower_components

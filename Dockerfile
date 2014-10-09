@@ -16,7 +16,6 @@ ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
 
 WORKDIR /data
 
-
 # ----- Add private ssh key -----
 RUN mkdir -p /root/.ssh
 
@@ -56,11 +55,20 @@ RUN echo "Host github.com\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config
 # ----- Setup enviroment -----
 RUN git clone git@github.com:ngmiller/lighthouse.git
 WORKDIR /data/lighthouse
-# You can play around with which branch you want the build use. Master is default.
-# RUN git checkout -b some-branch origin/some-branch
+
+RUN git fetch origin
+# Set your development branch here; uncomment for a production deploy
+# RUN git checkout <DEV BRANCH NAME HERE>
 
 RUN go get github.com/fsouza/go-dockerclient
 
+# Build front-end
+WORKDIR /data/lighthouse/client
+RUN npm install
 RUN npm install -g gulp
+RUN gulp build
+
+# Build/run server
+WORKDIR /data/lighthouse/backend/static
 
 EXPOSE 5000
