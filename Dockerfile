@@ -61,6 +61,8 @@ WORKDIR /data/lighthouse
 
 RUN go get github.com/fsouza/go-dockerclient
 
-RUN npm install -g gulp
+RUN npm install
+RUN npm install gulp
+RUN gulp build
 
 EXPOSE 5000

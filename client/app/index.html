@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="dockerThing">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Docker Thang</title>
+
+    <link rel="stylesheet" href="/static/css/picnic.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+</head>
+
+<body>
+
+<nav>
+  <a href="#" class="main" style="">Docker Thing</a>
+</nav>
+
+<div class="container" ng-controller="mainController">
+    <h6>Attention all planets of the solar federation... we have assumed control.</h6>
+
+    <h1>Containers</h1>
+    <div id="containers" class="row">
+        <table class="primary">
+            <thead>
+                <tr>
+                    <th>Image</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Ports</th>
+                    <th>Command</th>
+                    <th>Names</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr ng-repeat="container in remote.containers">
+                    <td>{{ container.Image }}</td>
+                    <td>{{ container.Status }}</td>
+                    <td>{{ formatTime(container.Created) }}</td>
+                    <td>{{ container.Ports[0].IP }} : {{ container.Ports[0].PublicPort }} -> {{ container.Ports[0].PrivatePort }} / {{ container.Ports[0].Type }}</td>
+                    <td>{{ container.Command }}</td>
+                    <td>{{ container.Names }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>Images</h1>
+    <div id="images" class="row">
+        <table class="primary">
+            <thead>
+                <th>RepoTags</th>
+                <th>ID</th>
+                <th>Created</th>
+            </thead>
+            <tbody>
+                <tr ng-repeat="image in remote.images">
+                    <td>{{ image.RepoTags }}</td>
+                    <td>{{ image.Id }}</td>
+                    <td>{{ formatTime(image.Created) }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>Info</h1>
+    <div id="info" class="row"><pre>{{ remote.info }}</pre></div>
+</div>
+
+<script src="/static/js/app.js"></script>
+
+</body>
+</html>
