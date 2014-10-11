@@ -21,7 +21,7 @@ func main() {
     v := "/api/v0.1"
 
     r := mux.NewRouter()
-    r.HandleFunc(v + "", GetInfo).Methods("GET")
+    r.HandleFunc(v + "/", GetInfo).Methods("GET")
     r.HandleFunc(v + "/images", GetImages).Methods("GET")
     r.HandleFunc(v + "/containers", GetContainers).Methods("GET")
     r.HandleFunc(v + "/containers/create", CreateContainer).Methods("POST")
