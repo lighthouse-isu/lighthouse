@@ -57,9 +57,10 @@ RUN echo "Host github.com\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config
 RUN git clone git@github.com:ngmiller/lighthouse.git
 WORKDIR /data/lighthouse
 # You can play around with which branch you want the build use. Master is default.
-# RUN git checkout -b some-branch origin/some-branch
+RUN git checkout front-end
 
 RUN go get github.com/fsouza/go-dockerclient
+RUN go get github.com/gorilla/mux
 
 RUN npm install -g gulp
 
