@@ -16,6 +16,8 @@ ENV PATH $GOROOT/bin:$GOPATH/bin:$PATH
 
 WORKDIR /data
 
+RUN apt-get update
+RUN apt-get install -y mercurial
 
 # ----- Add private ssh key -----
 RUN mkdir -p /root/.ssh
@@ -60,6 +62,9 @@ WORKDIR /data/lighthouse
 # RUN git checkout -b some-branch origin/some-branch
 
 RUN go get github.com/fsouza/go-dockerclient
+RUN go get github.com/gorilla/mux
+RUN go get code.google.com/p/goauth2/oauth
+RUN go get code.google.com/p/google-api-go-client/compute/v1
 
 RUN npm install -g gulp
 
