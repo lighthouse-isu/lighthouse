@@ -60,6 +60,7 @@ WORKDIR /data/lighthouse
 # RUN git checkout -b some-branch origin/some-branch
 
 RUN go get github.com/fsouza/go-dockerclient
+RUN go get github.com/gorilla/mux
 
 RUN npm install -g gulp
 
