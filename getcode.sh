@@ -1,22 +1,21 @@
 #!/bin/bash
 
-# Pull code
-cd /data
-git clone git@github.com:ngmiller/lighthouse.git
-git clone git@github.com:lighthouse/lighthouse-client.git
-
-# Pull backend
+# Pull backend updates
 cd /data/lighthouse
 git fetch origin
 git checkout back-branch
+git pull origin back-branch
 
-# Pull frontend and build
+# Pull frontend updates and build
 cd /data/lighthouse-client
 git fetch origin
 git checkout front-branch
+git pull origin back-branch
+
 npm install
 gulp build
 
 # Run server 
-cd /data/lighthouse
-## server commands here
+cd /data/lighthouse/backend/static
+# just testing
+python -m SimpleHTTPServer 5000
