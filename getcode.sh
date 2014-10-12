@@ -14,6 +14,7 @@ git checkout back-branch
 cd /data/lighthouse-client
 git fetch origin
 git checkout front-branch
+npm install
 gulp build
 
 # Run server 
