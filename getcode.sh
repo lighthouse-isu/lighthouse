@@ -3,7 +3,7 @@
 # Pull code
 cd /data
 git clone git@github.com:ngmiller/lighthouse.git
-git clone git@github.com:ngmiller/lighthouse-client.git
+git clone git@github.com:lighthouse/lighthouse-client.git
 
 # Pull backend
 cd /data/lighthouse
