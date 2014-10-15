@@ -94,17 +94,15 @@ func (this *Users) CreateUser(email, password string) *Users {
     salt := GenerateSalt()
     saltedPassword := SaltPassword(password, salt)
 
-    insertUsers := fmt.Sprintf("INSERT INTO users VALUES ('%s', '%s', '%s')",
+    this.db.Exec("INSERT INTO users (email, salt, password) VALUES (($1), ($2), ($3))",
         email, salt, saltedPassword)
 
-    this.db.Exec(insertUsers)
     return this
 }
 
 func (this *Users) GetUser(email string) *User {
-    userQuery := fmt.Sprintf(
-        "SELECT email, salt, password FROM users WHERE email = '%s'", email)
-    row := this.db.QueryRow(userQuery)
+    row := this.db.QueryRow(
+        "SELECT email, salt, password FROM users WHERE email = ($1)", email)
 
     user := &User{}
     err := row.Scan(&user.Email, &user.Salt, &user.Password)
