@@ -1,0 +1,8 @@
+{
+    "ClientId": "this-is-a-secret",
+    "ClientSecret": "this-is-a-secret",
+    "Scope": "https://www.googleapis.com/auth/compute",
+    "AuthURL": "https://accounts.google.com/o/oauth2/auth",
+    "TokenURL": "https://accounts.google.com/o/oauth2/token",
+    "RedirectURL": "/report/back/to/me/when/authed",
+}

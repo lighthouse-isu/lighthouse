@@ -1,6 +1,7 @@
 package gce
 
 import (
+    "os"
     "fmt"
     "net/http"
     "io/ioutil"
@@ -13,21 +14,13 @@ import (
 )
 
 
-var config = &oauth.Config {
-    ClientId: "91093806825-0q1cmch4r6vdknf23ui359kqcqmti7rc.apps.googleusercontent.com",
-    ClientSecret: "h0WEhjlsfofdn711b3NalurD",
-    Scope: "https://www.googleapis.com/auth/compute",
-    AuthURL: "https://accounts.google.com/o/oauth2/auth",
-    TokenURL: "https://accounts.google.com/o/oauth2/token",
-    RedirectURL: "http://localhost:5000/plugins/gce/vms/find",
-}
+var oauthConfig *oauth.Config
 
 type DiscoveredVM struct {
     Name string
     Address string
     CanAccessDocker bool
 }
-
 
 func GetCurrentProjectID() (string, error) {
     request, _ := http.NewRequest(
@@ -52,7 +45,7 @@ func GetCurrentProjectID() (string, error) {
 
 func DiscoverVMs(authCode string) {
     transport := &oauth.Transport{
-        Config: config,
+        Config: oauthConfig,
     }
     transport.Exchange(authCode)
 
@@ -98,10 +91,26 @@ func DiscoverVMs(authCode string) {
 }
 
 func AuthUrl() string {
-    return config.AuthCodeURL("")
+    return oauthConfig.AuthCodeURL("")
+}
+
+func LoadGCEConfig() *oauth.Config {
+    var fileName string
+    if _, err := os.Stat("/config/gce.json"); os.IsNotExist(err) {
+        fileName = "../config/gce.json"
+    } else {
+        fileName = "/config/gce.json"
+    }
+    configFile, _ := ioutil.ReadFile(fileName)
+
+    var config oauth.Config
+    json.Unmarshal(configFile, &config)
+    return &config
 }
 
 func Handle(r *mux.Router) {
+    oauthConfig = LoadGCEConfig()
+
     r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
         w.Header().Set("Content-Type", "application/json")
 
