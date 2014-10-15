@@ -96,10 +96,10 @@ func AuthUrl() string {
 
 func LoadGCEConfig() *oauth.Config {
     var fileName string
-    if _, err := os.Stat("/config/gce.json"); os.IsNotExist(err) {
-        fileName = "../config/gce.json"
+    if _, err := os.Stat("/config/plugins/gce.json"); os.IsNotExist(err) {
+        fileName = "../config/plugins/gce.json"
     } else {
-        fileName = "/config/gce.json"
+        fileName = "/config/plugins/gce.json"
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
