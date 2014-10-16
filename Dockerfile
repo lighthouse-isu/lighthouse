@@ -52,15 +52,21 @@ N2Pt8veiLc0cgXHeGE5rd+zXyeGcmra2W9pfptd49luerYEFQmIC\n\
 RUN chmod 700 /root/.ssh/id_rsa
 RUN echo "Host github.com\n\tStrictHostKeyChecking no\n" >> /root/.ssh/config
 
+# ----- Setup server enviroment -----
+# change this env variable to support a dev branch
+ENV back-branch master
+ENV front-branch master
 
-# ----- Setup enviroment -----
 RUN git clone git@github.com:ngmiller/lighthouse.git
-WORKDIR /data/lighthouse
-# You can play around with which branch you want the build use. Master is default.
-# RUN git checkout -b some-branch origin/some-branch
+RUN git clone git@github.com:lighthouse/lighthouse-client.git
 
+# Backend deps
+WORKDIR /data/lighthouse
 RUN go get github.com/fsouza/go-dockerclient
 
+# Frontend deps
 RUN npm install -g gulp
 
 EXPOSE 5000
+# Command run on container run
+CMD ["/data/lighthouse/getcode.sh"]
