@@ -3,14 +3,14 @@
 # Pull backend updates
 cd /data/lighthouse
 git fetch origin
-git checkout back-branch
-git pull origin back-branch
+git checkout $back-branch
+git pull origin $back-branch
 
 # Pull frontend updates and build
 cd /data/lighthouse-client
 git fetch origin
-git checkout front-branch
-git pull origin back-branch
+git checkout $front-branch
+git pull origin $front-branch
 
 npm install
 gulp build
