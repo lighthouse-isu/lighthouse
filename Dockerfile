@@ -3,7 +3,6 @@ FROM dockerfile/nodejs
 
 MAINTAINER lighthouse
 
-
 # ----- Install go -----
 WORKDIR /root
 RUN \
@@ -64,7 +63,6 @@ RUN git clone git@github.com:lighthouse/lighthouse-client.git
 
 # Backend deps
 WORKDIR /data/lighthouse
-RUN go get github.com/fsouza/go-dockerclient
 RUN go get github.com/gorilla/mux
 RUN go get github.com/gorilla/sessions
 RUN go get github.com/gorilla/securecookie
