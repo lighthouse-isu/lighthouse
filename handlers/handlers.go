@@ -6,7 +6,7 @@ import (
     "encoding/json"
     "io/ioutil"
     "github.com/gorilla/mux"
-    "../hosts"
+    "github.com/ngmiller/lighthouse/hosts"
 )
 
 /*
