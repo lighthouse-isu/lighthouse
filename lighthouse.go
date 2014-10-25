@@ -26,7 +26,13 @@ func LoggingMiddleware(h http.Handler) http.Handler {
     })
 }
 
+/*
+    Handles all requests through the Docker endpoint.  Calls all
+    relevant custom handlers and then passes request on to Docker.
 
+    If an error occurs in a custom handler or with the Docker request
+    itself, the custom handlers will be instructed to rollback.
+*/
 func DockerHandler(w http.ResponseWriter, r *http.Request) {
     // Ready all HTTP form data for the handlers
     r.ParseForm()
