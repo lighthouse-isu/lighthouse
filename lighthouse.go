@@ -56,8 +56,15 @@ func main() {
     fmt.Println("Starting...!!!")
     baseRouter := mux.NewRouter()
 
+    baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+        http.ServeFile(w, r, "static/index.html")
+    }).Methods("GET")
+
+    staticServer := http.FileServer(http.Dir("static"))
+    baseRouter.PathPrefix("/static/").Handler(
+        http.StripPrefix("/static/", staticServer))
+
     auth.Handle(baseRouter)
-    ignoreURLs := []string{"/", "/login", "/logout", "/plugins/gce/vms/find"}
 
     versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
     hostRouter    := versionRouter.PathPrefix("/{host}")
@@ -67,6 +74,7 @@ func main() {
 
     plugins.Handle(baseRouter.PathPrefix("/plugins").Subrouter())
 
+    ignoreURLs := []string{"/", "/login", "/logout", "/plugins/gce/vms/find"}
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
     app = LoggingMiddleware(app)
 
