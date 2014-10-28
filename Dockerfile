@@ -1,4 +1,4 @@
-FROM google/golang
+FROM google/golang:latest
 
 MAINTAINER lighthouse
 
