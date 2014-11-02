@@ -12,14 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugins
+package unknown
 
 import (
-    "github.com/lighthouse/lighthouse/plugins/gce"
-    
-    "github.com/gorilla/mux"
+    "github.com/ngmiller/lighthouse/provider/models"
 )
 
-func Handle(r *mux.Router) {
-    gce.Handle(r.PathPrefix("/gce").Subrouter())
+var Provider = &models.Provider {
+    Name: "unknown",
+    IsApplicable: IsApplicable,
+    GetVMs: GetVMs,
+}
+
+func IsApplicable() bool {
+    return true
+}
+
+func GetVMs() []*models.VM {
+    return []*models.VM{}
 }
