@@ -15,7 +15,7 @@
 package plugins
 
 import (
-    "github.com/ngmiller/lighthouse/plugins/gce"
+    "github.com/lighthouse/lighthouse/plugins/gce"
     
     "github.com/gorilla/mux"
 )

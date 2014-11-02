@@ -20,7 +20,7 @@ import (
     "encoding/json"
     "io/ioutil"
     "github.com/gorilla/mux"
-    "github.com/ngmiller/lighthouse/hosts"
+    "github.com/lighthouse/lighthouse/hosts"
 )
 
 /*
