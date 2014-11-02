@@ -20,7 +20,7 @@ import (
     "time"
 
     "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/plugins"
+    "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
 
     "github.com/gorilla/mux"
@@ -67,7 +67,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
-    fmt.Println("Starting...!!!")
+    fmt.Println("Starting...")
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -86,9 +86,9 @@ func main() {
     // The regex ignores /'s that would normally break the url
     dockerRouter.HandleFunc("/{dockerURL:.*}", DockerHandler)
 
-    plugins.Handle(baseRouter.PathPrefix("/plugins").Subrouter())
+    provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
 
-    ignoreURLs := []string{"/", "/login", "/logout", "/plugins/gce/vms/find"}
+    ignoreURLs := []string{"/", "/login", "/logout"}
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
     app = LoggingMiddleware(app)
 
