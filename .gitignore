@@ -5,5 +5,5 @@
 *.pem
 
 # Ignore front-end build artifacts
-backend/static
+/static
 

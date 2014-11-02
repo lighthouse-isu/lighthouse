@@ -117,7 +117,7 @@ func (this *Users) GetUser(email string) *User {
 func LoadAuthConfig() *AuthConfig{
     var fileName string
     if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
-        fileName = "../config/auth.json"
+        fileName = "./config/auth.json"
     } else {
         fileName = "/config/auth.json"
     }
