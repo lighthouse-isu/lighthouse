@@ -16,7 +16,7 @@ FROM google/golang:latest
 
 MAINTAINER lighthouse
 
-WORKDIR /gopath/src/github.com/ngmiller/lighthouse
+WORKDIR /gopath/src/github.com/lighthouse/lighthouse
 
 RUN go get github.com/gorilla/mux \
            github.com/gorilla/sessions \
@@ -25,7 +25,7 @@ RUN go get github.com/gorilla/mux \
            code.google.com/p/goauth2/oauth \
            code.google.com/p/google-api-go-client/compute/v1
 
-ADD . /gopath/src/github.com/ngmiller/lighthouse/
-RUN go get github.com/ngmiller/lighthouse
+ADD . /gopath/src/github.com/lighthouse/lighthouse/
+RUN go get github.com/lighthouse/lighthouse
 
 ENTRYPOINT ["/gopath/bin/lighthouse"]
