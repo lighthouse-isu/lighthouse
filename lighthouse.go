@@ -19,9 +19,9 @@ import (
     "net/http"
     "time"
 
-    "github.com/ngmiller/lighthouse/auth"
-    "github.com/ngmiller/lighthouse/plugins"
-    "github.com/ngmiller/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/plugins"
+    "github.com/lighthouse/lighthouse/handlers"
 
     "github.com/gorilla/mux"
 )
