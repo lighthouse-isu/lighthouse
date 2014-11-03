@@ -19,7 +19,7 @@ import (
     "net/http"
     "io/ioutil"
 
-    "github.com/ngmiller/lighthouse/provider/models"
+    "github.com/lighthouse/lighthouse/provider/models"
 
     compute "code.google.com/p/google-api-go-client/compute/v1"
 )

@@ -18,7 +18,7 @@ import (
     "os"
     "strings"
 
-    "github.com/ngmiller/lighthouse/provider/models"
+    "github.com/lighthouse/lighthouse/provider/models"
 )
 
 var Provider = &models.Provider {

@@ -19,11 +19,11 @@ import (
     "net/http"
     "encoding/json"
 
-    "github.com/ngmiller/lighthouse/provider/models"
+    "github.com/lighthouse/lighthouse/provider/models"
 
-    "github.com/ngmiller/lighthouse/provider/providers/gce"
-    "github.com/ngmiller/lighthouse/provider/providers/local"
-    "github.com/ngmiller/lighthouse/provider/providers/unknown"
+    "github.com/lighthouse/lighthouse/provider/providers/gce"
+    "github.com/lighthouse/lighthouse/provider/providers/local"
+    "github.com/lighthouse/lighthouse/provider/providers/unknown"
 
     "github.com/gorilla/mux"
 )
