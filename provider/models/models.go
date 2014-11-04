@@ -21,9 +21,11 @@ import (
 )
 
 type VM struct {
-    Name string
-    Address string
-    CanAccessDocker bool
+    Name string `json:"name,omitempty"`
+    Address string `json:"address,omitempty"`
+    Port string `json:"port,omitempty"`
+    Version string `json:"version,omitempty"`
+    CanAccessDocker bool `json:"canAccessDocker,omitempty"`
 }
 
 type Provider struct {
@@ -32,8 +34,9 @@ type Provider struct {
     GetVMs func() []*VM
 }
 
-func PingDocker(address string) bool {
-    pingAddress := fmt.Sprintf("http://%s:2375/v1/_ping", address)
+func PingDocker(vm *VM) bool {
+    pingAddress := fmt.Sprintf("http://%s:%s/%s/_ping",
+        vm.Address, vm.Port, vm.Version)
 
     client := &http.Client{
         Timeout: time.Duration(2)*time.Second,

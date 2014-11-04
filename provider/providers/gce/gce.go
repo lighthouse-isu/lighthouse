@@ -79,6 +79,8 @@ func GetProjectVMs() []*models.VM {
             discoveredVMs = append(discoveredVMs, &models.VM{
                 Name: instance.Name,
                 Address: network.NetworkIP,
+                Port: "2357",
+                Version: "v1",
                 CanAccessDocker: false,
             })
         }
@@ -89,7 +91,7 @@ func GetProjectVMs() []*models.VM {
         wg.Add(1)
         go func(vm *models.VM) {
             defer wg.Done()
-            vm.CanAccessDocker = models.PingDocker(vm.Address)
+            vm.CanAccessDocker = models.PingDocker(vm)
         }(vm)
     }
     wg.Wait()

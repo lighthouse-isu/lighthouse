@@ -34,13 +34,16 @@ func IsApplicable() bool {
 func GetVMS() []*models.VM {
     dockerHost := os.Getenv("DOCKER_HOST")
     dockerHost = strings.Replace(dockerHost, "tcp://", "", 1)
-    dockerHost = strings.Replace(dockerHost, ":2375", "", 1)
+    hostInfo := strings.Split(dockerHost, ":")
 
-    return []*models.VM{
-        &models.VM{
-            Name: "boot2docker",
-            Address: dockerHost,
-            CanAccessDocker: models.PingDocker(dockerHost),
-        },
+    boot2Docker := &models.VM{
+        Name: "boot2docker",
+        Address: hostInfo[0],
+        Port: hostInfo[1],
+        Version: "v1",
+        CanAccessDocker: false,
     }
+    boot2Docker.CanAccessDocker = models.PingDocker(boot2Docker)
+
+    return []*models.VM{boot2Docker}
 }
