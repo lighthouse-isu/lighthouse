@@ -19,6 +19,8 @@ import (
     "net/http"
     "encoding/json"
 
+    "github.com/lighthouse/lighthouse/logging"
+
     "github.com/lighthouse/lighthouse/provider/models"
 
     "github.com/lighthouse/lighthouse/provider/providers/gce"
@@ -44,7 +46,8 @@ func Handle(r *mux.Router) {
         local.Provider,
     })
 
-    fmt.Printf("Detected provider is %s....\n", selectedProvider.Name)
+    logging.Info(
+        fmt.Sprintf("Detected provider is %s....", selectedProvider.Name))
 
     r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
         vms := selectedProvider.GetVMs()

@@ -15,30 +15,17 @@
 package main
 
 import (
-    "fmt"
     "net/http"
-    "time"
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
 
+    "github.com/lighthouse/lighthouse/logging"
+
     "github.com/gorilla/mux"
 )
 
-
-func LoggingMiddleware(h http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        start := time.Now()
-
-        h.ServeHTTP(w, r)
-
-        end := time.Now()
-        latency := end.Sub(start)
-        fmt.Printf("%s %12s %s %s\n",
-            end.Format("2006/01/02 - 15:04:05"), latency, r.Method, r.URL)
-    })
-}
 
 /*
     Handles all requests through the Docker endpoint.  Calls all
@@ -67,7 +54,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
-    fmt.Println("Starting...")
+    logging.Info("Starting...")
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -90,9 +77,9 @@ func main() {
 
     ignoreURLs := []string{"/", "/login", "/logout"}
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
-    app = LoggingMiddleware(app)
+    app = logging.Middleware(app)
 
     http.Handle("/", app)
-    fmt.Println("Ready...")
+    logging.Info("Ready...")
     http.ListenAndServe(":5000", nil)
 }
