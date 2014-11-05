@@ -3,9 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -56,7 +56,9 @@ import (
       - its error message will be returned to the client during failure
 */
 
-type customHandlerFunc func(info HandlerInfo, rollback bool) (*HandlerError)
+type CustomHandlerFunc func(info HandlerInfo, rollback bool) (*HandlerError)
+
+type CustomHandlerMap map[*regexp.Regexp]CustomHandlerFunc
 
 /*
     Container of failure data created by the handlers
@@ -87,8 +89,7 @@ type HandlerInfo struct {
     fields that appear in the body must be declared in this struct.
 */
 type RequestBody struct {
-    Payload string `json:"payload,omitempty"`
-    App     string `json:"app,omitempty"`
+    Payload string
 }
 
 /*
@@ -97,16 +98,11 @@ type RequestBody struct {
     RETURN: A list of custom handlers which have run (for rollback)
             an non-nil *HandlerError on failure, nil otherwise
 */
-func RunCustomHandlers(info HandlerInfo) ([]customHandlerFunc, *HandlerError) {
+func RunCustomHandlers(info HandlerInfo, handlers CustomHandlerMap) ([]CustomHandlerFunc, *HandlerError) {
 
-    // Could make this global - more memory overhead, less latency
-    customHandlers := map[*regexp.Regexp]customHandlerFunc{
-        //regexp.MustCompile("example"): ExampleHandler,
-    }
+    runHandlers := []CustomHandlerFunc{}
 
-    runHandlers := []customHandlerFunc{}
-
-    for exp, handler := range customHandlers {
+    for exp, handler := range handlers {
         if exp.MatchString(info.DockerEndpoint) {
             if res := handler(info, false); res != nil {
                 return runHandlers, res
@@ -127,7 +123,7 @@ func Rollback(
     w http.ResponseWriter,
     err *HandlerError,
     info HandlerInfo,
-    runHandlers []customHandlerFunc,
+    runHandlers []CustomHandlerFunc,
 ) {
     WriteError(w, err)
     for _, handler := range runHandlers {
@@ -140,8 +136,8 @@ func Rollback(
 */
 func WriteError(w http.ResponseWriter, err *HandlerError) {
     json, _ := json.Marshal(struct {
-        Error   string  `json:"error"`
-        Message string  `json:"message"`
+        Error   string
+        Message string
     }{err.Cause, err.Message})
 
     w.Header().Set("Content-Type", "application/json")
@@ -159,8 +155,8 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
     vars := mux.Vars(r)
     var info HandlerInfo
 
-    info.Host = hosts.AliasLookup(vars["host"])
-    info.DockerEndpoint = vars["dockerURL"]
+    info.Host = hosts.AliasLookup(vars["Host"])
+    info.DockerEndpoint = vars["DockerURL"]
     info.Body = GetRequestBody(r)
     info.Request = r
 
@@ -182,8 +178,8 @@ func GetRequestBody(r *http.Request) *RequestBody {
         return nil
     }
 
-    var body *RequestBody
-    json.Unmarshal(reqBody, body)
+    var body RequestBody
+    json.Unmarshal(reqBody, &body)
 
-    return body
+    return &body
 }
