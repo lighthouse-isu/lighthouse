@@ -37,13 +37,8 @@ func SetupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
     }
 
     server := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
-    server.Config.Addr = "/"
-
-    go func() {
-        l, _ := net.Listen("tcp", ":8080")
-        server.Listener = l
-        server.Start()
-    }()
+    server.Listener, _= net.Listen("tcp", ":8080")
+    server.Start()
 
     return server
 }
@@ -176,7 +171,7 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     err := DockerRequestHandler(w, info)
 
-    assert.Nil(t, err, "DockerRequestHandler should not return nil error on invalid request")
+    assert.Nil(t, err, "DockerRequestHandler should return nil error on valid request")
 
     assert.Equal(t, 200, w.Code,
         "DockerRequestHandler should output the forwarded request's response code.")
