@@ -121,7 +121,7 @@ func RunCustomHandlers(info HandlerInfo, handlers CustomHandlerMap) ([]CustomHan
 */
 func Rollback(
     w http.ResponseWriter,
-    err *HandlerError,
+    err HandlerError,
     info HandlerInfo,
     runHandlers []CustomHandlerFunc,
 ) {
@@ -134,7 +134,7 @@ func Rollback(
 /*
     Writes error data and code to the HTTP response.
 */
-func WriteError(w http.ResponseWriter, err *HandlerError) {
+func WriteError(w http.ResponseWriter, err HandlerError) {
     json, _ := json.Marshal(struct {
         Error   string
         Message string

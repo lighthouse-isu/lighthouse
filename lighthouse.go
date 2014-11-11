@@ -66,11 +66,13 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     // On error, rollback
     if err != nil {
-        handlers.Rollback(w, err, info, runCustomHandlers)
+        handlers.Rollback(w, *err, info, runCustomHandlers)
     }
 }
 
-func SetupRouters() *mux.Router {
+func main() {
+    fmt.Println("Starting...!!!")
+
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -86,7 +88,6 @@ func SetupRouters() *mux.Router {
     versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
     hostRouter    := versionRouter.PathPrefix("/{Host}")
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    // The regex ignores /'s that would normally break the url
     dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
     plugins.Handle(baseRouter.PathPrefix("/plugins").Subrouter())
@@ -96,14 +97,6 @@ func SetupRouters() *mux.Router {
     app = LoggingMiddleware(app)
 
     http.Handle("/", app)
-
-    return dockerRouter
-}
-
-func main() {
-    fmt.Println("Starting...!!!")
-
-    SetupRouters()
 
     fmt.Println("Ready...")
     http.ListenAndServe(":5000", nil)
