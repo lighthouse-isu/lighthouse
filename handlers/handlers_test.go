@@ -125,19 +125,21 @@ func Test_WriteError(t *testing.T) {
 
     router.HandleFunc("/",
         func(w http.ResponseWriter, r *http.Request) {
-            WriteError(w, HandlerError{999, "TestCause", "TestMessage"})
+            WriteError(w, HandlerError{500, "TestCause", "TestMessage"})
     })
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
     router.ServeHTTP(w, r)
 
-    assert.Equal(t, 999, w.Code,
+    // Header check
+    assert.Equal(t, 500, w.Code,
         "WriteError did not set status code correctly")
 
     assert.Equal(t, "application/json", w.Header().Get("Content-type"),
         "WriteError did not set content type correctly")
 
+    // Body check
     body, _ := ioutil.ReadAll(w.Body)
     sBody := string(body)
 
@@ -195,7 +197,7 @@ func Test_RunCustomHandlers_Normal(t *testing.T) {
 func Test_RunCustomHandlers_Error(t *testing.T) {
     handlers := make(CustomHandlerMap)
 
-    testError := HandlerError{999, "TestCause", "TestMessage"}
+    testError := HandlerError{500, "TestCause", "TestMessage"}
     doError := func(info HandlerInfo, rollback bool) (*HandlerError) {
         return &testError
     }

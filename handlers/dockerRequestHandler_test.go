@@ -25,9 +25,18 @@ import (
     "github.com/stretchr/testify/assert"
 )
 
+/*
+    These tests verify the functionality of dockerRequestHandler.go. In order to
+    perform verifications, the tests each create a test server which runs a
+    single handler function.  The purpose of this server is to emulate various
+    types of real Docker responses and test proper handling of them.
+*/
+
 // Helper to perform test server setup.  Returns a *Server which will
 // need to be closed at the end of the calling test
 func SetupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
+
+    // Handler function, defaults to an empty func
     var useFunc func(http.ResponseWriter, *http.Request)
 
     if f != nil {
@@ -36,6 +45,7 @@ func SetupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
         useFunc = func(http.ResponseWriter, *http.Request) {}
     }
 
+    // Start a new test server to listen for requests from the tests
     server := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
     server.Listener, _= net.Listen("tcp", ":8080")
     server.Start()
@@ -81,8 +91,10 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
     testBody := []byte("TestBody")
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
+        // Verify that the body is correctly transferred
         body, _ := ioutil.ReadAll(r.Body)
         assert.Equal(t, testBody, body)
+
         w.WriteHeader(200)
         w.Write([]byte("success"))
     }
