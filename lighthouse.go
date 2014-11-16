@@ -3,9 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -52,7 +52,12 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
 
     info := handlers.GetHandlerInfo(r)
-    runCustomHandlers, err := handlers.RunCustomHandlers(info)
+
+    var customHandlers = handlers.CustomHandlerMap{
+        //regexp.MustCompile("example"): ExampleHandler,
+    }
+
+    runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)
 
     // On success, send request to Docker
     if err == nil {
@@ -61,13 +66,13 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     // On error, rollback
     if err != nil {
-        handlers.Rollback(w, err, info, runCustomHandlers)
+        handlers.Rollback(w, *err, info, runCustomHandlers)
     }
 }
 
-
 func main() {
     fmt.Println("Starting...!!!")
+
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -81,10 +86,9 @@ func main() {
     auth.Handle(baseRouter)
 
     versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
-    hostRouter    := versionRouter.PathPrefix("/{host}")
+    hostRouter    := versionRouter.PathPrefix("/{Host}")
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    // The regex ignores /'s that would normally break the url
-    dockerRouter.HandleFunc("/{dockerURL:.*}", DockerHandler)
+    dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
     plugins.Handle(baseRouter.PathPrefix("/plugins").Subrouter())
 
@@ -93,6 +97,7 @@ func main() {
     app = LoggingMiddleware(app)
 
     http.Handle("/", app)
+
     fmt.Println("Ready...")
     http.ListenAndServe(":5000", nil)
 }
