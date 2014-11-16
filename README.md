@@ -7,14 +7,20 @@ It bridges the gap between providers hosting docker services. Are you running co
 
 ### Build and Deploy
 
-`git clone git@github.com:lighthouse/lighthouse.git`
-(optional) `git clone git@github.com:lighthouse/lighthouse-client.git && cd lighthouse-client`
-(optional) `gulp prod build && cd ..`
-`docker build -t lighthouse .`
-`docker run --name postgres-image -d postgres`
-`docker run -t -i -p 5000:5000 --link postgres-image:postgres lighthouse`
+* `git clone git@github.com:lighthouse/lighthouse.git`
+* (optional) `git clone git@github.com:lighthouse/lighthouse-client.git && cd lighthouse-client`
+* (optional) `gulp prod build && cd ..`
+* `docker build -t lighthouse .`
+* `docker run --name postgres-image -d postgres`
+* `docker run -t -i -p 5000:5000 --link postgres-image:postgres lighthouse`
 
 The optional commands above will grab and build the web app frontend if you desire such functionality. Otherwise, see the API documentation for more information.
+
+### Dependencies
+
+* [golang](https://golang.org/)
+* a Docker instance if running locally. [boot2docker](http://boot2docker.io/) works well for Windows or OS X
+* see [lighthouse-client](https://github.com/lighthouse/lighthouse-client) for set up if opting to use web client
 
 ### API
 
