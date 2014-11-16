@@ -28,10 +28,14 @@ Write your own client! See the API [documentation](https://github.com/lighthouse
 
 ### Team
 
-We're a group of engineering students completing our senior project at Iowa State University.
+We're a group of engineering students completing our senior project at Iowa State University. Developed and tested with the help of [Workiva](https://github.com/workiva)
 
 * [Caleb Brose](https://github.com/cmbrose)
 * [Chris Fogerty](https://github.com/chfogerty)
 * [Zach Taylor](https://github.com/zach-taylor)
 * [Rob Sheehy](https://github.com/theMagicalKarp)
 * [Nick Miller](https://github.com/ngmiller)
+
+### License
+
+[Apache v2.0](http://www.apache.org/licenses/LICENSE-2.0)
