@@ -21,6 +21,7 @@ import (
 
     "github.com/lighthouse/lighthouse/provider/models"
 
+    "code.google.com/p/gameboy1092-goauth2/compute/serviceaccount"
     compute "code.google.com/p/google-api-go-client/compute/v1"
 )
 
@@ -61,7 +62,7 @@ func GetCurrentProjectID() (string, error) {
 }
 
 func GetProjectVMs() []*models.VM {
-    client, _ := NewClient(&Options{})
+    client, _ := serviceaccount.NewClient(&serviceaccount.Options{})
     computeClient, _ := compute.New(client)
 
     projectID, _ := GetCurrentProjectID()
