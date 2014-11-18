@@ -3,9 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -20,7 +20,6 @@ import (
     "strings"
     "io/ioutil"
     "net/http"
-    "database/sql"
 
     "crypto/sha512"
     "crypto/rand"
@@ -31,6 +30,8 @@ import (
     "github.com/gorilla/mux"
     "github.com/gorilla/sessions"
     "github.com/gorilla/securecookie"
+
+    "github.com/lighthouse/lighthouse/users"
 
     _ "github.com/bmizerany/pq"
 )
@@ -54,78 +55,14 @@ func GenerateSalt() string {
     return hex.EncodeToString(salt)
 }
 
-type User struct {
-    Email string
-    Salt string
-    Password string
-}
-
 type LoginForm struct {
     Email string
     Password string
 }
 
 type AuthConfig struct {
-    Admins []User
+    Admins []users.User
     SecretKey string
-}
-
-type Users struct {
-    db *sql.DB
-}
-
-func Connect() *Users {
-    host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
-    var postgresOptions string
-
-    if host == "" { // if running locally
-        postgresOptions = "sslmode=disable"
-    } else { // if running in docker
-        postgresOptions = fmt.Sprintf(
-            "host=%s sslmode=disable user=postgres", host)
-    }
-
-    postgres, err := sql.Open("postgres", postgresOptions)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return &Users{postgres}
-}
-
-func (this *Users) Init() *Users {
-    this.db.Exec("CREATE TABLE users (email varchar(40), salt char(32), password char(128))")
-    return this
-}
-
-func (this *Users) Drop() *Users {
-    this.db.Exec("DROP TABLE users")
-    return this
-}
-
-func (this *Users) CreateUser(email, password string) *Users {
-    salt := GenerateSalt()
-    saltedPassword := SaltPassword(password, salt)
-
-    this.db.Exec("INSERT INTO users (email, salt, password) VALUES (($1), ($2), ($3))",
-        email, salt, saltedPassword)
-
-    return this
-}
-
-func (this *Users) GetUser(email string) *User {
-    row := this.db.QueryRow(
-        "SELECT email, salt, password FROM users WHERE email = ($1)", email)
-
-    user := &User{}
-    err := row.Scan(&user.Email, &user.Salt, &user.Password)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return user
 }
 
 func LoadAuthConfig() *AuthConfig{
@@ -157,6 +94,11 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
         }
 
         session, _ := CookieStore.Get(r, "auth")
+
+// REMOVE ME
+session.Values["logged_in"] = true
+session.Values["user_name"] = "admin@gmail.com"
+
         if loggedIn, ok := session.Values["logged_in"].(bool); loggedIn && ok {
             h.ServeHTTP(w, r)
         } else {
@@ -167,13 +109,15 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
 }
 
 func Handle(r *mux.Router) {
-    users := Connect().Drop().Init()
     config := LoadAuthConfig()
 
     SECRET_HASH_KEY = config.SecretKey
 
     for _, admin := range config.Admins {
-        users.CreateUser(admin.Email, admin.Password)
+        salt := GenerateSalt()
+        saltedPassword := SaltPassword(admin.Password, salt)
+
+        users.CreateUser(admin.Email, salt, saltedPassword)
     }
 
     r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
@@ -185,13 +129,18 @@ func Handle(r *mux.Router) {
 
         user := users.GetUser(loginForm.Email)
         password := SaltPassword(loginForm.Password, user.Salt)
-        session.Values["logged_in"] = password == user.Password
+
+        if (password == user.Password) {
+            session.Values["logged_in"] = true
+            session.Values["user_name"] = user
+        } else {
+            session.Values["logged_in"] = false
+        }
 
         session.Save(r, w)
 
         fmt.Fprintf(w, "%t", session.Values["logged_in"].(bool))
     }).Methods("POST")
-
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
         session, _ := CookieStore.Get(r, "auth")
