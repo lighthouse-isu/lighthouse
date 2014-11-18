@@ -20,7 +20,6 @@ import (
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/providers"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -79,8 +78,6 @@ func main() {
     dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
     provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
-
-    providers.Handle(baseRouter.PathPrefix("/providers").Subrouter())
 
     ignoreURLs := []string{"/", "/login", "/logout"}
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
