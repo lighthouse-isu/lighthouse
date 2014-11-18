@@ -1,0 +1,6 @@
+[
+    {
+        "Email": "admin@gmail.com",
+        "Providers": ["Provider1", "Provider2"]
+    }
+]

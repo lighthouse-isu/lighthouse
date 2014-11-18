@@ -17,7 +17,15 @@ package permissions
 import (
     "os"
     "fmt"
+    "net/http"
+    "io/ioutil"
     "database/sql"
+
+    "encoding/json"
+
+    "github.com/gorilla/mux"
+
+    "github.com/lighthouse/lighthouse/session"
 )
 
 type Permissions struct {
@@ -88,4 +96,33 @@ func GetPermissions(email string) *Permission {
     }
 
     return permission
+}
+
+func LoadPermissions() []Permission {
+    var fileName string
+    if _, err := os.Stat("/config/permissions.json"); os.IsNotExist(err) {
+        fileName = "./config/permissions.json"
+    } else {
+        fileName = "/config/permissions.json"
+    }
+    configFile, _ := ioutil.ReadFile(fileName)
+
+    var configPerms []Permission
+    json.Unmarshal(configFile, &configPerms)
+    return configPerms
+}
+
+func Handle(router *mux.Router) {
+    perms := LoadPermissions()
+
+    for _, perm := range perms {
+        AddPermission(perm.Email, perm.Providers)
+    }
+
+    router.HandleFunc("/which", func(w http.ResponseWriter, r *http.Request) {
+        email := session.GetValueOrDefault(r, "auth", "email", "").(string)
+
+        response, _ := json.Marshal(GetPermissions(email))
+        fmt.Fprintf(w, "%s", response)
+    }).Methods("GET")
 }

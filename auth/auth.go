@@ -28,17 +28,16 @@ import (
     "encoding/json"
 
     "github.com/gorilla/mux"
-    "github.com/gorilla/sessions"
-    "github.com/gorilla/securecookie"
 
     "github.com/lighthouse/lighthouse/users"
+
+    "github.com/lighthouse/lighthouse/session"
 
     _ "github.com/bmizerany/pq"
 )
 
 
 var SECRET_HASH_KEY string
-var CookieStore = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
 
 func SaltPassword(password, salt string) string {
     key := fmt.Sprintf("%s:%s:%s", password, salt, SECRET_HASH_KEY)
@@ -65,14 +64,7 @@ type AuthConfig struct {
     SecretKey string
 }
 
-func GetValueOrDefault(r *http.Request, key string, def interface{}) interface{} {
-    session, _ := CookieStore.Get(r, "auth")
-    val, ok := session.Values[key]
-    if val != nil && ok {
-        return val
-    }
-    return def
-}
+
 
 func LoadAuthConfig() *AuthConfig{
     var fileName string
@@ -102,13 +94,11 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-        session, _ := CookieStore.Get(r, "auth")
-
 // REMOVE ME
-session.Values["logged_in"] = true
-session.Values["email"] = "admin@gmail.com"
+session.SetValue(r, "auth", "logged_in", true)
+session.SetValue(r, "auth", "email", "admin@gmail.com")
 
-        if loggedIn, ok := session.Values["logged_in"].(bool); loggedIn && ok {
+        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
             h.ServeHTTP(w, r)
         } else {
             w.WriteHeader(http.StatusUnauthorized)
@@ -130,25 +120,25 @@ func Handle(r *mux.Router) {
     }
 
     r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-        session, _ := CookieStore.Get(r, "auth")
-
         loginForm := &LoginForm{}
         body, _ := ioutil.ReadAll(r.Body)
         json.Unmarshal(body, &loginForm)
 
         user := users.GetUser(loginForm.Email)
         password := SaltPassword(loginForm.Password, user.Salt)
-        session.Values["logged_in"] = password == user.Password
 
-        session.Save(r, w)
+        validPassword := password == user.Password
 
-        fmt.Fprintf(w, "%t", session.Values["logged_in"].(bool))
+        session.SetValue(r, "auth", "logged_in", validPassword)
+
+        session.Save("auth", r, w)
+
+        fmt.Fprintf(w, "%t", validPassword)
     }).Methods("POST")
 
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
-        session, _ := CookieStore.Get(r, "auth")
-        session.Values["logged_in"] = false
-        session.Save(r, w)
+        session.SetValue(r, "auth", "logged_in", false)
+        session.Save("auth", r, w)
     }).Methods("GET")
 }

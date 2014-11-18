@@ -18,6 +18,10 @@ import (
     "os"
     "fmt"
     "database/sql"
+
+    "github.com/gorilla/mux"
+
+    "github.com/lighthouse/lighthouse/users/permissions"
 )
 
 type Users struct {
@@ -89,4 +93,8 @@ func GetUser(email string) *User {
     }
 
     return user
+}
+
+func Handle(r *mux.Router) {
+    permissions.Handle(r.PathPrefix("/permissions").Subrouter())
 }
