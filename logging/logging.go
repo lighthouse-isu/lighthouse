@@ -12,14 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package plugins
+package logging
 
 import (
-    "github.com/lighthouse/lighthouse/plugins/gce"
-    
-    "github.com/gorilla/mux"
+    "os"
+    "log"
+    "time"
+    "net/http"
 )
 
-func Handle(r *mux.Router) {
-    gce.Handle(r.PathPrefix("/gce").Subrouter())
+var logger = log.New(os.Stdout, "", log.Ldate | log.Ltime)
+
+func Info(data string) {
+    logger.Println(data)
+}
+
+
+func Middleware(h http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        start := time.Now()
+        h.ServeHTTP(w, r)
+        latency := time.Now().Sub(start)
+
+        logger.Printf("%12s %s %s\n", latency, r.Method, r.URL)
+    })
 }
