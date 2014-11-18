@@ -20,7 +20,6 @@ import (
     "encoding/json"
     "io/ioutil"
     "github.com/gorilla/mux"
-    "github.com/lighthouse/lighthouse/hosts"
 )
 
 /*
@@ -155,7 +154,8 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
     vars := mux.Vars(r)
     var info HandlerInfo
 
-    info.Host = hosts.AliasLookup(vars["Host"])
+    // TODO - add aliasing
+    info.Host = vars["Host"]
     info.DockerEndpoint = vars["DockerURL"]
     info.Body = GetRequestBody(r)
     info.Request = r

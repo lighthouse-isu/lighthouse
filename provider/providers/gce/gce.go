@@ -21,6 +21,8 @@ import (
 
     "github.com/lighthouse/lighthouse/provider/models"
 
+    "github.com/lighthouse/lighthouse/users/permissions"
+
     "code.google.com/p/gameboy1092-goauth2/compute/serviceaccount"
     compute "code.google.com/p/google-api-go-client/compute/v1"
 )

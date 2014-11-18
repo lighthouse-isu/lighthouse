@@ -3,9 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -18,6 +18,8 @@ import (
     "fmt"
     "net/http"
     "encoding/json"
+
+    "github.com/lighthouse/lighthouse/auth"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -50,7 +52,9 @@ func Handle(r *mux.Router) {
         fmt.Sprintf("Detected provider is %s....", selectedProvider.Name))
 
     r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
-        vms := selectedProvider.GetVMs()
+        email := auth.GetValueOrDefault(r, "email", "").(string)
+
+        vms := selectedProvider.GetVMs(email)
         response, _ := json.Marshal(vms)
 
         fmt.Fprintf(w, "%s", response)

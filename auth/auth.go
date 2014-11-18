@@ -61,8 +61,17 @@ type LoginForm struct {
 }
 
 type AuthConfig struct {
-    Admins []User
+    Admins []users.User
     SecretKey string
+}
+
+func GetValueOrDefault(r *http.Request, key string, def interface{}) interface{} {
+    session, _ := CookieStore.Get(r, "auth")
+    val, ok := session.Values[key]
+    if val != nil && ok {
+        return val
+    }
+    return def
 }
 
 func LoadAuthConfig() *AuthConfig{
@@ -94,6 +103,11 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
         }
 
         session, _ := CookieStore.Get(r, "auth")
+
+// REMOVE ME
+session.Values["logged_in"] = true
+session.Values["email"] = "admin@gmail.com"
+
         if loggedIn, ok := session.Values["logged_in"].(bool); loggedIn && ok {
             h.ServeHTTP(w, r)
         } else {

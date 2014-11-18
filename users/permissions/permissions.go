@@ -62,8 +62,8 @@ func (this *Permissions) drop() *Permissions {
 }
 
 func Setup() {
-    if users == nil {
-        users = connect().drop().init()
+    if permissions == nil {
+        permissions = connect().drop().init()
     }
 }
 
@@ -74,7 +74,7 @@ func AddPermission(email string, providers []string) {
         email, providers) // Probably need to format this
 }
 
-func GetPermissions(email string) *User {
+func GetPermissions(email string) *Permission {
     Setup()
 
     row := permissions.db.QueryRow(
