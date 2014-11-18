@@ -61,7 +61,7 @@ type LoginForm struct {
 }
 
 type AuthConfig struct {
-    Admins []users.User
+    Admins []User
     SecretKey string
 }
 
@@ -94,11 +94,6 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
         }
 
         session, _ := CookieStore.Get(r, "auth")
-
-// REMOVE ME
-session.Values["logged_in"] = true
-session.Values["user_name"] = "admin@gmail.com"
-
         if loggedIn, ok := session.Values["logged_in"].(bool); loggedIn && ok {
             h.ServeHTTP(w, r)
         } else {
@@ -129,18 +124,13 @@ func Handle(r *mux.Router) {
 
         user := users.GetUser(loginForm.Email)
         password := SaltPassword(loginForm.Password, user.Salt)
-
-        if (password == user.Password) {
-            session.Values["logged_in"] = true
-            session.Values["user_name"] = user
-        } else {
-            session.Values["logged_in"] = false
-        }
+        session.Values["logged_in"] = password == user.Password
 
         session.Save(r, w)
 
         fmt.Fprintf(w, "%t", session.Values["logged_in"].(bool))
     }).Methods("POST")
+
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
         session, _ := CookieStore.Get(r, "auth")

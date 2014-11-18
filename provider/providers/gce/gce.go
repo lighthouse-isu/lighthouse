@@ -3,9 +3,9 @@
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
-// 
+//
 //     http://www.apache.org/licenses/LICENSE-2.0
-// 
+//
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -61,13 +61,15 @@ func GetCurrentProjectID() (string, error) {
     return string(projectID), nil
 }
 
-func GetProjectVMs() []*models.VM {
+func GetProjectVMs(email string) []*models.VM {
     client, _ := serviceaccount.NewClient(&serviceaccount.Options{})
     computeClient, _ := compute.New(client)
 
     projectID, _ := GetCurrentProjectID()
 
     zones, _ := computeClient.Instances.AggregatedList(projectID).Do()
+
+    providers := permissions.GetPermissions(email).Providers
 
     var discoveredVMs []*models.VM
 
@@ -77,13 +79,24 @@ func GetProjectVMs() []*models.VM {
             // to use instead of deafulting to the first one.
             network := instance.NetworkInterfaces[0]
 
-            discoveredVMs = append(discoveredVMs, &models.VM{
-                Name: instance.Name,
-                Address: network.NetworkIP,
-                Port: "2357",
-                Version: "v1",
-                CanAccessDocker: false,
-            })
+            allowed := false
+            // Could convert to map[string]bool for speedup
+            for _, provider := range providers {
+                if provider == instance.Name {
+                    allowed = true
+                    break
+                }
+            }
+
+            if allowed {
+                discoveredVMs = append(discoveredVMs, &models.VM{
+                    Name: instance.Name,
+                    Address: network.NetworkIP,
+                    Port: "2357",
+                    Version: "v1",
+                    CanAccessDocker: false,
+                })
+            }
         }
     }
 
