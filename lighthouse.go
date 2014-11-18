@@ -22,6 +22,7 @@ import (
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/plugins"
     "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/providers"
 
     "github.com/gorilla/mux"
 )
@@ -91,6 +92,8 @@ func main() {
     dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
     plugins.Handle(baseRouter.PathPrefix("/plugins").Subrouter())
+
+    providers.Handle(baseRouter.PathPrefix("/providers").Subrouter())
 
     ignoreURLs := []string{"/", "/login", "/logout", "/plugins/gce/vms/find"}
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
