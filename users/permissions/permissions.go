@@ -60,7 +60,7 @@ func connect() *Permissions {
 }
 
 func (this *Permissions) init() *Permissions {
-    this.db.Exec("CREATE TABLE permissions (email varchar(40), providers text[])")
+    this.db.Exec("CREATE TABLE permissions (email varchar(40), providers text)")
     return this
 }
 
@@ -75,11 +75,18 @@ func Setup() {
     }
 }
 
-func AddPermission(email string, providers []string) {
+func AddPermission(email string, providers string) {
     Setup()
 
     permissions.db.Exec("INSERT INTO permissions (email, providers) VALUES (($1), ($2))",
-        email, providers) // Probably need to format this
+        email, providers)
+}
+
+func UpdatePermission(email string, providers string) {
+    Setup()
+
+    permissions.db.Exec("UPDATE permissions SET providers = ($1) WHERE email = ($2)",
+        providers, email)
 }
 
 func GetPermissions(email string) *Permission {
@@ -89,7 +96,10 @@ func GetPermissions(email string) *Permission {
         "SELECT email, providers FROM permissions WHERE email = ($1)", email)
 
     permission := &Permission{}
-    err := row.Scan(&permission.Email, &permission.Providers)
+    var providers string
+
+    err := row.Scan(&permission.Email, &providers)
+    json.Unmarshal([]byte(providers), &permission.Providers)
 
     if err != nil {
         fmt.Println(err.Error())
@@ -109,6 +119,7 @@ func LoadPermissions() []Permission {
 
     var configPerms []Permission
     json.Unmarshal(configFile, &configPerms)
+
     return configPerms
 }
 
@@ -116,13 +127,29 @@ func Handle(router *mux.Router) {
     perms := LoadPermissions()
 
     for _, perm := range perms {
-        AddPermission(perm.Email, perm.Providers)
+        providers, _ := json.Marshal(perm.Providers)
+        AddPermission(perm.Email, string(providers))
     }
 
-    router.HandleFunc("/which", func(w http.ResponseWriter, r *http.Request) {
+    router.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
         email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-
-        response, _ := json.Marshal(GetPermissions(email))
+        response, _ := json.Marshal(GetPermissions(email).Providers)
         fmt.Fprintf(w, "%s", response)
     }).Methods("GET")
+
+    router.HandleFunc("/vms/add/{Provider}",
+        func(w http.ResponseWriter, r *http.Request) {
+
+        email := session.GetValueOrDefault(r, "auth", "email", "").(string)
+        providers := GetPermissions(email).Providers
+
+        if providers != nil {
+            providers = append(providers, mux.Vars(r)["Provider"])
+            json, _ := json.Marshal(providers)
+            UpdatePermission(email, string(json))
+        }
+
+        response, _ := json.Marshal(GetPermissions(email).Providers)
+        fmt.Fprintf(w, "%s", response)
+    }).Methods("PUT")
 }

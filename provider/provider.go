@@ -32,7 +32,6 @@ import (
     "github.com/gorilla/mux"
 )
 
-
 func DecideProvider(providers []*models.Provider) *models.Provider {
     for _, provider := range providers {
         if provider.IsApplicable() {

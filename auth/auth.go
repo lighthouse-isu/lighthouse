@@ -64,8 +64,6 @@ type AuthConfig struct {
     SecretKey string
 }
 
-
-
 func LoadAuthConfig() *AuthConfig{
     var fileName string
     if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
@@ -130,12 +128,10 @@ func Handle(r *mux.Router) {
         validPassword := password == user.Password
 
         session.SetValue(r, "auth", "logged_in", validPassword)
-
         session.Save("auth", r, w)
 
         fmt.Fprintf(w, "%t", validPassword)
     }).Methods("POST")
-
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
         session.SetValue(r, "auth", "logged_in", false)
