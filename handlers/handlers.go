@@ -161,7 +161,7 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
     if err == nil {
         info.Host = value
     } else {
-        info.Host = hostAlias
+        info.Host = hostAlias // Unknown alias, just use what was given
     }
 
     info.DockerEndpoint = vars["DockerURL"]

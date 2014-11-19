@@ -31,7 +31,7 @@ import (
 var permissions *database.Database
 
 type Permission struct {
-    Providers []string
+    Providers map[string]bool
 }
 
 func getDBSingleton() *database.Database {
@@ -66,14 +66,19 @@ func LoadPermissions() map[string]Permission {
 
     var data []struct {
         Email   string
-        Permission Permission
+        Permission []string
     }
 
     json.Unmarshal(configFile, &data)
 
     perms := make(map[string]Permission)
     for _, item := range data {
-        perms[item.Email] = item.Permission
+        perm := make(map[string]bool)
+        for _, provider := range item.Permission {
+            perm[provider] = true
+        }
+
+        perms[item.Email] = Permission{perm}
     }
 
     return perms
@@ -108,9 +113,9 @@ func Handle(router *mux.Router) {
 
         var response []byte = nil
         if err == nil {
-            providers := append(perm.Providers, mux.Vars(r)["Provider"])
-            UpdatePermission(email, Permission{providers})
-            response, _ = json.Marshal(providers)
+            perm.Providers[mux.Vars(r)["Provider"]] = true
+            UpdatePermission(email, perm)
+            response, _ = json.Marshal(perm.Providers)
         } else {
             // TODO - handle error
         }
