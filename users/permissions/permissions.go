@@ -19,121 +19,84 @@ import (
     "fmt"
     "net/http"
     "io/ioutil"
-    "database/sql"
 
     "encoding/json"
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/database"
     "github.com/lighthouse/lighthouse/session"
 )
 
-type Permissions struct {
-    db *sql.DB
-}
-
-var permissions *Permissions = nil
+var permissions *database.Database
 
 type Permission struct {
-    Email string
     Providers []string
 }
 
-func connect() *Permissions {
-    host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
-    var postgresOptions string
-
-    if host == "" { // if running locally
-        postgresOptions = "sslmode=disable"
-    } else { // if running in docker
-        postgresOptions = fmt.Sprintf(
-            "host=%s sslmode=disable user=postgres", host)
-    }
-
-    postgres, err := sql.Open("postgres", postgresOptions)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return &Permissions{postgres}
-}
-
-func (this *Permissions) init() *Permissions {
-    this.db.Exec("CREATE TABLE permissions (email varchar(40), providers text)")
-    return this
-}
-
-func (this *Permissions) drop() *Permissions {
-    this.db.Exec("DROP TABLE permissions")
-    return this
-}
-
-func Setup() {
+func getDBSingleton() *database.Database {
     if permissions == nil {
-        permissions = connect().drop().init()
+        permissions = database.New("permissions")
     }
+    return permissions
 }
 
-func AddPermission(email string, providers string) {
-    Setup()
-
-    permissions.db.Exec("INSERT INTO permissions (email, providers) VALUES (($1), ($2))",
-        email, providers)
+func AddPermission(email string, permission Permission) error {
+    return getDBSingleton().Insert(email, permission)
 }
 
-func UpdatePermission(email string, providers string) {
-    Setup()
-
-    permissions.db.Exec("UPDATE permissions SET providers = ($1) WHERE email = ($2)",
-        providers, email)
+func UpdatePermission(email string, permission Permission) error {
+    return getDBSingleton().Update(email, permission)
 }
 
-func GetPermissions(email string) *Permission {
-    Setup()
-
-    row := permissions.db.QueryRow(
-        "SELECT email, providers FROM permissions WHERE email = ($1)", email)
-
-    permission := &Permission{}
-    var providers string
-
-    err := row.Scan(&permission.Email, &providers)
-    json.Unmarshal([]byte(providers), &permission.Providers)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return permission
+func GetPermissions(email string) (perm Permission, err error) {
+    err = getDBSingleton().Select(email, &perm)
+    return
 }
 
-func LoadPermissions() []Permission {
+func LoadPermissions() map[string]Permission {
     var fileName string
     if _, err := os.Stat("/config/permissions.json"); os.IsNotExist(err) {
         fileName = "./config/permissions.json"
     } else {
         fileName = "/config/permissions.json"
     }
+
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var configPerms []Permission
-    json.Unmarshal(configFile, &configPerms)
+    var data []struct {
+        Email   string
+        Permission Permission
+    }
 
-    return configPerms
+    json.Unmarshal(configFile, &data)
+
+    perms := make(map[string]Permission)
+    for _, item := range data {
+        perms[item.Email] = item.Permission
+    }
+
+    return perms
 }
 
 func Handle(router *mux.Router) {
     perms := LoadPermissions()
 
-    for _, perm := range perms {
-        providers, _ := json.Marshal(perm.Providers)
-        AddPermission(perm.Email, string(providers))
+    for email, perm := range perms {
+        AddPermission(email, perm)
     }
 
     router.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
         email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-        response, _ := json.Marshal(GetPermissions(email).Providers)
+        perm, err := GetPermissions(email)
+
+        var response []byte = nil
+        if err == nil {
+            response, _ = json.Marshal(perm.Providers)
+        } else {
+            // TODO - handle error
+        }
+
         fmt.Fprintf(w, "%s", response)
     }).Methods("GET")
 
@@ -141,15 +104,17 @@ func Handle(router *mux.Router) {
         func(w http.ResponseWriter, r *http.Request) {
 
         email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-        providers := GetPermissions(email).Providers
+        perm, err := GetPermissions(email)
 
-        if providers != nil {
-            providers = append(providers, mux.Vars(r)["Provider"])
-            json, _ := json.Marshal(providers)
-            UpdatePermission(email, string(json))
+        var response []byte = nil
+        if err == nil {
+            providers := append(perm.Providers, mux.Vars(r)["Provider"])
+            UpdatePermission(email, Permission{providers})
+            response, _ = json.Marshal(providers)
+        } else {
+            // TODO - handle error
         }
 
-        response, _ := json.Marshal(GetPermissions(email).Providers)
         fmt.Fprintf(w, "%s", response)
     }).Methods("PUT")
 }

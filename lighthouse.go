@@ -27,37 +27,6 @@ import (
     "github.com/gorilla/mux"
 )
 
-
-/*
-    Handles all requests through the Docker endpoint.  Calls all
-    relevant custom handlers and then passes request on to Docker.
-
-    If an error occurs in a custom handler or with the Docker request
-    itself, the custom handlers will be instructed to rollback.
-*/
-func DockerHandler(w http.ResponseWriter, r *http.Request) {
-    // Ready all HTTP form data for the handlers
-    r.ParseForm()
-
-    info := handlers.GetHandlerInfo(r)
-
-    var customHandlers = handlers.CustomHandlerMap{
-        //regexp.MustCompile("example"): ExampleHandler,
-    }
-
-    runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)
-
-    // On success, send request to Docker
-    if err == nil {
-        err = handlers.DockerRequestHandler(w, info)
-    }
-
-    // On error, rollback
-    if err != nil {
-        handlers.Rollback(w, *err, info, runCustomHandlers)
-    }
-}
-
 func main() {
 
     logging.Info("Starting...")
@@ -76,7 +45,7 @@ func main() {
     versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
     hostRouter    := versionRouter.PathPrefix("/{Host}")
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
+    dockerRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
     provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
 

@@ -28,6 +28,6 @@ func IsApplicable() bool {
     return true
 }
 
-func GetVMs(email string) []*models.VM {
+func GetVMs() []*models.VM {
     return []*models.VM{}
 }

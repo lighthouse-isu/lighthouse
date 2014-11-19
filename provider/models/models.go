@@ -31,7 +31,7 @@ type VM struct {
 type Provider struct {
     Name string
     IsApplicable func() bool
-    GetVMs func(email string) []*VM
+    GetVMs func() []*VM
 }
 
 func PingDocker(vm *VM) bool {

@@ -21,8 +21,6 @@ import (
 
     "github.com/lighthouse/lighthouse/logging"
 
-    "github.com/lighthouse/lighthouse/session"
-
     "github.com/lighthouse/lighthouse/provider/models"
 
     "github.com/lighthouse/lighthouse/provider/providers/gce"
@@ -51,9 +49,7 @@ func Handle(r *mux.Router) {
         fmt.Sprintf("Detected provider is %s....", selectedProvider.Name))
 
     r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
-        email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-
-        vms := selectedProvider.GetVMs(email)
+        vms := selectedProvider.GetVMs()
         response, _ := json.Marshal(vms)
 
         fmt.Fprintf(w, "%s", response)

@@ -21,8 +21,6 @@ import (
 
     "github.com/lighthouse/lighthouse/provider/models"
 
-    "github.com/lighthouse/lighthouse/users/permissions"
-
     "code.google.com/p/gameboy1092-goauth2/compute/serviceaccount"
     compute "code.google.com/p/google-api-go-client/compute/v1"
 )
@@ -63,15 +61,13 @@ func GetCurrentProjectID() (string, error) {
     return string(projectID), nil
 }
 
-func GetProjectVMs(email string) []*models.VM {
+func GetProjectVMs() []*models.VM {
     client, _ := serviceaccount.NewClient(&serviceaccount.Options{})
     computeClient, _ := compute.New(client)
 
     projectID, _ := GetCurrentProjectID()
 
     zones, _ := computeClient.Instances.AggregatedList(projectID).Do()
-
-    providers := permissions.GetPermissions(email).Providers
 
     var discoveredVMs []*models.VM
 
@@ -81,24 +77,13 @@ func GetProjectVMs(email string) []*models.VM {
             // to use instead of deafulting to the first one.
             network := instance.NetworkInterfaces[0]
 
-            allowed := false
-            // Could convert to map[string]bool for speedup
-            for _, provider := range providers {
-                if provider == instance.Name {
-                    allowed = true
-                    break
-                }
-            }
-
-            if allowed {
-                discoveredVMs = append(discoveredVMs, &models.VM{
-                    Name: instance.Name,
-                    Address: network.NetworkIP,
-                    Port: "2357",
-                    Version: "v1",
-                    CanAccessDocker: false,
-                })
-            }
+            discoveredVMs = append(discoveredVMs, &models.VM{
+                Name: instance.Name,
+                Address: network.NetworkIP,
+                Port: "2357",
+                Version: "v1",
+                CanAccessDocker: false,
+            })
         }
     }
 

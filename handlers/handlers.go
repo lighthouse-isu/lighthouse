@@ -157,9 +157,9 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
     var info HandlerInfo
 
     hostAlias := vars["Host"]
-    host := aliases.GetAlias(hostAlias)
-    if host != nil {
-        info.Host = host.Value
+    value, err := aliases.GetAlias(hostAlias)
+    if err == nil {
+        info.Host = value
     } else {
         info.Host = hostAlias
     }

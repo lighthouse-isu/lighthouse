@@ -15,20 +15,13 @@
 package users
 
 import (
-    "os"
-    "fmt"
-    "database/sql"
-
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/database"
     "github.com/lighthouse/lighthouse/users/permissions"
 )
 
-type Users struct {
-    db *sql.DB
-}
-
-var users *Users = nil
+var users *database.Database
 
 type User struct {
     Email string
@@ -36,63 +29,20 @@ type User struct {
     Password string
 }
 
-func connect() *Users {
-    host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
-    var postgresOptions string
-
-    if host == "" { // if running locally
-        postgresOptions = "sslmode=disable"
-    } else { // if running in docker
-        postgresOptions = fmt.Sprintf(
-            "host=%s sslmode=disable user=postgres", host)
-    }
-
-    postgres, err := sql.Open("postgres", postgresOptions)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return &Users{postgres}
-}
-
-func (this *Users) init() *Users {
-    this.db.Exec("CREATE TABLE users (email varchar(40), salt char(32), password char(128))")
-    return this
-}
-
-func (this *Users) drop() *Users {
-    this.db.Exec("DROP TABLE users")
-    return this
-}
-
-func Setup() {
+func getDBSingleton() *database.Database {
     if users == nil {
-        users = connect().drop().init()
+        users = database.New("users")
     }
+    return users
 }
 
-func CreateUser(email, salt, password string) {
-    Setup()
-
-    users.db.Exec("INSERT INTO users (email, salt, password) VALUES (($1), ($2), ($3))",
-        email, salt, password)
+func CreateUser(email, salt, password string) error {
+    return getDBSingleton().Insert(email, User{email, salt, password})
 }
 
-func GetUser(email string) *User {
-    Setup()
-
-    row := users.db.QueryRow(
-        "SELECT email, salt, password FROM users WHERE email = ($1)", email)
-
-    user := &User{}
-    err := row.Scan(&user.Email, &user.Salt, &user.Password)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return user
+func GetUser(email string) (user User, err error) {
+    err = getDBSingleton().Select(email, &user)
+    return
 }
 
 func Handle(r *mux.Router) {

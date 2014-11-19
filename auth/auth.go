@@ -122,7 +122,7 @@ func Handle(r *mux.Router) {
         body, _ := ioutil.ReadAll(r.Body)
         json.Unmarshal(body, &loginForm)
 
-        user := users.GetUser(loginForm.Email)
+        user, _ := users.GetUser(loginForm.Email)
         password := SaltPassword(loginForm.Password, user.Salt)
 
         validPassword := password == user.Password

@@ -16,96 +16,40 @@ package aliases
 
 import (
     "os"
-    "fmt"
     "io/ioutil"
-    "database/sql"
 
     "encoding/json"
+
+    "github.com/lighthouse/lighthouse/database"
 )
 
-type Aliases struct {
-    db *sql.DB
-}
+var aliases *database.Database
 
-var aliases *Aliases = nil
-
-type Alias struct {
-    Alias string
-    Value string
-}
-
-func connect() *Aliases {
-    host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
-    var postgresOptions string
-
-    if host == "" { // if running locally
-        postgresOptions = "sslmode=disable"
-    } else { // if running in docker
-        postgresOptions = fmt.Sprintf(
-            "host=%s sslmode=disable user=postgres", host)
-    }
-
-    postgres, err := sql.Open("postgres", postgresOptions)
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-
-    return &Aliases{postgres}
-}
-
-func (this *Aliases) init() *Aliases {
-    this.db.Exec("CREATE TABLE aliases (alias text, value text)")
-    return this
-}
-
-func (this *Aliases) drop() *Aliases {
-    this.db.Exec("DROP TABLE aliases")
-    return this
-}
-
-func Setup() {
+func getDBSingleton() *database.Database {
     if aliases == nil {
-        aliases = connect().drop().init()
+        aliases = database.New("aliases")
 
-        for _, alias := range LoadAliases() {
-            AddAlias(alias.Alias, alias.Value)
+        for alias, value := range LoadAliases() {
+            AddAlias(alias, value)
         }
     }
+    return aliases
 }
 
-func AddAlias(alias, value string) {
-    Setup()
-
-    aliases.db.Exec("INSERT INTO aliases (alias, value) VALUES (($1), ($2))",
-        alias, value)
+func AddAlias(alias, value string) error {
+    return getDBSingleton().Insert(alias, value)
 }
 
-func UpdateAlias(alias, value string) {
-    Setup()
-
-    aliases.db.Exec("UPDATE aliases SET value = ($1) WHERE alias = ($2)",
-        value, alias)
+func UpdateAlias(alias, value string) error {
+    return getDBSingleton().Update(alias, value)
 }
 
-func GetAlias(alias string) *Alias {
-    Setup()
-
-    row := aliases.db.QueryRow(
-        "SELECT alias, value FROM aliases WHERE alias = ($1)", alias)
-
-    found := &Alias{}
-    err := row.Scan(&found.Alias, &found.Value)
-
-    if err != nil {
-        fmt.Println(err.Error())
-        return nil
-    }
-
-    return found
+func GetAlias(alias string) (value string, err error) {
+    err = getDBSingleton().Select(alias, &value)
+    return
 }
 
-func LoadAliases() []Alias {
+func LoadAliases() map[string]string {
     var fileName string
     if _, err := os.Stat("/config/aliases.json"); os.IsNotExist(err) {
         fileName = "./config/aliases.json"
@@ -114,8 +58,17 @@ func LoadAliases() []Alias {
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var configAliases []Alias
-    json.Unmarshal(configFile, &configAliases)
+    var data []struct {
+        Alias   string
+        Value   string
+    }
+
+    json.Unmarshal(configFile, &data)
+
+    configAliases := make(map[string]string)
+    for _, item := range data {
+        configAliases[item.Alias] = item.Value
+    }
 
     return configAliases
 }

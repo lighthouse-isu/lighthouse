@@ -31,7 +31,7 @@ func IsApplicable() bool {
     return os.Getenv("DOCKER_HOST") != ""
 }
 
-func GetVMS(email string) []*models.VM {
+func GetVMS() []*models.VM {
     dockerHost := os.Getenv("DOCKER_HOST")
     dockerHost = strings.Replace(dockerHost, "tcp://", "", 1)
     hostInfo := strings.Split(dockerHost, ":")
