@@ -15,6 +15,7 @@
 package main
 
 import (
+    "fmt"
     "net/http"
 
     "github.com/lighthouse/lighthouse/auth"
@@ -57,6 +58,10 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+const (
+    API_VERSION_0_1 = "/api/v0.1"
+)
+
 func main() {
 
     logging.Info("Starting...")
@@ -70,16 +75,22 @@ func main() {
     baseRouter.PathPrefix("/static/").Handler(
         http.StripPrefix("/static/", staticServer))
 
-    auth.Handle(baseRouter)
 
-    versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
+    versionRouter := baseRouter.PathPrefix(API_VERSION_0_1).Subrouter()
     hostRouter    := versionRouter.PathPrefix("/{Host}")
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
     dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
     provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
 
-    ignoreURLs := []string{"/", "/login", "/logout"}
+    auth.Handle(versionRouter)
+
+    ignoreURLs := []string{
+        "/",
+        fmt.Sprintf("%s/login", API_VERSION_0_1),
+        fmt.Sprintf("%s/logout", API_VERSION_0_1),
+    }
+
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
     app = logging.Middleware(app)
 
