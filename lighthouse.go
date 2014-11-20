@@ -81,7 +81,7 @@ func main() {
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
     dockerRouter.HandleFunc("/{DockerURL:.*}", DockerHandler)
 
-    provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
+    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
 
     auth.Handle(versionRouter)
 
