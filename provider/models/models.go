@@ -41,6 +41,6 @@ func PingDocker(vm *VM) bool {
     client := &http.Client{
         Timeout: time.Duration(2)*time.Second,
     }
-    _, err := client.Get(pingAddress)
-    return err == nil
+    response, err := client.Get(pingAddress)
+    return err == nil && response.StatusCode == 200
 }
