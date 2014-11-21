@@ -110,7 +110,7 @@ func getTestAliasDB() (postgres.DBInterface) {
 func Test_GetHandlerInfo(t *testing.T) {
 
     oldAlias := aliases.Aliases
-    aliases.Aliases = postgres.NewFromDB("junktable", getTestAliasDB())
+    aliases.Aliases = postgres.NewFromDB("test_table", getTestAliasDB())
 
     aliases.AddAlias("TestHost", "TestHost")
 
