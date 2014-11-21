@@ -25,15 +25,15 @@ import (
 )
 
 type DBInterface interface {
-	Begin() (*sql.Tx, error)
-	Close() error
-	Driver() driver.Driver
-	Exec(string, ...interface{}) (sql.Result, error)
-	Ping() error
-	Prepare(string) (*sql.Stmt, error)
-	Query(string, ...interface{}) (*sql.Rows, error)
-	QueryRow(string, ...interface{}) *sql.Row
-	SetMaxIdleConns(int)
+    Begin() (*sql.Tx, error)
+    Close() error
+    Driver() driver.Driver
+    Exec(string, ...interface{}) (sql.Result, error)
+    Ping() error
+    Prepare(string) (*sql.Stmt, error)
+    Query(string, ...interface{}) (*sql.Rows, error)
+    QueryRow(string, ...interface{}) *sql.Row
+    SetMaxIdleConns(int)
 }
 
 type Database struct {
@@ -94,10 +94,10 @@ func (this *Database) drop() {
 
 func (this *Database) Insert(key string, value interface{}) error {
     json, _ := json.Marshal(value)
-    query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES ('%s', '%s');`,
-        this.table, keyColumn, valueColumn, key, string(json))
+    query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (($1), ($2));`,
+        this.table, keyColumn, valueColumn)
 
-    _, err := this.db.Exec(query)
+    _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
         fmt.Println(err.Error())
@@ -107,10 +107,10 @@ func (this *Database) Insert(key string, value interface{}) error {
 
 func (this *Database) Update(key string, newValue interface{}) (error) {
     json, _ := json.Marshal(newValue)
-    query := fmt.Sprintf(`UPDATE %s SET %s = '%s' WHERE %s = '%s';`,
-        this.table, valueColumn, string(json), keyColumn, key)
+    query := fmt.Sprintf(`UPDATE %s SET %s = ($1) WHERE %s = ($2);`,
+        this.table, valueColumn, keyColumn)
 
-    _, err := this.db.Exec(query)
+    _, err := this.db.Exec(query, string(json), key)
 
     if err != nil {
         fmt.Println(err.Error())
@@ -119,10 +119,10 @@ func (this *Database) Update(key string, newValue interface{}) (error) {
 }
 
 func (this *Database) SelectRow(key string, value interface{}) error {
-    query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = '%s';`,
-        valueColumn, this.table, keyColumn, key)
+    query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = ($1);`,
+        valueColumn, this.table, keyColumn)
 
-    row := this.db.QueryRow(query)
+    row := this.db.QueryRow(query, key)
 
     if row == nil {
         return errors.New("key not found")
