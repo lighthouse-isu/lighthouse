@@ -21,7 +21,7 @@ import (
     "github.com/lighthouse/lighthouse/users/permissions"
 )
 
-var users *database.Database
+var users *postgres.Database
 
 type User struct {
     Email string
@@ -29,9 +29,9 @@ type User struct {
     Password string
 }
 
-func getDBSingleton() *database.Database {
+func getDBSingleton() *postgres.Database {
     if users == nil {
-        users = database.New("users")
+        users = postgres.New("users")
     }
     return users
 }
@@ -41,7 +41,7 @@ func CreateUser(email, salt, password string) error {
 }
 
 func GetUser(email string) (user User, err error) {
-    err = getDBSingleton().Select(email, &user)
+    err = getDBSingleton().SelectRow(email, &user)
     return
 }
 

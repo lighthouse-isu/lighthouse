@@ -12,17 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package database
+package postgres
 
 import (
     "os"
     "fmt"
-    "database/sql"
+    "errors"
     "encoding/json"
+
+    "database/sql"
+    "database/sql/driver"
 )
 
+type DBInterface interface {
+	Begin() (*sql.Tx, error)
+	Close() error
+	Driver() driver.Driver
+	Exec(string, ...interface{}) (sql.Result, error)
+	Ping() error
+	Prepare(string) (*sql.Stmt, error)
+	Query(string, ...interface{}) (*sql.Rows, error)
+	QueryRow(string, ...interface{}) *sql.Row
+	SetMaxIdleConns(int)
+}
+
 type Database struct {
-    db *sql.DB
+    db DBInterface
     table string
 }
 
@@ -32,8 +47,12 @@ const (
 )
 
 func New(table string) *Database {
-    sql := connect()
-    this := &Database{sql, table}
+    db := connect()
+    return NewFromDB(table, db)
+}
+
+func NewFromDB(table string, db DBInterface) *Database {
+    this := &Database{db, table}
     this.drop()
     this.init()
     return this
@@ -60,7 +79,7 @@ func connect() *sql.DB {
 }
 
 func (this *Database) init() {
-    query := fmt.Sprintf(`CREATE TABLE %s (%s text PRIMARY KEY, %s json);`,
+    query := fmt.Sprintf(`CREATE TABLE %s (%s text UNIQUE PRIMARY KEY, %s json);`,
         this.table, keyColumn, valueColumn)
 
     this.db.Exec(query)
@@ -99,11 +118,15 @@ func (this *Database) Update(key string, newValue interface{}) (error) {
     return err
 }
 
-func (this *Database) Select(key string, value interface{}) error {
+func (this *Database) SelectRow(key string, value interface{}) error {
     query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = '%s';`,
         valueColumn, this.table, keyColumn, key)
 
     row := this.db.QueryRow(query)
+
+    if row == nil {
+        return errors.New("key not found")
+    }
 
     var data interface{}
     err := row.Scan(&data)

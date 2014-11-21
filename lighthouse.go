@@ -27,6 +27,10 @@ import (
     "github.com/gorilla/mux"
 )
 
+const (
+    API_VERSION_0_1 = "/api/v0.1"
+)
+
 func main() {
 
     logging.Info("Starting...")
@@ -38,20 +42,26 @@ func main() {
 
     staticServer := http.FileServer(http.Dir("static"))
     baseRouter.PathPrefix("/static/").Handler(
-        http.StripPrefix("/static/", staticServer))
+        http.StripPrefix("/static/", staticServer)
 
-    auth.Handle(baseRouter)
+    versionRouter := baseRouter.PathPrefix("API_VERSION_0_1").Subrouter()
 
-    versionRouter := baseRouter.PathPrefix("/api/v0.1").Subrouter()
     hostRouter    := versionRouter.PathPrefix("/{Host}")
     dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
     dockerRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
-    provider.Handle(baseRouter.PathPrefix("/provider").Subrouter())
+    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
 
-    users.Handle(baseRouter.PathPrefix("/users").Subrouter())
+    auth.Handle(versionRouter)
 
-    ignoreURLs := []string{"/", "/login", "/logout"}
+    users.Handle(versionRouter.PathPrefix("/users").Subrouter())
+
+    ignoreURLs := []string{
+        "/",
+        fmt.Sprintf("%s/login", API_VERSION_0_1),
+        fmt.Sprintf("%s/logout", API_VERSION_0_1),
+    }
+
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
     app = logging.Middleware(app)
 

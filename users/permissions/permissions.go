@@ -28,15 +28,15 @@ import (
     "github.com/lighthouse/lighthouse/session"
 )
 
-var permissions *database.Database
+var permissions *postgres.Database
 
 type Permission struct {
     Providers map[string]bool
 }
 
-func getDBSingleton() *database.Database {
+func getDBSingleton() *postgres.Database {
     if permissions == nil {
-        permissions = database.New("permissions")
+        permissions = postgres.New("permissions")
     }
     return permissions
 }
@@ -50,7 +50,7 @@ func UpdatePermission(email string, permission Permission) error {
 }
 
 func GetPermissions(email string) (perm Permission, err error) {
-    err = getDBSingleton().Select(email, &perm)
+    err = getDBSingleton().SelectRow(email, &perm)
     return
 }
 

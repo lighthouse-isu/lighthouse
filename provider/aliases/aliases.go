@@ -23,17 +23,17 @@ import (
     "github.com/lighthouse/lighthouse/database"
 )
 
-var aliases *database.Database
+var Aliases *postgres.Database
 
-func getDBSingleton() *database.Database {
-    if aliases == nil {
-        aliases = database.New("aliases")
+func getDBSingleton() *postgres.Database {
+    if Aliases == nil {
+        Aliases = postgres.New("aliases")
 
         for alias, value := range LoadAliases() {
             AddAlias(alias, value)
         }
     }
-    return aliases
+    return Aliases
 }
 
 func AddAlias(alias, value string) error {
@@ -45,7 +45,7 @@ func UpdateAlias(alias, value string) error {
 }
 
 func GetAlias(alias string) (value string, err error) {
-    err = getDBSingleton().Select(alias, &value)
+    err = getDBSingleton().SelectRow(alias, &value)
     return
 }
 
