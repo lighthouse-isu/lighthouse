@@ -66,7 +66,7 @@ func LoadPermissions() map[string]Permission {
 
     var data []struct {
         Email   string
-        Permission []string
+        Providers []string
     }
 
     json.Unmarshal(configFile, &data)
@@ -74,7 +74,7 @@ func LoadPermissions() map[string]Permission {
     perms := make(map[string]Permission)
     for _, item := range data {
         perm := make(map[string]bool)
-        for _, provider := range item.Permission {
+        for _, provider := range item.Providers {
             perm[provider] = true
         }
 
@@ -99,27 +99,9 @@ func Handle(router *mux.Router) {
         if err == nil {
             response, _ = json.Marshal(perm.Providers)
         } else {
-            // TODO - handle error
+            response = []byte("") // User unknown
         }
 
         fmt.Fprintf(w, "%s", response)
     }).Methods("GET")
-
-    router.HandleFunc("/vms/add/{Provider}",
-        func(w http.ResponseWriter, r *http.Request) {
-
-        email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-        perm, err := GetPermissions(email)
-
-        var response []byte = nil
-        if err == nil {
-            perm.Providers[mux.Vars(r)["Provider"]] = true
-            UpdatePermission(email, perm)
-            response, _ = json.Marshal(perm.Providers)
-        } else {
-            // TODO - handle error
-        }
-
-        fmt.Fprintf(w, "%s", response)
-    }).Methods("PUT")
 }

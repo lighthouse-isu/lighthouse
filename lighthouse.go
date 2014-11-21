@@ -15,6 +15,7 @@
 package main
 
 import (
+    "fmt"
     "net/http"
 
     "github.com/lighthouse/lighthouse/auth"
@@ -42,12 +43,12 @@ func main() {
 
     staticServer := http.FileServer(http.Dir("static"))
     baseRouter.PathPrefix("/static/").Handler(
-        http.StripPrefix("/static/", staticServer)
+        http.StripPrefix("/static/", staticServer))
 
-    versionRouter := baseRouter.PathPrefix("API_VERSION_0_1").Subrouter()
+    versionRouter := baseRouter.PathPrefix(API_VERSION_0_1).Subrouter()
 
     hostRouter    := versionRouter.PathPrefix("/{Host}")
-    dockerRouter  := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
+    dockerRouter := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
     dockerRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
     provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())

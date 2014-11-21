@@ -92,10 +92,6 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-// REMOVE ME
-session.SetValue(r, "auth", "logged_in", true)
-session.SetValue(r, "auth", "email", "admin@gmail.com")
-
         if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
             h.ServeHTTP(w, r)
         } else {
@@ -128,6 +124,7 @@ func Handle(r *mux.Router) {
         validPassword := password == user.Password
 
         session.SetValue(r, "auth", "logged_in", validPassword)
+        session.SetValue(r, "auth", "email", user.Email)
         session.Save("auth", r, w)
 
         fmt.Fprintf(w, "%t", validPassword)

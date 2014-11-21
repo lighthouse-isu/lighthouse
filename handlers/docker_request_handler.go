@@ -15,6 +15,7 @@
 package handlers
 
 import (
+    "fmt"
     "net/http"
     "io/ioutil"
     "bytes"
@@ -87,6 +88,8 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     email := session.GetValueOrDefault(r, "auth", "email", "").(string)
     perms, dbErr := permissions.GetPermissions(email)
 
+    fmt.Print(perms)
+
     if dbErr != nil {
         WriteError(w, HandlerError{401, "control", "unknown user"})
         return
@@ -100,7 +103,9 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     }
 
     if !reqAllowed {
-        WriteError(w, HandlerError{401, "control", "user not permitted to access host"})
+        WriteError(w, HandlerError{401, "control",
+            fmt.Sprintf("user not permitted to access host: %s", info.Host),
+        })
         return
     }
 
