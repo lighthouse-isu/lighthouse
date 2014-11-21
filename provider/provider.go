@@ -49,9 +49,7 @@ func Handle(r *mux.Router) {
         fmt.Sprintf("Detected provider is %s....", selectedProvider.Name))
 
     r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
-        vms := selectedProvider.GetVMs()
-        response, _ := json.Marshal(vms)
-
+        response, _ := json.Marshal(selectedProvider.GetVMs())
         fmt.Fprintf(w, "%s", response)
     }).Methods("GET")
 
