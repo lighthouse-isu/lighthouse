@@ -32,6 +32,10 @@ const (
     API_VERSION_0_1 = "/api/v0.1"
 )
 
+const (
+    API_VERSION_0_1 = "/api/v0.1"
+)
+
 func main() {
 
     logging.Info("Starting...")
