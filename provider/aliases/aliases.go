@@ -20,7 +20,7 @@ import (
 
     "encoding/json"
 
-    "github.com/lighthouse/lighthouse/database"
+    "github.com/lighthouse/lighthouse/postgres"
 )
 
 var Aliases *postgres.Database

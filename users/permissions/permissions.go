@@ -24,7 +24,7 @@ import (
 
     "github.com/gorilla/mux"
 
-    "github.com/lighthouse/lighthouse/database"
+    "github.com/lighthouse/lighthouse/postgres"
     "github.com/lighthouse/lighthouse/session"
 )
 

@@ -29,7 +29,7 @@ import (
 
     "github.com/lighthouse/lighthouse/provider/aliases"
 
-    "github.com/lighthouse/lighthouse/database"
+    "github.com/lighthouse/lighthouse/postgres"
 )
 
 // Helper for GetRequestBody tests
