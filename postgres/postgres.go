@@ -23,7 +23,7 @@ import (
     "database/sql"
     "database/sql/driver"
 
-    _ "github.com/bmizerany/pq"
+    _ "github.com/lib/pq"
 )
 
 type DBInterface interface {
