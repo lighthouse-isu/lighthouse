@@ -118,16 +118,25 @@ func Handle(r *mux.Router) {
         body, _ := ioutil.ReadAll(r.Body)
         json.Unmarshal(body, &loginForm)
 
-        user, _ := users.GetUser(loginForm.Email)
-        password := SaltPassword(loginForm.Password, user.Salt)
+        var userOK, passwordOK bool
 
-        validPassword := password == user.Password
+        user, err := users.GetUser(loginForm.Email)
+        userOK = err == nil
 
-        session.SetValue(r, "auth", "logged_in", validPassword)
-        session.SetValue(r, "auth", "email", user.Email)
+        if userOK {
+            password := SaltPassword(loginForm.Password, user.Salt)
+            passwordOK = password == user.Password
+
+            session.SetValue(r, "auth", "logged_in", passwordOK)
+        }
+
+        if passwordOK {
+            session.SetValue(r, "auth", "email", user.Email)
+        }
+
         session.Save("auth", r, w)
 
-        fmt.Fprintf(w, "%t", validPassword)
+        fmt.Fprintf(w, "%t", userOK && passwordOK)
     }).Methods("POST")
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {

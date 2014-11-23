@@ -124,19 +124,17 @@ func (this *Database) SelectRow(key string, value interface{}) error {
 
     row := this.db.QueryRow(query, key)
 
-    if row == nil {
-        return errors.New("key not found")
-    }
-
     var data interface{}
     err := row.Scan(&data)
 
-    if err != nil {
-        fmt.Println(err.Error())
+    switch {
+    case err == sql.ErrNoRows:
+        return errors.New("key not found")
+
+    case err != nil:
         return err
+
+    default:
+        return json.Unmarshal(data.([]byte), &value)
     }
-
-    json.Unmarshal(data.([]byte), &value)
-
-    return nil
 }

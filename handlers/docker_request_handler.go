@@ -88,8 +88,6 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     email := session.GetValueOrDefault(r, "auth", "email", "").(string)
     perms, dbErr := permissions.GetPermissions(email)
 
-    fmt.Print(perms)
-
     if dbErr != nil {
         WriteError(w, HandlerError{401, "control", "unknown user"})
         return
