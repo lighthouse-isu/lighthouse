@@ -32,8 +32,6 @@ import (
     "github.com/lighthouse/lighthouse/users"
 
     "github.com/lighthouse/lighthouse/session"
-
-    _ "github.com/bmizerany/pq"
 )
 
 

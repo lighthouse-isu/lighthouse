@@ -21,7 +21,7 @@ WORKDIR /gopath/src/github.com/lighthouse/lighthouse
 RUN go get github.com/gorilla/mux \
            github.com/gorilla/sessions \
            github.com/gorilla/securecookie \
-           github.com/bmizerany/pq \
+           github.com/lib/pq \
            code.google.com/p/goauth2/oauth \
            code.google.com/p/google-api-go-client/compute/v1
 
