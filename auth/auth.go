@@ -134,6 +134,12 @@ func Handle(r *mux.Router) {
 
         session.Save("auth", r, w)
 
+        if userOK && passwordOK {
+            w.WriteHeader(200)
+        } else {
+            w.WriteHeader(401)
+        }
+
         fmt.Fprintf(w, "%t", userOK && passwordOK)
     }).Methods("POST")
 
