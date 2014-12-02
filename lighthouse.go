@@ -32,14 +32,18 @@ const (
     API_VERSION_0_1 = "/api/v0.1"
 )
 
+func ServeIndex(w http.ResponseWriter, r *http.Request) {
+    http.ServeFile(w, r, "static/index.html")
+}
+
+
 func main() {
 
     logging.Info("Starting...")
     baseRouter := mux.NewRouter()
 
-    baseRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-        http.ServeFile(w, r, "static/index.html")
-    }).Methods("GET")
+    baseRouter.HandleFunc("/", ServeIndex).Methods("GET")
+    baseRouter.NotFoundHandler =  http.HandlerFunc(ServeIndex)
 
     staticServer := http.FileServer(http.Dir("static"))
     baseRouter.PathPrefix("/static/").Handler(
@@ -59,6 +63,7 @@ func main() {
 
     ignoreURLs := []string{
         "/",
+        "/login",
         fmt.Sprintf("%s/login", API_VERSION_0_1),
         fmt.Sprintf("%s/logout", API_VERSION_0_1),
     }
