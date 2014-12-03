@@ -15,9 +15,13 @@
 package handlers
 
 import (
+    "fmt"
     "net/http"
     "io/ioutil"
     "bytes"
+
+    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/users/permissions"
 )
 
 /*
@@ -64,4 +68,58 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
     w.WriteHeader(resp.StatusCode)
     w.Write(body)
     return nil
+}
+
+/*
+    Handles all requests through the Docker endpoint.  Calls all
+    relevant custom handlers and then passes request on to Docker.
+
+    If an error occurs in a custom handler or with the Docker request
+    itself, the custom handlers will be instructed to rollback.
+*/
+func DockerHandler(w http.ResponseWriter, r *http.Request) {
+    // Ready all HTTP form data for the handlers
+    r.ParseForm()
+
+    info := GetHandlerInfo(r)
+
+    reqAllowed := false
+
+    email := session.GetValueOrDefault(r, "auth", "email", "").(string)
+    perms, dbErr := permissions.GetPermissions(email)
+
+    if dbErr != nil {
+        WriteError(w, HandlerError{401, "control", "unknown user"})
+        return
+    }
+
+    for host, _ := range perms.Providers {
+        if host == info.Host {
+            reqAllowed = true
+            break
+        }
+    }
+
+    if !reqAllowed {
+        WriteError(w, HandlerError{401, "control",
+            fmt.Sprintf("user not permitted to access host: %s", info.Host),
+        })
+        return
+    }
+
+    var customHandlers = CustomHandlerMap{
+        //regexp.MustCompile("example"): ExampleHandler,
+    }
+
+    runCustomHandlers, err := RunCustomHandlers(info, customHandlers)
+
+    // On success, send request to Docker
+    if err == nil {
+        err = DockerRequestHandler(w, info)
+    }
+
+    // On error, rollback
+    if err != nil {
+        Rollback(w, *err, info, runCustomHandlers)
+    }
 }

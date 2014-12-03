@@ -15,18 +15,21 @@
 package handlers
 
 import (
-        "testing"
-        "net/http"
-        "net/http/httptest"
-        "bytes"
-        "io/ioutil"
-        "strings"
-        "regexp"
+    "testing"
+    "net/http"
+    "net/http/httptest"
+    "bytes"
+    "io/ioutil"
+    "strings"
+    "regexp"
+    "database/sql"
 
-        "github.com/gorilla/mux"
-        "github.com/stretchr/testify/assert"
+    "github.com/gorilla/mux"
+    "github.com/stretchr/testify/assert"
 
-        "github.com/lighthouse/lighthouse/hosts"
+    "github.com/lighthouse/lighthouse/provider/aliases"
+
+    "github.com/lighthouse/lighthouse/postgres"
 )
 
 // Helper for GetRequestBody tests
@@ -91,11 +94,25 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
         "GetResponseBody did not extract Payload correctly with an extra field")
 }
 
+func getTestAliasDB() (postgres.DBInterface) {
+
+    mock := &postgres.MockDatabase{}
+
+    mock.MockExec = func(string, ...interface{}) (r sql.Result, e error) { return }
+    mock.MockQueryRow = func(string, ...interface{}) (r *sql.Row) { return nil }
+    return mock
+}
+
 /*
     Tests data extraction for requests into a HandlerInfo.
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
+
+    oldAlias := aliases.Aliases
+    aliases.Aliases = postgres.NewFromDB("test_table", getTestAliasDB())
+
+    aliases.AddAlias("TestHost", "TestHost")
 
     router := mux.NewRouter()
     var info HandlerInfo
@@ -108,12 +125,12 @@ func Test_GetHandlerInfo(t *testing.T) {
     r, _ := http.NewRequest("GET", "/TestHost/TestEndpoint", nil)
     router.ServeHTTP(httptest.NewRecorder(), r)
 
-    // Doesn't matter what this actually is, just needs to match
-    expectedHost := hosts.AliasLookup("TestHost")
-    expected := HandlerInfo{"TestEndpoint", expectedHost, nil, r}
+    expected := HandlerInfo{"TestEndpoint", "TestHost", nil, r}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")
+
+    aliases.Aliases = oldAlias
 }
 
 /*
