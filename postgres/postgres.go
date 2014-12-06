@@ -74,7 +74,11 @@ func connect() *sql.DB {
     postgres, err := sql.Open("postgres", postgresOptions)
 
     if err != nil {
-        fmt.Println(err.Error())
+        panic(err.Error())
+    }
+
+    if err := postgres.Ping(); err != nil {
+        panic(err.Error())
     }
 
     return postgres
