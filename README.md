@@ -16,6 +16,7 @@ It bridges the gap between providers hosting docker services. Are you running co
 
 * `go get github.com/lighthouse/lighthouse`
 * (optional) build a static client into the root directory named `static`, see [lighthouse-client](https://github.com/lighthouse/lighthouse-client) for more information
+* `cd $GOPATH/src/github.com/lighthouse/lighthouse`
 * Run postgres locally or inside boot2docker
   * `docker run -p 5432:5432 -d postgres:latest`
   * See more about running PostgresSQL locally [here](http://www.postgresql.org/docs/9.1/static/tutorial-start.html) if you don't want to use docker
