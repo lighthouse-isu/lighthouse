@@ -130,10 +130,10 @@ func (this *Database) Insert(key string, value interface{}) error {
 
 func (this *Database) Update(key string, newValue interface{}) (error) {
     json, _ := json.Marshal(newValue)
-    query := fmt.Sprintf(`UPDATE %s SET %s = ($1) WHERE %s = ($2);`,
+    query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
         this.table, valueColumn, keyColumn)
 
-    _, err := this.db.Exec(query, string(json), key)
+    _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
         fmt.Println(err.Error())
@@ -146,6 +146,10 @@ func (this *Database) SelectRow(key string, value interface{}) error {
         valueColumn, this.table, keyColumn)
 
     row := this.db.QueryRow(query, key)
+
+    if row == nil { // This isn't supposed to be able to happen
+        return errors.New("unknown postgres error")
+    }
 
     var data interface{}
     err := row.Scan(&data)

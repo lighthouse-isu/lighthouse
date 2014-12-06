@@ -99,7 +99,7 @@ func getTestAliasDB() (postgres.DBInterface) {
     mock := &postgres.MockDatabase{}
 
     mock.MockExec = func(string, ...interface{}) (r sql.Result, e error) { return }
-    mock.MockQueryRow = func(string, ...interface{}) (r *sql.Row) { return nil }
+    mock.MockQueryRow = func(string, ...interface{}) (r *sql.Row) { return }
     return mock
 }
 
