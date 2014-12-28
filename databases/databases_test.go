@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package databases
 
 import (
     "testing"
@@ -45,33 +45,33 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData) {
     return db, call
 }
 
-func Test_NewFromDB(t *testing.T) {
+func Test_NewTable(t *testing.T) {
     db, call := makeTestingDatabase(t)
-    database := NewFromDB("test_database", db)
+    table := NewTable(db, "test_table")
 
-    assert.Equal(t, db, database.db, "Database pointer not stored properly")
-    assert.Equal(t, "test_database", database.table, "Table name not stored properly")
+    assert.Equal(t, db, table.db, "Database pointer not stored properly")
+    assert.Equal(t, "test_table", table.table, "Table name not stored properly")
 
     q := call["exec"].query
 
     assert.True(t, strings.Contains(q, "CREATE"),
         "Database setup should CREATE table")
-    assert.True(t, strings.Contains(q, "test_database"),
+    assert.True(t, strings.Contains(q, "test_table"),
         "Table creation Exec call should contain table name")
 }
 
 func Test_Insert(t *testing.T) {
     db, call := makeTestingDatabase(t)
-    database := NewFromDB("test_database", db)
+    table := NewTable(db, "test_table")
 
-    database.Insert("TEST_KEY", "TEST_VAL")
+    table.Insert("TEST_KEY", "TEST_VAL")
 
     q := call["exec"].query
     args := call["exec"].args[0].([]interface{})
 
     assert.True(t, strings.Contains(q, "INSERT"),
         "Insert query should contain INSERT")
-    assert.True(t, strings.Contains(q, "test_database"),
+    assert.True(t, strings.Contains(q, "test_table"),
         "Insertion Exec call should contain table name")
 
     assert.Equal(t, "TEST_KEY", args[0].(string),
@@ -82,16 +82,16 @@ func Test_Insert(t *testing.T) {
 
 func Test_Update(t *testing.T) {
     db, call := makeTestingDatabase(t)
-    database := NewFromDB("test_database", db)
+    table := NewTable(db, "test_table")
 
-    database.Update("TEST_KEY", "TEST_VAL")
+    table.Update("TEST_KEY", "TEST_VAL")
 
     q := call["exec"].query
     args := call["exec"].args[0].([]interface{})
 
     assert.True(t, strings.Contains(q, "UPDATE"),
         "Update query should contain UPDATE")
-    assert.True(t, strings.Contains(q, "test_database"),
+    assert.True(t, strings.Contains(q, "test_table"),
         "Update Exec call should contain table name")
 
     assert.Equal(t, "TEST_KEY", args[0].(string),
@@ -102,16 +102,16 @@ func Test_Update(t *testing.T) {
 
 func Test_SelectRow(t *testing.T) {
     db, call := makeTestingDatabase(t)
-    database := NewFromDB("test_database", db)
+    table := NewTable(db, "test_table")
 
-    database.SelectRow("TEST_KEY", nil)
+    table.SelectRow("TEST_KEY", nil)
 
     q := call["query_row"].query
     args := call["query_row"].args[0].([]interface{})
 
     assert.True(t, strings.Contains(q, "SELECT"),
         "Row query should contain SELECT")
-    assert.True(t, strings.Contains(q, "test_database"),
+    assert.True(t, strings.Contains(q, "test_table"),
         "Query should contain table name")
 
     assert.Equal(t, "TEST_KEY", args[0].(string),

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package postgres
+package databases
 
 import (
     "database/sql"
@@ -36,38 +36,46 @@ type MockDatabase struct {
     MockSetMaxIdleConns func(int)
 }
 
-func (t *MockDatabase) Begin()(*sql.Tx, error) {
-    return t.MockBegin()
+func (t *MockDatabase) Begin()(tx *sql.Tx, e error) {
+    if t.MockBegin != nil { return t.MockBegin() }
+    return
 }
 
-func (t *MockDatabase) Close() (error) {
-    return t.MockClose()
+func (t *MockDatabase) Close() (e error) {
+    if t.MockClose != nil { return t.MockClose() }
+    return
 }
 
-func (t *MockDatabase) Driver() (driver.Driver) {
-    return t.MockDriver()
+func (t *MockDatabase) Driver() (d driver.Driver) {
+    if t.MockDriver != nil { return t.MockDriver() }
+    return
 }
 
-func (t *MockDatabase) Exec(s string, i ...interface{}) (sql.Result, error) {
-    return t.MockExec(s, i)
+func (t *MockDatabase) Exec(s string, i ...interface{}) (r sql.Result, e error) {
+    if t.MockExec != nil { return t.MockExec(s, i) }
+    return
 }
 
 func (t *MockDatabase) Ping() (e error) {
-    return t.MockPing()
+    if t.MockPing != nil { return t.MockPing() }
+    return
 }
 
-func (t *MockDatabase) Prepare(s string) (*sql.Stmt, error) {
-    return t.MockPrepare(s)
+func (t *MockDatabase) Prepare(s string) (st *sql.Stmt, e error) {
+    if t.MockPrepare != nil { return t.MockPrepare(s) }
+    return
 }
 
-func (t *MockDatabase) Query(s string, i ...interface{}) (*sql.Rows, error) {
-    return t.MockQuery(s, i)
+func (t *MockDatabase) Query(s string, i ...interface{}) (r *sql.Rows, e error) {
+    if t.MockQuery != nil { return t.MockQuery(s, i) }
+    return
 }
 
-func (t *MockDatabase) QueryRow(s string, i ...interface{}) (*sql.Row) {
-    return t.MockQueryRow(s, i)
+func (t *MockDatabase) QueryRow(s string, i ...interface{}) (r *sql.Row) {
+    if t.MockQueryRow != nil { return t.MockQueryRow(s, i) }
+    return
 }
 
 func (t *MockDatabase) SetMaxIdleConns(i int) () {
-    t.MockSetMaxIdleConns(i)
+    if t.MockSetMaxIdleConns != nil { t.MockSetMaxIdleConns(i) }
 }

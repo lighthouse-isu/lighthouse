@@ -24,19 +24,20 @@ import (
 
     "github.com/gorilla/mux"
 
-    "github.com/lighthouse/lighthouse/postgres"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases/postgres"
     "github.com/lighthouse/lighthouse/session"
 )
 
-var permissions *postgres.Database
+var permissions *databases.Table
 
 type Permission struct {
     Providers map[string]bool
 }
 
-func getDBSingleton() *postgres.Database {
+func getDBSingleton() *databases.Table {
     if permissions == nil {
-        permissions = postgres.New("permissions")
+        permissions = databases.NewTable(postgres.Connection(), "permissions")
     }
     return permissions
 }

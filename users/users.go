@@ -17,11 +17,13 @@ package users
 import (
     "github.com/gorilla/mux"
 
-    "github.com/lighthouse/lighthouse/postgres"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases/postgres"
+
     "github.com/lighthouse/lighthouse/users/permissions"
 )
 
-var users *postgres.Database
+var users *databases.Table
 
 type User struct {
     Email string
@@ -29,9 +31,9 @@ type User struct {
     Password string
 }
 
-func getDBSingleton() *postgres.Database {
+func getDBSingleton() *databases.Table {
     if users == nil {
-        users = postgres.New("users")
+        users = databases.NewTable(postgres.Connection(), "users")
     }
     return users
 }
