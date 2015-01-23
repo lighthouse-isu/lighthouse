@@ -29,7 +29,7 @@ import (
 
     "github.com/lighthouse/lighthouse/provider/aliases"
 
-    "github.com/lighthouse/lighthouse/postgres"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 // Helper for GetRequestBody tests
@@ -94,9 +94,9 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
         "GetResponseBody did not extract Payload correctly with an extra field")
 }
 
-func getTestAliasDB() (postgres.DBInterface) {
+func getTestAliasDB() (databases.DBInterface) {
 
-    mock := &postgres.MockDatabase{}
+    mock := &databases.MockDatabase{}
 
     mock.MockExec = func(string, ...interface{}) (r sql.Result, e error) { return }
     mock.MockQueryRow = func(string, ...interface{}) (r *sql.Row) { return }
@@ -110,7 +110,7 @@ func getTestAliasDB() (postgres.DBInterface) {
 func Test_GetHandlerInfo(t *testing.T) {
 
     oldAlias := aliases.Aliases
-    aliases.Aliases = postgres.NewFromDB("test_table", getTestAliasDB())
+    aliases.Aliases = databases.NewTable(getTestAliasDB(), "test_table")
 
     aliases.AddAlias("TestHost", "TestHost")
 

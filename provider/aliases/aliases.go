@@ -20,14 +20,15 @@ import (
 
     "encoding/json"
 
-    "github.com/lighthouse/lighthouse/postgres"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var Aliases *postgres.Database
+var Aliases *databases.Table
 
-func getDBSingleton() *postgres.Database {
+func getDBSingleton() *databases.Table {
     if Aliases == nil {
-        Aliases = postgres.New("aliases")
+        Aliases = databases.NewTable(postgres.Connection(), "aliases")
 
         for alias, value := range LoadAliases() {
             AddAlias(alias, value)
