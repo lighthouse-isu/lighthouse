@@ -17,6 +17,7 @@ package postgres
 import (
     "os"
     "fmt"
+    "strings"
     "errors"
     "encoding/json"
 
@@ -24,6 +25,8 @@ import (
     "database/sql/driver"
 
     _ "github.com/lib/pq"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 type DBInterface interface {
@@ -61,20 +64,38 @@ func NewFromDB(table string, db DBInterface) *Database {
 }
 
 func connect() *sql.DB {
-    host := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
+    postgresHost := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
+    dockerHost := os.Getenv("DOCKER_HOST")
+
     var postgresOptions string
 
-    if host == "" { // if running locally
-        postgresOptions = "sslmode=disable"
-    } else { // if running in docker
+    if postgresHost != "" {
+        logging.Info("connecting to a linked container running postgres")
+
         postgresOptions = fmt.Sprintf(
-            "host=%s sslmode=disable user=postgres", host)
+            "host=%s sslmode=disable user=postgres", postgresHost)
+
+    } else if dockerHost != "" {
+        logging.Info("connecting to postgres server inside a docker container")
+
+        dockerHost = strings.Replace(dockerHost, "tcp://", "", 1)
+        dockerHost = strings.Split(dockerHost, ":")[0]
+
+        postgresOptions = fmt.Sprintf(
+                "host=%s sslmode=disable user=postgres", dockerHost)
+    } else {
+        logging.Info("connecting to localhost running postgres")
+        postgresOptions = "sslmode=disable"
     }
 
     postgres, err := sql.Open("postgres", postgresOptions)
 
     if err != nil {
-        fmt.Println(err.Error())
+        panic(err.Error())
+    }
+
+    if err := postgres.Ping(); err != nil {
+        panic(err.Error())
     }
 
     return postgres
