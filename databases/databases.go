@@ -86,7 +86,9 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
     query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
         this.table, valueColumn, keyColumn)
 
-    _, err := this.db.Exec(query, key, string(json))
+    res, err := this.db.Exec(query, key, string(json))
+
+    fmt.Printf("%s\n", res)
 
     if err != nil {
         fmt.Println(err.Error())
@@ -100,19 +102,15 @@ func (this *Table) SelectRow(key string, value interface{}) error {
 
     row := this.db.QueryRow(query, key)
 
-    if row == nil { // This isn't supposed to be able to happen
+    if row == nil {
         return errors.New("unknown database error")
     }
 
     var data interface{}
     err := row.Scan(&data)
 
-    if err == sql.ErrNoRows {
-        return errors.New("key not found")
-    }
-
-    if err != nil {
-        err = json.Unmarshal(data.([]byte), &value)
+    if err == nil {
+        err = json.Unmarshal(data.([]byte), value)
     }
 
     return err
