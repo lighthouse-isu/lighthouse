@@ -83,6 +83,38 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
 }
 
 /*
+    Tests docker request forwarding requests with query params
+*/
+func Test_DockerRequestHandler_query_params(t *testing.T) {
+    h :=  func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(200)
+
+        assert.Equal(t, "test=pass", r.URL.RawQuery,
+            "DockerRequestHandler should forwarded request's query params.")
+
+        w.Write([]byte("success"))
+    }
+
+    defer SetupServer(&h).Close()
+
+    w := httptest.NewRecorder()
+    r, _ := http.NewRequest("GET", "/?test=pass", nil)
+    info := HandlerInfo{"", "localhost:8080", nil, r}
+
+    err := DockerRequestHandler(w, info)
+
+    assert.Nil(t, err, "DockerRequestHandler should return nil error on valid request")
+
+    assert.Equal(t, 200, w.Code,
+        "DockerRequestHandler should output the forwarded request's response code.")
+
+    body, _ := ioutil.ReadAll(w.Body)
+
+    assert.Equal(t, "success", string(body),
+        "DockerRequestHandler should output the forwarded request's response body.")
+}
+
+/*
     Tests docker request forwarding for bodied requests
     Purpose: POST and PUT requests
 */

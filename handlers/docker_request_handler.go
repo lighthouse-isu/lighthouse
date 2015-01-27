@@ -35,6 +35,10 @@ import (
 func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError {
     url := "http://" + info.Host + "/" + info.DockerEndpoint
 
+    if info.Request.URL.RawQuery != "" {
+        url += "?" + info.Request.URL.RawQuery
+    }
+
     payload := []byte(nil)
     if info.Body != nil {
         payload = []byte(info.Body.Payload)
