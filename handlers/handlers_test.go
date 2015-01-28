@@ -27,7 +27,7 @@ import (
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
 
-    "github.com/lighthouse/lighthouse/provider/aliases"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 
     "github.com/lighthouse/lighthouse/databases"
 )

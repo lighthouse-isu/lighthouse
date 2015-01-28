@@ -21,7 +21,7 @@ import (
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/users"
+    "github.com/lighthouse/lighthouse/beacons"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -29,7 +29,7 @@ import (
 )
 
 const (
-    API_VERSION_0_1 = "/api/v0.1"
+    API_VERSION_0_2 = "/api/v0.2"
 )
 
 func ServeIndex(w http.ResponseWriter, r *http.Request) {
@@ -49,23 +49,23 @@ func main() {
     baseRouter.PathPrefix("/static/").Handler(
         http.StripPrefix("/static/", staticServer))
 
-    versionRouter := baseRouter.PathPrefix(API_VERSION_0_1).Subrouter()
+    versionRouter := baseRouter.PathPrefix(API_VERSION_0_2).Subrouter()
 
-    hostRouter    := versionRouter.PathPrefix("/{Host}")
-    dockerRouter := hostRouter.PathPrefix("/d").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    dockerRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
+    dockerRouter := versionRouter.PathPrefix("/d")
+    hostRouter := dockerRouter.PathPrefix("/{Host}").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
+    hostRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
     provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
 
-    auth.Handle(versionRouter)
+    beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
 
-    users.Handle(versionRouter.PathPrefix("/users").Subrouter())
+    auth.Handle(versionRouter)
 
     ignoreURLs := []string{
         "/",
         "/login",
-        fmt.Sprintf("%s/login", API_VERSION_0_1),
-        fmt.Sprintf("%s/logout", API_VERSION_0_1),
+        fmt.Sprintf("%s/login", API_VERSION_0_2),
+        fmt.Sprintf("%s/logout", API_VERSION_0_2),
     }
 
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)

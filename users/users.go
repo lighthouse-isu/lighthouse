@@ -15,12 +15,8 @@
 package users
 
 import (
-    "github.com/gorilla/mux"
-
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
-
-    "github.com/lighthouse/lighthouse/users/permissions"
 )
 
 var users *databases.Table
@@ -45,8 +41,4 @@ func CreateUser(email, salt, password string) error {
 func GetUser(email string) (user User, err error) {
     err = getDBSingleton().SelectRow(email, &user)
     return
-}
-
-func Handle(r *mux.Router) {
-    permissions.Handle(r.PathPrefix("/permissions").Subrouter())
 }
