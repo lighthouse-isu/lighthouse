@@ -54,8 +54,6 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
         url += "?" + info.Request.URL.RawQuery
     }
 
-    fmt.Println(url)
-
     payload := []byte(nil)
     if info.Body != nil {
         payload = []byte(info.Body.Payload)
