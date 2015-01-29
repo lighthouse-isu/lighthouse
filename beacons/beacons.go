@@ -54,30 +54,6 @@ func UpdateBeacon(instance string, inst Beacon) error {
     return getDBSingleton().Update(instance, inst)
 }
 
-func AddUserToBeacon(instance, user string) error {
-    beacon, _ := GetBeacon(instance)
-    beacon.Users[user] = true
-    return UpdateBeacon(instance, beacon)
-}
-
-func RemoveUserFromBeacon(instance, user string) error {
-    beacon, _ := GetBeacon(instance)
-    delete(beacon.Users, user)
-    return UpdateBeacon(instance, beacon)
-}
-
-func UpdateBeaconToken(instance, token string) error {
-    beacon, _ := GetBeacon(instance)
-    beacon.Token = token
-    return UpdateBeacon(instance, beacon)
-}
-
-func UpdateBeaconAddress(instance, address string) error {
-    beacon, _ := GetBeacon(instance)
-    beacon.Address = address
-    return UpdateBeacon(instance, beacon)
-}
-
 func GetBeacon(instance string) (Beacon, error) {
     var inst Beacon
     err := getDBSingleton().SelectRow(instance, &inst)
@@ -121,23 +97,15 @@ func Handle(r *mux.Router) {
         AddBeacon(instance, beacon)
     }
 
-    updateRouter := r.PathPrefix("/update").Subrouter()
+    instanceRouter := r.PathPrefix("/{Instance}").Subrouter()
 
-    updateRouter.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
-        handleUpdateRoutes(w, r, AddUserToBeacon)
-    }).Methods("PUT")
+    instanceRouter.HandleFunc("/user/{Id}", handleAddUserToBeacon).Methods("PUT")
 
-    updateRouter.HandleFunc("/user/rm", func(w http.ResponseWriter, r *http.Request) {
-        handleUpdateRoutes(w, r, RemoveUserFromBeacon)
-    }).Methods("PUT")
+    instanceRouter.HandleFunc("/user/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
 
-    updateRouter.HandleFunc("/address", func(w http.ResponseWriter, r *http.Request) {
-        handleUpdateRoutes(w, r, UpdateBeaconAddress)
-    }).Methods("PUT")
+    instanceRouter.HandleFunc("/address/{Address}", handleUpdateBeaconAddress).Methods("PUT")
 
-    updateRouter.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
-        handleUpdateRoutes(w, r, UpdateBeaconToken)
-    }).Methods("PUT")
+    instanceRouter.HandleFunc("/token", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
         reqBody, err := ioutil.ReadAll(r.Body)
@@ -184,7 +152,62 @@ func Handle(r *mux.Router) {
     }).Methods("POST")
 }
 
-func handleUpdateRoutes(w http.ResponseWriter, r *http.Request, updateFunc func(string, string)(error)) {
+func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+
+    instance := vars["Instance"]
+    userId := vars["Id"]
+
+    beacon, _ := GetBeacon(instance)
+    beacon.Users[userId] = true
+    err := UpdateBeacon(instance, beacon)
+
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError) 
+        fmt.Fprint(w, err)
+    } else {
+        w.WriteHeader(http.StatusOK)
+    }
+}
+
+func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+
+    instance := vars["Instance"]
+    userId := vars["Id"]
+
+    beacon, _ := GetBeacon(instance)
+    delete(beacon.Users, userId)
+    err := UpdateBeacon(instance, beacon)
+
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError) 
+        fmt.Fprint(w, err)
+    } else {
+        w.WriteHeader(http.StatusOK)
+    }
+}
+
+func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
+    vars := mux.Vars(r)
+
+    instance := vars["Instance"]
+    address := vars["Address"]
+
+    beacon, _ := GetBeacon(instance)
+    beacon.Address = address
+    err := UpdateBeacon(instance, beacon)
+
+    if err != nil {
+        w.WriteHeader(http.StatusInternalServerError) 
+        fmt.Fprint(w, err)
+    } else {
+        w.WriteHeader(http.StatusOK)
+    }
+}
+
+func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
+    instance := mux.Vars(r)["Instance"]
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -192,32 +215,24 @@ func handleUpdateRoutes(w http.ResponseWriter, r *http.Request, updateFunc func(
         fmt.Fprint(w, err)
     }
 
-    var body struct {
-        Instance string
-        Data string
-    }
+    var token string
 
-    err = json.Unmarshal(reqBody, &body)
+    err = json.Unmarshal(reqBody, &token)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError) 
         fmt.Fprint(w, err)
+        return
     }
 
-    if body.Instance == "" {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, "missing instance to update")
-    }
+    beacon, _ := GetBeacon(instance)
+    beacon.Token = token
+    err = UpdateBeacon(instance, beacon)
 
-    if body.Data == "" {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, "missing value to update")
-    }
-
-    err = updateFunc(body.Instance, body.Data)
     if err != nil {
         w.WriteHeader(http.StatusInternalServerError) 
         fmt.Fprint(w, err)
+    } else {
+        w.WriteHeader(http.StatusOK)
     }
-
-    w.WriteHeader(http.StatusOK)
 }
+
