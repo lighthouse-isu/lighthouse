@@ -49,23 +49,23 @@ func getDBSingleton() *databases.Table {
     return beacons
 }
 
-func AddBeacon(instance string, inst Beacon) error {
-    return getDBSingleton().Insert(instance, inst)
+func AddBeacon(instance string, beacon Beacon) error {
+    return getDBSingleton().Insert(instance, beacon)
 }
 
-func UpdateBeacon(instance string, inst Beacon) error {
-    return getDBSingleton().Update(instance, inst)
+func UpdateBeacon(instance string, beacon Beacon) error {
+    return getDBSingleton().Update(instance, beacon)
 }
 
 func GetBeacon(instance string) (Beacon, error) {
-    var inst Beacon
-    err := getDBSingleton().SelectRow(instance, &inst)
+    var beacon Beacon
+    err := getDBSingleton().SelectRow(instance, &beacon)
 
     if err != nil {
-        return Beacon{}, err
+        return Beacon{"", "", make(map[string]bool)}, err
     }
-
-    return inst, nil
+   
+    return beacon, nil
 }
 
 func LoadBeacons() map[string]Beacon {
@@ -261,7 +261,7 @@ func handleCreate(r *http.Request) (int, error) {
     }
 
     for _, vm := range vms {
-        address := fmt.Sprintf("http://%s:%s/%s", vm.Address, vm.Port, vm.Version)
+        address := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
         AddBeacon(address, beacon)
     }
 
