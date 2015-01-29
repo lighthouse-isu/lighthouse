@@ -17,11 +17,14 @@ package beacons
 import (
     "os"
     "fmt"
+    "errors"
     "io/ioutil"
     "net/http"
     "encoding/json"
 
     "github.com/gorilla/mux"
+
+    beaconStructs "github.com/lighthouse/beacon/structs"
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
@@ -108,47 +111,13 @@ func Handle(r *mux.Router) {
     instanceRouter.HandleFunc("/token", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
-        reqBody, err := ioutil.ReadAll(r.Body)
+
+        code, err := handleCreate(r)
+        w.WriteHeader(code) 
         if err != nil {
-            w.WriteHeader(http.StatusInternalServerError) 
             fmt.Fprint(w, err)
         }
 
-        var body struct {
-            InstanceAddress string
-            BeaconAddress string
-            Token string
-            Users []string
-        }
-
-        err = json.Unmarshal(reqBody, &body)
-        if err != nil {
-            w.WriteHeader(http.StatusInternalServerError) 
-            fmt.Fprint(w, err)
-        }
-
-        if body.InstanceAddress == "" {
-            w.WriteHeader(http.StatusInternalServerError) 
-            fmt.Fprint(w, "missing instance's address")
-        }
-
-        if body.BeaconAddress == "" || body.Token == "" {
-            w.WriteHeader(http.StatusInternalServerError) 
-            fmt.Fprint(w, "missing beacon's address or token")
-        }
-
-        beacon := Beacon{body.BeaconAddress, body.Token, make(map[string]bool)}
-        for _, user := range body.Users {
-            beacon.Users[user] = true
-        }
-
-        err = AddBeacon(body.InstanceAddress, beacon)
-        if err != nil {
-            w.WriteHeader(http.StatusInternalServerError) 
-            fmt.Fprint(w, err)
-        }
-
-        w.WriteHeader(http.StatusOK)
     }).Methods("POST")
 }
 
@@ -236,3 +205,65 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func handleCreate(r *http.Request) (int, error) {
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    var beaconData struct {
+        Address string
+        Token string
+        Users []string
+    }
+
+    err = json.Unmarshal(reqBody, &beaconData)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    beacon := Beacon{beaconData.Address, beaconData.Token, make(map[string]bool)}
+    for _, user := range beaconData.Users {
+        beacon.Users[user] = true
+    }
+
+    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.Address)
+
+    req, err := http.NewRequest("GET", vmsTarget, nil)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    // Assuming user has permission to access token since they provided it
+    req.Header.Set(HEADER_TOKEN_KEY, beaconData.Token)
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK {
+        return resp.StatusCode, errors.New("beacon error")
+    }
+
+    vmsBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    var vms []beaconStructs.VM
+
+    err = json.Unmarshal(vmsBody, &vms)
+    if err != nil {
+        return http.StatusInternalServerError, err
+    }
+
+    for _, vm := range vms {
+        address := fmt.Sprintf("http://%s:%s/%s", vm.Address, vm.Port, vm.Version)
+        AddBeacon(address, beacon)
+    }
+
+    return http.StatusOK, nil
+}
