@@ -37,9 +37,15 @@ type Permission struct {
 
 func getDBSingleton() *databases.Table {
     if permissions == nil {
-        permissions = databases.NewTable(postgres.Connection(), "permissions")
+        panic("Permissions database not initialized")
     }
     return permissions
+}
+
+func Init() {
+    if permissions == nil {
+        permissions = databases.NewTable(postgres.Connection(), "permissions")
+    }
 }
 
 func AddPermission(email string, permission Permission) error {

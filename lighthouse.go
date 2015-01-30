@@ -20,9 +20,11 @@ import (
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
+    "github.com/lighthouse/lighthouse/provider/aliases"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/users"
-
+    "github.com/lighthouse/lighthouse/users/permissions"
+    
     "github.com/lighthouse/lighthouse/logging"
 
     "github.com/gorilla/mux"
@@ -40,6 +42,11 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
 func main() {
 
     logging.Info("Starting...")
+
+    users.Init()
+    permissions.Init()
+    aliases.Init()
+
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", ServeIndex).Methods("GET")

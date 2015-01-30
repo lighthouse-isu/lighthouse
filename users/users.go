@@ -33,9 +33,15 @@ type User struct {
 
 func getDBSingleton() *databases.Table {
     if users == nil {
-        users = databases.NewTable(postgres.Connection(), "users")
+        panic("Users database not initialized")
     }
     return users
+}
+
+func Init() {
+    if users == nil {
+        users = databases.NewTable(postgres.Connection(), "users")
+    }
 }
 
 func CreateUser(email, salt, password string) error {

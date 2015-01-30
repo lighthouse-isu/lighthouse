@@ -28,13 +28,19 @@ var Aliases *databases.Table
 
 func getDBSingleton() *databases.Table {
     if Aliases == nil {
+        panic("Aliases database not initialized")
+    }
+    return Aliases
+}
+
+func Init() {
+    if Aliases == nil {
         Aliases = databases.NewTable(postgres.Connection(), "aliases")
 
         for alias, value := range LoadAliases() {
             AddAlias(alias, value)
         }
     }
-    return Aliases
 }
 
 func AddAlias(alias, value string) error {
