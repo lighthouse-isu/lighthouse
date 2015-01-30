@@ -86,9 +86,7 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
     query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
         this.table, valueColumn, keyColumn)
 
-    res, err := this.db.Exec(query, key, string(json))
-
-    fmt.Printf("%s\n", res)
+    _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
         fmt.Println(err.Error())

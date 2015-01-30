@@ -26,6 +26,8 @@ import (
 
     beaconStructs "github.com/lighthouse/beacon/structs"
 
+    "github.com/lighthouse/lighthouse/beacons/aliases"
+
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -100,15 +102,13 @@ func Handle(r *mux.Router) {
         AddBeacon(instance, beacon)
     }
 
-    instanceRouter := r.PathPrefix("/{Instance}").Subrouter()
+    r.HandleFunc("/user/{Instance}/{Id}", handleAddUserToBeacon).Methods("PUT")
 
-    instanceRouter.HandleFunc("/user/{Id}", handleAddUserToBeacon).Methods("PUT")
+    r.HandleFunc("/user/{Instance}/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
 
-    instanceRouter.HandleFunc("/user/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
+    r.HandleFunc("/address/{Instance}/{Address}", handleUpdateBeaconAddress).Methods("PUT")
 
-    instanceRouter.HandleFunc("/address/{Address}", handleUpdateBeaconAddress).Methods("PUT")
-
-    instanceRouter.HandleFunc("/token", handleUpdateBeaconToken).Methods("PUT")
+    r.HandleFunc("/token/{Instance}", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
 
@@ -121,10 +121,18 @@ func Handle(r *mux.Router) {
     }).Methods("POST")
 }
 
+func getInstanceAlias(instance string) string {
+    alias, err := aliases.GetAlias(instance)
+    if err != nil {
+        return instance
+    }
+    return alias
+}
+
 func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
 
-    instance := vars["Instance"]
+    instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
     beacon, _ := GetBeacon(instance)
@@ -142,7 +150,7 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
 func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
 
-    instance := vars["Instance"]
+    instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
     beacon, _ := GetBeacon(instance)
@@ -160,7 +168,7 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
 func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
 
-    instance := vars["Instance"]
+    instance := getInstanceAlias(vars["Instance"])
     address := vars["Address"]
 
     beacon, _ := GetBeacon(instance)
@@ -176,7 +184,7 @@ func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-    instance := mux.Vars(r)["Instance"]
+    instance := getInstanceAlias(mux.Vars(r)["Instance"])
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
