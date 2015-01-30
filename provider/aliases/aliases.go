@@ -17,7 +17,6 @@ package aliases
 import (
     "os"
     "io/ioutil"
-    "sync"
 
     "encoding/json"
 
