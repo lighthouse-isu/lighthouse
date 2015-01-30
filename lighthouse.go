@@ -20,7 +20,7 @@ import (
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
-    "github.com/lighthouse/lighthouse/providers/aliases"
+    "github.com/lighthouse/lighthouse/provider/aliases"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/users"
     "github.com/lighthouse/lighthouse/users/permissions"
