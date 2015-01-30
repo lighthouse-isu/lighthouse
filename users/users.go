@@ -33,7 +33,7 @@ type User struct {
 
 func getDBSingleton() *databases.Table {
     if users == nil {
-        panic()
+        panic("Users database not initialized")
     }
     return users
 }

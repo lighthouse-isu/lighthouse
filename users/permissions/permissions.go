@@ -37,7 +37,7 @@ type Permission struct {
 
 func getDBSingleton() *databases.Table {
     if permissions == nil {
-        panic()
+        panic("Permissions database not initialized")
     }
     return permissions
 }

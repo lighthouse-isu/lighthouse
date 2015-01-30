@@ -28,7 +28,7 @@ var Aliases *databases.Table
 
 func getDBSingleton() *databases.Table {
     if Aliases == nil {
-        panic()
+        panic("Aliases database not initialized")
     }
     return Aliases
 }
