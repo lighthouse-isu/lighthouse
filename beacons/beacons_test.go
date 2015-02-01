@@ -28,7 +28,7 @@ import (
 
 var mockTable map[string]Beacon
 
-func makeTestingDatabase(t *testing.T) (*databases.MockDatabase) {
+func makeTestingDatabase(t *testing.T) *databases.MockDatabase {
     mockTable = make(map[string]Beacon)
     db := &databases.MockDatabase{}
 
@@ -53,8 +53,8 @@ func makeTestingDatabase(t *testing.T) (*databases.MockDatabase) {
 }
 
 func Test_AddBeacon(t *testing.T) {
-    oldBeacons := beacons
-    beacons = databases.NewTable(makeTestingDatabase(t), "test_table")
+    SetupTestingTable(makeTestingDatabase(t))
+    defer TeardownTestingTable()
 
     testBeacon := Beacon{
         "ADDRESS_PASS", "TOKEN_PASS", map[string]bool{"USER_PASS":true},
@@ -68,13 +68,11 @@ func Test_AddBeacon(t *testing.T) {
 
     assert.Equal(t, testBeacon, mockTable["TEST_INST"], 
         "AddBeacon should insert the given Beacon")
-
-    beacons = oldBeacons
 }
 
 func Test_UpdateBeacon(t *testing.T) {
-    oldBeacons := beacons
-    beacons = databases.NewTable(makeTestingDatabase(t), "test_table")
+    SetupTestingTable(makeTestingDatabase(t))
+    defer TeardownTestingTable()
 
     testBeacon := Beacon{
         "ADDRESS_FAIL", "TOKEN_FAIL", map[string]bool{"USER_FAIL":true},
@@ -94,13 +92,11 @@ func Test_UpdateBeacon(t *testing.T) {
 
     assert.Equal(t, updateBeacon, mockTable["TEST_INST"], 
         "UpdateBeacon should insert the given Beacon")
-
-    beacons = oldBeacons
 }
 
 func Test_GetBeacon_NotFound(t *testing.T) {
-    oldBeacons := beacons
-    beacons = databases.NewTable(makeTestingDatabase(t), "test_table")
+    SetupTestingTable(makeTestingDatabase(t))
+    defer TeardownTestingTable()
 
     res, err := GetBeacon("TEST_INST")
 
@@ -115,6 +111,4 @@ func Test_GetBeacon_NotFound(t *testing.T) {
 
     assert.NotNil(t, res.Users, 
         "GetBeacon should return an empty Users map on unknown instance")
-
-    beacons = oldBeacons
 }
