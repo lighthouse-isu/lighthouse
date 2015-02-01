@@ -46,9 +46,15 @@ type Beacon struct {
 
 func getDBSingleton() *databases.Table {
     if beacons == nil {
-        beacons = databases.NewTable(postgres.Connection(), "beacons")
+        panic("Beacons database not initialized")
     }
     return beacons
+}
+
+func Init() {
+    if beacons == nil {
+        beacons = databases.NewTable(postgres.Connection(), "beacons")
+    }
 }
 
 func AddBeacon(instance string, beacon Beacon) error {

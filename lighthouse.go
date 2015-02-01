@@ -22,6 +22,8 @@ import (
     "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
+    "github.com/lighthouse/lighthouse/users"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -40,6 +42,11 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
 func main() {
 
     logging.Info("Starting...")
+
+    users.Init()
+    beacons.Init()
+    aliases.Init()
+
     baseRouter := mux.NewRouter()
 
     baseRouter.HandleFunc("/", ServeIndex).Methods("GET")
