@@ -22,12 +22,11 @@ import (
     "io/ioutil"
     "strings"
     "regexp"
-    "database/sql"
 
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
 
-    "github.com/lighthouse/lighthouse/provider/aliases"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 
     "github.com/lighthouse/lighthouse/databases"
 )
@@ -94,23 +93,13 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
         "GetResponseBody did not extract Payload correctly with an extra field")
 }
 
-func getTestAliasDB() (databases.DBInterface) {
-
-    mock := &databases.MockDatabase{}
-
-    mock.MockExec = func(string, ...interface{}) (r sql.Result, e error) { return }
-    mock.MockQueryRow = func(string, ...interface{}) (r *sql.Row) { return }
-    return mock
-}
-
 /*
     Tests data extraction for requests into a HandlerInfo.
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
-
-    oldAlias := aliases.Aliases
-    aliases.Aliases = databases.NewTable(getTestAliasDB(), "test_table")
+    aliases.SetupTestingTable(&databases.MockDatabase{})
+    defer aliases.TeardownTestingTable()
 
     aliases.AddAlias("TestHost", "TestHost")
 
@@ -129,8 +118,6 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")
-
-    aliases.Aliases = oldAlias
 }
 
 /*

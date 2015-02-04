@@ -12,39 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package users
+package beacons
 
 import (
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var users *databases.Table
-
-type User struct {
-    Email string
-    Salt string
-    Password string
+func SetupTestingTable(db *databases.MockDatabase) {
+    beacons = databases.NewTable(db, "test_table")
 }
 
-func getDBSingleton() *databases.Table {
-    if users == nil {
-        panic("Users database not initialized")
-    }
-    return users
-}
-
-func Init() {
-    if users == nil {
-        users = databases.NewTable(postgres.Connection(), "users")
-    }
-}
-
-func CreateUser(email, salt, password string) error {
-    return getDBSingleton().Insert(email, User{email, salt, password})
-}
-
-func GetUser(email string) (user User, err error) {
-    err = getDBSingleton().SelectRow(email, &user)
-    return
+func TeardownTestingTable() {
+    beacons = nil
 }

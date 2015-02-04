@@ -21,7 +21,7 @@ import (
     "bytes"
 
     "github.com/lighthouse/lighthouse/session"
-    "github.com/lighthouse/lighthouse/users/permissions"
+    "github.com/lighthouse/lighthouse/beacons"
 )
 
 /*
@@ -33,7 +33,22 @@ import (
     RETURN: nil on succes.  A non-nil *HandlerError on failure
 */
 func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError {
-    url := "http://" + info.Host + "/" + info.DockerEndpoint
+    email := session.GetValueOrDefault(info.Request, "auth", "email", "").(string)
+    beaconInstance, err := beacons.GetBeacon(info.Host)
+
+    requestIsToBeacon := err == nil
+
+    var targetAddress, targetEndpoint string
+
+    if requestIsToBeacon {
+        targetAddress = beaconInstance.Address
+        targetEndpoint = fmt.Sprintf("d/%s/%s", info.Host, info.DockerEndpoint)
+    } else {
+        targetAddress = info.Host
+        targetEndpoint = info.DockerEndpoint
+    }
+
+    url := fmt.Sprintf("http://%s/%s", targetAddress, targetEndpoint)
 
     if info.Request.URL.RawQuery != "" {
         url += "?" + info.Request.URL.RawQuery
@@ -51,7 +66,10 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
         return &HandlerError{500, "control", "Failed to create " + method + " request"}
     }
 
-    // TODO - better client
+    if requestIsToBeacon && beaconInstance.Users[email] {
+        req.Header.Set(beacons.HEADER_TOKEN_KEY, beaconInstance.Token)
+    }
+
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
         return &HandlerError{500, "control", method + " request failed"}
@@ -86,30 +104,6 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     r.ParseForm()
 
     info := GetHandlerInfo(r)
-
-    reqAllowed := false
-
-    email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-    perms, dbErr := permissions.GetPermissions(email)
-
-    if dbErr != nil {
-        WriteError(w, HandlerError{401, "control", "unknown user"})
-        return
-    }
-
-    for host, _ := range perms.Providers {
-        if host == info.Host {
-            reqAllowed = true
-            break
-        }
-    }
-
-    if !reqAllowed {
-        WriteError(w, HandlerError{401, "control",
-            fmt.Sprintf("user not permitted to access host: %s", info.Host),
-        })
-        return
-    }
 
     var customHandlers = CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,

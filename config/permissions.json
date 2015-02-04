@@ -1,6 +1,0 @@
-[
-    {
-        "Email": "admin@gmail.com",
-        "Providers":["172.17.42.1:5001/v1.12"]
-    }
-]

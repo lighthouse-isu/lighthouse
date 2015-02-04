@@ -24,18 +24,18 @@ import (
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var Aliases *databases.Table
+var aliases *databases.Table
 
 func getDBSingleton() *databases.Table {
-    if Aliases == nil {
+    if aliases == nil {
         panic("Aliases database not initialized")
     }
-    return Aliases
+    return aliases
 }
 
 func Init() {
-    if Aliases == nil {
-        Aliases = databases.NewTable(postgres.Connection(), "aliases")
+    if aliases == nil {
+        aliases = databases.NewTable(postgres.Connection(), "aliases")
 
         for alias, value := range LoadAliases() {
             AddAlias(alias, value)
