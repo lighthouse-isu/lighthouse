@@ -65,7 +65,6 @@ func main() {
 
     provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
-    aliases.Handle(versionRouter.PathPrefix("/aliases").Subrouter())
     auth.Handle(versionRouter)
 
     ignoreURLs := []string{
