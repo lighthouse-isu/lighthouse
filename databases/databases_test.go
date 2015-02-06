@@ -17,6 +17,7 @@ package databases
 import (
     "testing"
     "strings"
+    "errors"
     "database/sql"
 
     "github.com/stretchr/testify/assert"
@@ -33,13 +34,13 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData) {
     db := &MockDatabase{}
     call := make(testCallData)
 
-    db.MockExec = func(s string, i ...interface{}) (r sql.Result, e error) {
+    db.MockExec = func(s string, i ...interface{}) (sql.Result, error) {
         call["exec"] = testParameterPair{s, i}
-        return
+        return nil, errors.New("junk")
     }
-    db.MockQueryRow = func(s string, i ...interface{}) (r *sql.Row) {
+    db.MockQueryRow = func(s string, i ...interface{}) (*sql.Row) {
         call["query_row"] = testParameterPair{s, i}
-        return
+        return nil
     }
 
     return db, call

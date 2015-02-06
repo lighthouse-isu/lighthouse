@@ -135,22 +135,41 @@ func getInstanceAlias(instance string) string {
     return alias
 }
 
+func writeResponse(err error, w http.ResponseWriter) {
+    var code int
+
+    switch err {
+        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+            code = http.StatusBadRequest
+
+        case nil:
+            code = http.StatusOK
+
+        default:
+            code = http.StatusInternalServerError
+    }
+
+    w.WriteHeader(code)
+
+    if err != nil {
+        fmt.Fprint(w, err)
+    }
+}
+
 func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
     vars := mux.Vars(r)
 
     instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
-    beacon, _ := GetBeacon(instance)
-    beacon.Users[userId] = true
-    err := UpdateBeacon(instance, beacon)
+    beacon, err := GetBeacon(instance)
 
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
-    } else {
-        w.WriteHeader(http.StatusOK)
+    if err == nil {
+        beacon.Users[userId] = true
+        err = UpdateBeacon(instance, beacon)
     }
+
+    writeResponse(err, w)
 }
 
 func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
@@ -159,16 +178,13 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
     instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
-    beacon, _ := GetBeacon(instance)
-    delete(beacon.Users, userId)
-    err := UpdateBeacon(instance, beacon)
-
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
-    } else {
-        w.WriteHeader(http.StatusOK)
+    beacon, err := GetBeacon(instance)
+    if err == nil {
+        delete(beacon.Users, userId)
+        err = UpdateBeacon(instance, beacon)
     }
+
+    writeResponse(err, w)
 }
 
 func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
@@ -177,16 +193,13 @@ func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
     instance := getInstanceAlias(vars["Instance"])
     address := vars["Address"]
 
-    beacon, _ := GetBeacon(instance)
-    beacon.Address = address
-    err := UpdateBeacon(instance, beacon)
-
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
-    } else {
-        w.WriteHeader(http.StatusOK)
+    beacon, err := GetBeacon(instance)
+    if err == nil {
+        beacon.Address = address
+        err = UpdateBeacon(instance, beacon)
     }
+
+    writeResponse(err, w)
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
@@ -194,29 +207,25 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
+        writeResponse(err, w)
+        return
     }
 
     var token string
 
     err = json.Unmarshal(reqBody, &token)
     if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
+        writeResponse(err, w)
         return
     }
 
     beacon, _ := GetBeacon(instance)
-    beacon.Token = token
-    err = UpdateBeacon(instance, beacon)
-
-    if err != nil {
-        w.WriteHeader(http.StatusInternalServerError) 
-        fmt.Fprint(w, err)
-    } else {
-        w.WriteHeader(http.StatusOK)
+    if err == nil {
+        beacon.Token = token
+        err = UpdateBeacon(instance, beacon)
     }
+
+    writeResponse(err, w)
 }
 
 func handleCreate(r *http.Request) (int, error) {

@@ -15,10 +15,14 @@
 package aliases
 
 import (
+"fmt"
     "os"
     "io/ioutil"
+    "net/http"
 
     "encoding/json"
+
+    "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
@@ -36,10 +40,6 @@ func getDBSingleton() *databases.Table {
 func Init() {
     if aliases == nil {
         aliases = databases.NewTable(postgres.Connection(), "aliases")
-
-        for alias, value := range LoadAliases() {
-            AddAlias(alias, value)
-        }
     }
 }
 
@@ -78,4 +78,29 @@ func LoadAliases() map[string]string {
     }
 
     return configAliases
+}
+
+func Handle(r *mux.Router) {
+    aliases := LoadAliases()
+
+    for alias, value := range aliases {
+        AddAlias(alias, value)
+    }
+
+    r.HandleFunc("/{Host}/{Alias}", func(w http.ResponseWriter, r *http.Request) {
+        vars := mux.Vars(r)
+        host := vars["Host"]
+        alias := vars["Alias"]
+
+        fmt.Println(host, alias)
+
+        err := UpdateAlias(alias, host)
+
+        if err != nil {
+            w.WriteHeader(http.StatusInternalServerError)
+        } else {
+            w.WriteHeader(http.StatusOK)
+        }
+
+    }).Methods("PUT")
 }

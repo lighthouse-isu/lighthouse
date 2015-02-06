@@ -17,6 +17,7 @@ package beacons
 import (
     "testing"
 
+    "errors"
     "strings"
     "encoding/json"
     "database/sql"
@@ -32,7 +33,7 @@ func makeTestingDatabase(t *testing.T) *databases.MockDatabase {
     mockTable = make(map[string]Beacon)
     db := &databases.MockDatabase{}
 
-    db.MockExec = func(s string, i ...interface{}) (r sql.Result, e error) {
+    db.MockExec = func(s string, i ...interface{}) (sql.Result, error) {
 
         args := i[0].([]interface{})
 
@@ -42,11 +43,11 @@ func makeTestingDatabase(t *testing.T) *databases.MockDatabase {
             mockTable[args[0].(string)] = beacon
         }
 
-        return
+        return nil, errors.New("junk")
     }
 
-    db.MockQueryRow = func(s string, i ...interface{}) (r *sql.Row) {      
-        return
+    db.MockQueryRow = func(s string, i ...interface{}) (*sql.Row) {      
+        return nil
     }
 
     return db
