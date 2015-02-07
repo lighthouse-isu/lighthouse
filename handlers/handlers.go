@@ -19,7 +19,8 @@ import (
     "regexp"
     "encoding/json"
     "io/ioutil"
-    "github.com/gorilla/mux"
+    
+    "github.com/zenazn/goji/web"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
 )
@@ -152,11 +153,10 @@ func WriteError(w http.ResponseWriter, err HandlerError) {
 
     RETURN: A HandlerInfo extracted from the request
 */
-func GetHandlerInfo(r *http.Request) HandlerInfo {
-    vars := mux.Vars(r)
+func GetHandlerInfo(c web.C, r *http.Request) HandlerInfo {
     var info HandlerInfo
 
-    hostAlias := vars["Host"]
+    hostAlias := c.Env[1].(string)
     value, err := aliases.GetAlias(hostAlias)
     if err == nil {
         info.Host = value
@@ -164,7 +164,7 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
         info.Host = hostAlias // Unknown alias, just use what was given
     }
 
-    info.DockerEndpoint = vars["DockerURL"]
+    info.DockerEndpoint = c.Env[2].(string)
     info.Body = GetRequestBody(r)
     info.Request = r
 
@@ -190,4 +190,8 @@ func GetRequestBody(r *http.Request) *RequestBody {
     json.Unmarshal(reqBody, &body)
 
     return &body
+}
+
+func Handle(m *web.Mux) {
+    m.Handle("/*", DockerHandler)
 }

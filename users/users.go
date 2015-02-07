@@ -34,7 +34,7 @@ func getDBSingleton() *databases.Table {
     return users
 }
 
-func Init() {
+func init() {
     if users == nil {
         users = databases.NewTable(postgres.Connection(), "users")
     }
