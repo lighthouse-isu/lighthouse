@@ -167,3 +167,15 @@ func (this *Table) SelectRow(key string, value interface{}) error {
 
     return err
 }
+
+func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Row) {
+    var vals = make([]interface{}, len(queryParams))
+
+    for i, param := range queryParams {
+        vals[i] = param
+    }
+
+    row = this.db.QueryRow(query, vals)
+
+    return
+}
