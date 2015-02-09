@@ -25,6 +25,7 @@ import (
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
     "github.com/lighthouse/lighthouse/containers"
+    "github.com/lighthouse/lighthouse/containers/applications"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -47,6 +48,7 @@ func main() {
     users.Init()
     beacons.Init()
     aliases.Init()
+    applications.Init()
     containers.Init()
 
     baseRouter := mux.NewRouter()

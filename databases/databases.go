@@ -77,12 +77,13 @@ func (this *Table) InitSchema(columns, types []string) {
         buffer.WriteString(types[i])
 
         if i + 1 < len(columns) && i + 1 < len(types) {
-            buffer.WriteString(",")
+            buffer.WriteString(", ")
         }
     }
 
     query := fmt.Sprintf(`CREATE TABLE %s (%s);`, this.table, buffer.String())
     this.db.Exec(query)
+
 }
 
 func (this *Table) drop() {
