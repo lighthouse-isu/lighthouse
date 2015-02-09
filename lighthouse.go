@@ -62,10 +62,9 @@ func main() {
     hostRouter := dockerRouter.PathPrefix("/{Host}").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
     hostRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
+
     provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
-
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
-
     auth.Handle(versionRouter)
 
     ignoreURLs := []string{

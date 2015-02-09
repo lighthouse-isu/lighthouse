@@ -35,7 +35,7 @@ import (
     types of real Docker responses and test proper handling of them.
 */
 
-var mockBeaconsDB = &databases.MockDatabase{}
+var mockBeaconsDB = databases.CommonTestingDatabase()
 
 // Helper to perform test server setup.  Returns a *Server which will
 // need to be closed at the end of the calling test

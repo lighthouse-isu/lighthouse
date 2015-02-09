@@ -98,7 +98,7 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
-    aliases.SetupTestingTable(&databases.MockDatabase{})
+    aliases.SetupTestingTable(databases.CommonTestingDatabase())
     defer aliases.TeardownTestingTable()
 
     aliases.AddAlias("TestHost", "TestHost")

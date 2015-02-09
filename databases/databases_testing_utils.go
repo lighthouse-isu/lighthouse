@@ -15,6 +15,7 @@
 package databases
 
 import (
+    "errors"
     "database/sql"
     "database/sql/driver"
 )
@@ -78,4 +79,17 @@ func (t *MockDatabase) QueryRow(s string, i ...interface{}) (r *sql.Row) {
 
 func (t *MockDatabase) SetMaxIdleConns(i int) () {
     if t.MockSetMaxIdleConns != nil { t.MockSetMaxIdleConns(i) }
+}
+
+func CommonTestingDatabase() (*MockDatabase) {
+    db := &MockDatabase{}
+
+    db.MockExec = func(s string, i ...interface{}) (sql.Result, error) {
+        return nil, errors.New("junk")
+    }
+    db.MockQueryRow = func(s string, i ...interface{}) (*sql.Row) {
+        return nil
+    }
+
+    return db
 }
