@@ -19,7 +19,6 @@ import (
     "net/http"
 
     "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
@@ -63,7 +62,6 @@ func main() {
     hostRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
 
 
-    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     auth.Handle(versionRouter)
 
