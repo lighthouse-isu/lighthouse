@@ -16,6 +16,7 @@ package databases
 
 import (
     "fmt"
+    "bytes"
     "errors"
     "encoding/json"
 
@@ -68,11 +69,35 @@ func NewTable(db DBInterface, table string) *Table {
     return this
 }
 
+func NewSchemaTable(db DBInterface, table string, columns, types []string) *Table {
+    this := &Table{db, table} //store columns?
+    this.drop() //check if table already exists, instead of drop?
+    this.InitSchema(columns, types)
+    return this
+}
+
 func (this *Table) init() {
     query := fmt.Sprintf(`CREATE TABLE %s (%s text UNIQUE PRIMARY KEY, %s json);`,
         this.table, keyColumn, valueColumn)
 
     this.db.Exec(query)
+}
+
+func (this *Table) InitSchema(columns, types []string) {
+    var buffer bytes.Buffer
+    for i :=  0; i < len(columns) && i < len(types); i++ {
+        buffer.WriteString(columns[i])
+        buffer.WriteString(" ")
+        buffer.WriteString(types[i])
+
+        if i + 1 < len(columns) && i + 1 < len(types) {
+            buffer.WriteString(", ")
+        }
+    }
+
+    query := fmt.Sprintf(`CREATE TABLE %s (%s);`, this.table, buffer.String())
+    this.db.Exec(query)
+
 }
 
 func (this *Table) drop() {
@@ -93,6 +118,36 @@ func (this *Table) Insert(key string, value interface{}) error {
 
     _, err := this.db.Exec(query, key, string(json))
 
+    return err
+}
+
+func (this *Table) InsertSchema(columns, values []string) error {
+    var colBuf, valBuf bytes.Buffer
+    queryVals := make([]interface{}, len(values))
+
+    if len(columns) != len(values) {
+        return errors.New(`Column/Value mismatch`)
+    }
+
+    for i, col := range columns {
+        if i != 0 {
+            colBuf.WriteString(",")
+            valBuf.WriteString(",")
+        }
+        colBuf.WriteString(col)
+        s := fmt.Sprintf(`($%d)`, i)
+        valBuf.WriteString(s)
+
+        queryVals[i] = values[i]
+    }
+
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
+        this.table, colBuf.String(), valBuf.String())
+    _, err := this.db.Exec(query, queryVals...)
+
+    if err != nil {
+        fmt.Println(err.Error())
+    }
     return err
 }
 
@@ -143,4 +198,16 @@ func (this *Table) SelectRow(key string, value interface{}) error {
     }
 
     return err
+}
+
+func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Row) {
+    var vals = make([]interface{}, len(queryParams))
+
+    for i, param := range queryParams {
+        vals[i] = param
+    }
+
+    row = this.db.QueryRow(query, vals)
+
+    return
 }
