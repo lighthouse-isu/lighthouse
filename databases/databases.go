@@ -25,6 +25,13 @@ import (
     _ "github.com/lib/pq"
 )
 
+var (
+    EmptyKeyError = errors.New("databases: given key was empty string")
+    NoUpdateError = errors.New("databases: no rows updated")
+    UnknownError = errors.New("databases: unknown error")
+    KeyNotFoundError = errors.New("databases: given key not found")
+)
+
 type DBInterface interface {
     Begin() (*sql.Tx, error)
     Close() error
@@ -48,6 +55,13 @@ const (
 )
 
 func NewTable(db DBInterface, table string) *Table {
+    if table == "" {
+        panic("databases: table name was empty string")
+    }
+    if db == nil {
+        panic("databases: database connection was nil")
+    }
+
     this := &Table{db, table}
     this.drop()
     this.init()
@@ -69,43 +83,60 @@ func (this *Table) drop() {
 }
 
 func (this *Table) Insert(key string, value interface{}) error {
+    if key == "" {
+        return EmptyKeyError
+    }
+
     json, _ := json.Marshal(value)
     query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (($1), ($2));`,
         this.table, keyColumn, valueColumn)
 
     _, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        fmt.Println(err.Error())
-    }
     return err
 }
 
 func (this *Table) Update(key string, newValue interface{}) (error) {
+    if key == "" {
+        return EmptyKeyError
+    }
+
     json, _ := json.Marshal(newValue)
     query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
         this.table, valueColumn, keyColumn)
 
-    _, err := this.db.Exec(query, key, string(json))
+    res, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        fmt.Println(err.Error())
+    if err == nil {
+        cnt, err := res.RowsAffected()
+        if err == nil && cnt == 0 {
+            return NoUpdateError
+        }
     }
+
     return err
 }
 
 func (this *Table) SelectRow(key string, value interface{}) error {
+    if key == "" {
+        return EmptyKeyError
+    }
+
     query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = ($1);`,
         valueColumn, this.table, keyColumn)
 
     row := this.db.QueryRow(query, key)
 
     if row == nil {
-        return errors.New("unknown database error")
+        return UnknownError
     }
 
     var data interface{}
     err := row.Scan(&data)
+
+    if err == sql.ErrNoRows {
+        return KeyNotFoundError
+    }
 
     if err == nil {
         err = json.Unmarshal(data.([]byte), value)

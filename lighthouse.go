@@ -41,7 +41,7 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
 
 func AttachSubrouterTo(m *web.Mux, route string, handle func(m *web.Mux)) *web.Mux {
     sub := web.New()
-    m.Handle(route + "/*", sub)
+    m.Handle(fmt.Sprintf("%s/*", route), sub)
     sub.Use(middleware.SubRouter)
     handle(sub)
     sub.Compile()
@@ -53,7 +53,7 @@ func QueryParamExtract(c *web.C, h http.Handler) http.Handler {
         params := strings.Split(r.RequestURI, "/")
         for i, param := range params[3:] {
             param, _ = url.QueryUnescape(param)
-            c.Env[i] = param
+            c.Env[fmt.Sprintf("%d", i)] = param
         }
         h.ServeHTTP(w, r)
     })

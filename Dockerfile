@@ -18,7 +18,7 @@ MAINTAINER lighthouse
 
 WORKDIR /gopath/src/github.com/lighthouse/lighthouse
 
-RUN go get github.com/gorilla/mux \
+RUN go get github.com/zenazn/goji/web \
            github.com/gorilla/sessions \
            github.com/gorilla/securecookie \
            github.com/lib/pq \
