@@ -156,13 +156,13 @@ func WriteError(w http.ResponseWriter, err HandlerError) {
     RETURN: A HandlerInfo extracted from the request
 */
 func GetHandlerInfo(c web.C, r *http.Request) (*HandlerInfo, error) {
-    if _, ok := c.Env["2"]; !ok {
+    if _, ok := c.Env[2]; !ok {
         return nil, errors.New("handlers: not enough parameters")
     }
 
     var info HandlerInfo
 
-    hostAlias := c.Env["1"].(string)
+    hostAlias := c.Env[1].(string)
     value, err := aliases.GetAlias(hostAlias)
     if err == nil {
         info.Host = value

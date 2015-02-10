@@ -114,8 +114,8 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     r, _ := http.NewRequest("GET", "/d/TestHost/Test%2FEndpoint", nil)
     c := web.C {
-        Env : map[string]interface{}{
-            "0" : "d", "1" : "TestHost", "2" : "Test/Endpoint",
+        Env : map[interface{}]interface{}{
+            0 : "d", 1 : "TestHost", 2 : "Test/Endpoint",
         },
     }
 

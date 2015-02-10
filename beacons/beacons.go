@@ -160,13 +160,13 @@ func writeResponse(err error, w http.ResponseWriter) {
 }
 
 func handleAddUserToBeacon(c web.C, w http.ResponseWriter, r *http.Request) {
-    if _, ok := c.Env["3"]; !ok {
+    if _, ok := c.Env[3]; !ok {
         writeResponse(NotEnoughParametersError, w)
         return
     }
 
-    instance := getInstanceAlias(c.Env["2"].(string))
-    userId := c.Env["3"].(string)
+    instance := getInstanceAlias(c.Env[2].(string))
+    userId := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -178,13 +178,13 @@ func handleAddUserToBeacon(c web.C, w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRemoveUserFromBeacon(c web.C, w http.ResponseWriter, r *http.Request) {
-    if _, ok := c.Env["3"]; !ok {
+    if _, ok := c.Env[3]; !ok {
         writeResponse(NotEnoughParametersError, w)
         return
     }
 
-    instance := getInstanceAlias(c.Env["2"].(string))
-    userId := c.Env["3"].(string)
+    instance := getInstanceAlias(c.Env[2].(string))
+    userId := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -196,13 +196,13 @@ func handleRemoveUserFromBeacon(c web.C, w http.ResponseWriter, r *http.Request)
 }
 
 func handleUpdateBeaconAddress(c web.C, w http.ResponseWriter, r *http.Request) {
-    if _, ok := c.Env["3"]; !ok {
+    if _, ok := c.Env[3]; !ok {
         writeResponse(NotEnoughParametersError, w)
         return
     }
 
-    instance := getInstanceAlias(c.Env["2"].(string))
-    address := c.Env["3"].(string)
+    instance := getInstanceAlias(c.Env[2].(string))
+    address := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -214,12 +214,12 @@ func handleUpdateBeaconAddress(c web.C, w http.ResponseWriter, r *http.Request) 
 }
 
 func handleUpdateBeaconToken(c web.C, w http.ResponseWriter, r *http.Request) {
-    if _, ok := c.Env["2"]; !ok {
+    if _, ok := c.Env[2]; !ok {
         writeResponse(NotEnoughParametersError, w)
         return
     }
 
-    instance := getInstanceAlias(c.Env["2"].(string))
+    instance := getInstanceAlias(c.Env[2].(string))
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {

@@ -55,7 +55,7 @@ func QueryParamExtract(c *web.C, h http.Handler) http.Handler {
         params := strings.Split(r.RequestURI, "/")
         for i, param := range params[3:] {
             param, _ = url.QueryUnescape(param)
-            c.Env[fmt.Sprintf("%d", i)] = param
+            c.Env[i] = param
         }
         h.ServeHTTP(w, r)
     })
