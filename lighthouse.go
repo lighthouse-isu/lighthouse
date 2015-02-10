@@ -16,7 +16,9 @@ package main
 
 import (
     "fmt"
+    "strings"
     "net/http"
+    "net/url"
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
@@ -27,7 +29,8 @@ import (
 
     "github.com/lighthouse/lighthouse/logging"
 
-    "github.com/gorilla/mux"
+    "github.com/zenazn/goji/web"
+    "github.com/zenazn/goji/web/middleware"
 )
 
 const (
@@ -38,34 +41,52 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "static/index.html")
 }
 
+func AttachSubrouterTo(m *web.Mux, route string, handle func(m *web.Mux)) *web.Mux {
+    sub := web.New()
+    m.Handle(fmt.Sprintf("%s/*", route), sub)
+    sub.Use(middleware.SubRouter)
+    handle(sub)
+    sub.Compile()
+    return sub
+}
+
+func QueryParamExtract(c *web.C, h http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        params := strings.Split(r.RequestURI, "/")
+        for i, param := range params[3:] {
+            param, _ = url.QueryUnescape(param)
+            c.Env[i] = param
+        }
+        h.ServeHTTP(w, r)
+    })
+}
 
 func main() {
 
     logging.Info("Starting...")
 
-    users.Init()
     beacons.Init()
+    users.Init()
     aliases.Init()
 
-    baseRouter := mux.NewRouter()
+    baseRouter := web.New()
+    baseRouter.Use(auth.AuthMiddleware)
+    baseRouter.Use(logging.Middleware)
 
-    baseRouter.HandleFunc("/", ServeIndex).Methods("GET")
-    baseRouter.NotFoundHandler =  http.HandlerFunc(ServeIndex)
+    baseRouter.NotFound(ServeIndex)
 
     staticServer := http.FileServer(http.Dir("static"))
-    baseRouter.PathPrefix("/static/").Handler(
-        http.StripPrefix("/static/", staticServer))
+    baseRouter.Get("/static/*", staticServer)
 
-    versionRouter := baseRouter.PathPrefix(API_VERSION_0_2).Subrouter()
+    versionRouter := web.New()
+    baseRouter.Handle(API_VERSION_0_2 + "/*", versionRouter)
+    versionRouter.Use(middleware.SubRouter)
+    versionRouter.Use(middleware.EnvInit)
+    versionRouter.Use(QueryParamExtract)
 
-    dockerRouter := versionRouter.PathPrefix("/d")
-    hostRouter := dockerRouter.PathPrefix("/{Host}").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    hostRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
-
-
-    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
-    beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
-    auth.Handle(versionRouter)
+    AttachSubrouterTo(versionRouter, "/d", handlers.Handle)
+    AttachSubrouterTo(versionRouter, "/provider", provider.Handle)
+    AttachSubrouterTo(versionRouter, "/beacons", beacons.Handle)
 
     ignoreURLs := []string{
         "/",
@@ -73,11 +94,12 @@ func main() {
         fmt.Sprintf("%s/login", API_VERSION_0_2),
         fmt.Sprintf("%s/logout", API_VERSION_0_2),
     }
+    auth.Handle(versionRouter)
+    auth.Ignore(ignoreURLs)
 
-    app := auth.AuthMiddleware(baseRouter, ignoreURLs)
-    app = logging.Middleware(app)
-
-    http.Handle("/", app)
+    versionRouter.Compile()
+    baseRouter.Compile()
+    http.Handle("/", baseRouter)
 
     logging.Info("Ready...")
 

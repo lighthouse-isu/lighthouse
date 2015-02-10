@@ -22,7 +22,7 @@ import (
     "net/http"
     "encoding/json"
 
-    "github.com/gorilla/mux"
+    "github.com/zenazn/goji/web"
 
     beaconStructs "github.com/lighthouse/beacon/structs"
 
@@ -37,6 +37,10 @@ const (
 )
 
 var beacons *databases.Table
+
+var (
+    NotEnoughParametersError = errors.New("beacons: not enough parameters in endpoint")
+)
 
 type Beacon struct {
     Address string
@@ -101,30 +105,28 @@ func LoadBeacons() map[string]Beacon {
     return perms
 }
 
-func Handle(r *mux.Router) {
+func Handle(m *web.Mux) {
     beacons := LoadBeacons()
 
     for instance, beacon := range beacons {
         AddBeacon(instance, beacon)
     }
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleAddUserToBeacon).Methods("PUT")
+    m.Put("/user/*", handleAddUserToBeacon)
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
+    m.Delete("/user/*", handleRemoveUserFromBeacon)
 
-    r.HandleFunc("/address/{Instance}/{Address}", handleUpdateBeaconAddress).Methods("PUT")
+    m.Put("/address/*", handleUpdateBeaconAddress)
 
-    r.HandleFunc("/token/{Instance}", handleUpdateBeaconToken).Methods("PUT")
+    m.Put("/token/*", handleUpdateBeaconToken)
 
-    r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
-
+    m.Post("/create", func(c web.C, w http.ResponseWriter, r *http.Request) {
         code, err := handleCreate(r)
         w.WriteHeader(code) 
         if err != nil {
             fmt.Fprint(w, err)
         }
-
-    }).Methods("POST")
+    })
 }
 
 func getInstanceAlias(instance string) string {
@@ -139,7 +141,8 @@ func writeResponse(err error, w http.ResponseWriter) {
     var code int
 
     switch err {
-        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+        case databases.KeyNotFoundError, databases.NoUpdateError, 
+            databases.EmptyKeyError, NotEnoughParametersError:
             code = http.StatusBadRequest
 
         case nil:
@@ -156,14 +159,16 @@ func writeResponse(err error, w http.ResponseWriter) {
     }
 }
 
-func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+func handleAddUserToBeacon(c web.C, w http.ResponseWriter, r *http.Request) {
+    if _, ok := c.Env[3]; !ok {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
+    instance := getInstanceAlias(c.Env[2].(string))
+    userId := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
-
     if err == nil {
         beacon.Users[userId] = true
         err = UpdateBeacon(instance, beacon)
@@ -172,11 +177,14 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
     writeResponse(err, w)
 }
 
-func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+func handleRemoveUserFromBeacon(c web.C, w http.ResponseWriter, r *http.Request) {
+    if _, ok := c.Env[3]; !ok {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
+    instance := getInstanceAlias(c.Env[2].(string))
+    userId := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -187,11 +195,14 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
     writeResponse(err, w)
 }
 
-func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+func handleUpdateBeaconAddress(c web.C, w http.ResponseWriter, r *http.Request) {
+    if _, ok := c.Env[3]; !ok {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    address := vars["Address"]
+    instance := getInstanceAlias(c.Env[2].(string))
+    address := c.Env[3].(string)
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -202,8 +213,13 @@ func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
     writeResponse(err, w)
 }
 
-func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-    instance := getInstanceAlias(mux.Vars(r)["Instance"])
+func handleUpdateBeaconToken(c web.C, w http.ResponseWriter, r *http.Request) {
+    if _, ok := c.Env[2]; !ok {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
+
+    instance := getInstanceAlias(c.Env[2].(string))
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -216,6 +232,11 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
     err = json.Unmarshal(reqBody, &token)
     if err != nil {
         writeResponse(err, w)
+        return
+    }
+
+    if token == "" {
+        writeResponse(NotEnoughParametersError, w)
         return
     }
 

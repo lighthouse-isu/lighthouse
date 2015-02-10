@@ -27,7 +27,7 @@ import (
     "encoding/hex"
     "encoding/json"
 
-    "github.com/gorilla/mux"
+    "github.com/zenazn/goji/web"
 
     "github.com/lighthouse/lighthouse/users"
 
@@ -36,6 +36,8 @@ import (
 
 
 var SECRET_HASH_KEY string
+
+var ignorePaths []string
 
 func SaltPassword(password, salt string) string {
     key := fmt.Sprintf("%s:%s:%s", password, salt, SECRET_HASH_KEY)
@@ -62,6 +64,10 @@ type AuthConfig struct {
     SecretKey string
 }
 
+func Ignore(toIgnore []string) {
+    ignorePaths = toIgnore
+}
+
 func LoadAuthConfig() *AuthConfig{
     var fileName string
     if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
@@ -76,7 +82,7 @@ func LoadAuthConfig() *AuthConfig{
     return &config
 }
 
-func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
+func AuthMiddleware(c *web.C, h http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         if strings.HasPrefix(r.URL.Path, "/static") {
             h.ServeHTTP(w, r)
@@ -89,8 +95,9 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
                 return
             }
         }
-
-        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
+        
+        loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool)
+        if loggedIn {
             h.ServeHTTP(w, r)
             return
         }
@@ -99,7 +106,7 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
     })
 }
 
-func Handle(r *mux.Router) {
+func Handle(m *web.Mux) {
     config := LoadAuthConfig()
 
     SECRET_HASH_KEY = config.SecretKey
@@ -111,7 +118,7 @@ func Handle(r *mux.Router) {
         users.CreateUser(admin.Email, salt, saltedPassword)
     }
 
-    r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+    m.Post("/login", func(w http.ResponseWriter, r *http.Request) {
         loginForm := &LoginForm{}
         body, _ := ioutil.ReadAll(r.Body)
         json.Unmarshal(body, &loginForm)
@@ -141,10 +148,10 @@ func Handle(r *mux.Router) {
         }
 
         fmt.Fprintf(w, "%t", userOK && passwordOK)
-    }).Methods("POST")
+    })
 
-    r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+    m.Get("/logout", func(w http.ResponseWriter, r *http.Request) {
         session.SetValue(r, "auth", "logged_in", false)
         session.Save("auth", r, w)
-    }).Methods("GET")
+    })
 }

@@ -20,6 +20,8 @@ import (
     "io/ioutil"
     "bytes"
 
+    "github.com/zenazn/goji/web"
+
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
 )
@@ -99,25 +101,31 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
     If an error occurs in a custom handler or with the Docker request
     itself, the custom handlers will be instructed to rollback.
 */
-func DockerHandler(w http.ResponseWriter, r *http.Request) {
+func DockerHandler(c web.C, w http.ResponseWriter, r *http.Request) {
     // Ready all HTTP form data for the handlers
     r.ParseForm()
 
-    info := GetHandlerInfo(r)
+    infoPtr, err := GetHandlerInfo(c, r)
+    if err != nil {
+        WriteError(w, HandlerError{http.StatusBadRequest, "user", err.Error()})
+        return
+    }
+
+    info := *infoPtr
 
     var customHandlers = CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,
     }
 
-    runCustomHandlers, err := RunCustomHandlers(info, customHandlers)
+    runCustomHandlers, handleErr := RunCustomHandlers(info, customHandlers)
 
     // On success, send request to Docker
-    if err == nil {
-        err = DockerRequestHandler(w, info)
+    if handleErr == nil {
+        handleErr = DockerRequestHandler(w, info)
     }
 
     // On error, rollback
-    if err != nil {
-        Rollback(w, *err, info, runCustomHandlers)
+    if handleErr != nil {
+        Rollback(w, *handleErr, info, runCustomHandlers)
     }
 }

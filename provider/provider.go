@@ -27,7 +27,7 @@ import (
     "github.com/lighthouse/lighthouse/provider/providers/local"
     "github.com/lighthouse/lighthouse/provider/providers/unknown"
 
-    "github.com/gorilla/mux"
+    "github.com/zenazn/goji/web"
 )
 
 func DecideProvider(providers []*models.Provider) *models.Provider {
@@ -39,7 +39,7 @@ func DecideProvider(providers []*models.Provider) *models.Provider {
     return unknown.Provider
 }
 
-func Handle(r *mux.Router) {
+func Handle(m *web.Mux) {
     selectedProvider := DecideProvider([]*models.Provider{
         gce.Provider,
         local.Provider,
@@ -48,13 +48,13 @@ func Handle(r *mux.Router) {
     logging.Info(
         fmt.Sprintf("Detected provider is %s....", selectedProvider.Name))
 
-    r.HandleFunc("/vms", func(w http.ResponseWriter, r *http.Request) {
+    m.Get("/vms", func(w http.ResponseWriter, r *http.Request) {
         response, _ := json.Marshal(selectedProvider.GetVMs())
         fmt.Fprintf(w, "%s", response)
-    }).Methods("GET")
+    })
 
-    r.HandleFunc("/which", func(w http.ResponseWriter, r *http.Request) {
+    m.Get("/which", func(w http.ResponseWriter, r *http.Request) {
         response, _ := json.Marshal(selectedProvider.Name)
         fmt.Fprintf(w, "%s", response)
-    }).Methods("GET")
+    })
 }

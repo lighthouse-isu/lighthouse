@@ -23,7 +23,7 @@ import (
     "strings"
     "regexp"
 
-    "github.com/gorilla/mux"
+    "github.com/zenazn/goji/web"
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
@@ -103,18 +103,25 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     aliases.AddAlias("TestHost", "TestHost")
 
-    router := mux.NewRouter()
+    router := web.New()
     var info HandlerInfo
 
-    router.HandleFunc("/{Host}/{DockerURL}",
-        func(w http.ResponseWriter, r *http.Request) {
-            info = GetHandlerInfo(r)
+    router.Handle("/d/*",
+        func(c web.C, w http.ResponseWriter, r *http.Request) {
+            infoPtr, _ := GetHandlerInfo(c, r)
+            info = *infoPtr
     })
 
-    r, _ := http.NewRequest("GET", "/TestHost/TestEndpoint", nil)
-    router.ServeHTTP(httptest.NewRecorder(), r)
+    r, _ := http.NewRequest("GET", "/d/TestHost/Test%2FEndpoint", nil)
+    c := web.C {
+        Env : map[interface{}]interface{}{
+            0 : "d", 1 : "TestHost", 2 : "Test/Endpoint",
+        },
+    }
 
-    expected := HandlerInfo{"TestEndpoint", "TestHost", nil, r}
+    router.ServeHTTPC(c, httptest.NewRecorder(), r)
+
+    expected := HandlerInfo{"Test/Endpoint", "TestHost", nil, r}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")
@@ -125,9 +132,9 @@ func Test_GetHandlerInfo(t *testing.T) {
     Purpose: Ensuring handler errors reach the user correctly.
 */
 func Test_WriteError(t *testing.T) {
-    router := mux.NewRouter()
 
-    router.HandleFunc("/",
+    router := web.New()
+    router.Handle("/",
         func(w http.ResponseWriter, r *http.Request) {
             WriteError(w, HandlerError{500, "TestCause", "TestMessage"})
     })
