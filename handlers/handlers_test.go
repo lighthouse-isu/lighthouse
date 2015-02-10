@@ -108,7 +108,8 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     router.Handle("/d/*",
         func(c web.C, w http.ResponseWriter, r *http.Request) {
-            info = GetHandlerInfo(c, r)
+            infoPtr, _ := GetHandlerInfo(c, r)
+            info = *infoPtr
     })
 
     r, _ := http.NewRequest("GET", "/d/TestHost/Test%2FEndpoint", nil)

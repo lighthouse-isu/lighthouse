@@ -33,7 +33,7 @@ func getDBSingleton() *databases.Table {
     return aliases
 }
 
-func init() {
+func Init() {
     if aliases == nil {
         aliases = databases.NewTable(postgres.Connection(), "aliases")
 

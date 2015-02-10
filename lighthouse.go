@@ -24,6 +24,8 @@ import (
     "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
+    "github.com/lighthouse/lighthouse/users"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -62,6 +64,10 @@ func QueryParamExtract(c *web.C, h http.Handler) http.Handler {
 func main() {
 
     logging.Info("Starting...")
+
+    beacons.Init()
+    users.Init()
+    aliases.Init()
 
     baseRouter := web.New()
     baseRouter.Use(auth.AuthMiddleware)

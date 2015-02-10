@@ -55,7 +55,7 @@ func getDBSingleton() *databases.Table {
     return beacons
 }
 
-func init() {
+func Init() {
     if beacons == nil {
         beacons = databases.NewTable(postgres.Connection(), "beacons")
     }
