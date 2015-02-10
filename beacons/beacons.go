@@ -38,6 +38,13 @@ const (
 
 var beacons *databases.Table
 
+var schema = databases.Schema {
+    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
+    "Address" : "text",
+    "Token" : "text",
+    "Users" : "json",
+}
+
 type Beacon struct {
     Address string
     Token string
@@ -53,23 +60,42 @@ func getDBSingleton() *databases.Table {
 
 func Init() {
     if beacons == nil {
-        beacons = databases.NewTable(postgres.Connection(), "beacons")
+        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", schema)
+    }
+}
+
+func createDatabaseEntryFor(instance string, beacon Beacon) databases.Filter {
+    usersJson, _ := json.Marshal(beacon.Users)
+    
+    return databases.Filter{
+        "InstanceAddress" : instance,
+        "Address" : beacon.Address,
+        "Token" : beacon.Token,
+        "Users" : string(usersJson),
     }
 }
 
 func AddBeacon(instance string, beacon Beacon) error {
-    return getDBSingleton().Insert(instance, beacon)
+    entry := createDatabaseEntryFor(instance, beacon)
+    return getDBSingleton().InsertSchema(entry)
 }
 
 func UpdateBeacon(instance string, beacon Beacon) error {
-    return getDBSingleton().Update(instance, beacon)
+    to := createDatabaseEntryFor(instance, beacon)
+    where := databases.Filter{"InstanceAddress": instance}
+
+    return getDBSingleton().UpdateSchema(to, where)
 }
 
 func GetBeacon(instance string) (Beacon, error) {
     var beacon Beacon
-    err := getDBSingleton().SelectRow(instance, &beacon)
+    where := databases.Filter{"InstanceAddress" : instance}
+    columns := []string{"Address" , "Token", "Users"}
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
 
     if err != nil {
+        fmt.Println(err)
         return Beacon{"", "", make(map[string]bool)}, err
     }
    
@@ -285,7 +311,7 @@ func handleCreate(r *http.Request) (int, error) {
 
     for _, vm := range vms {
         address := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
-        AddBeacon(address, beacon)
+        err = AddBeacon(address, beacon)
     }
 
     return http.StatusOK, nil
