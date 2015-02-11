@@ -16,7 +16,6 @@ package beacons
 
 import (
     "testing"
-    "encoding/json"
 
     "github.com/stretchr/testify/assert"
 
@@ -74,9 +73,9 @@ func Test_UpdateBeaconData(t *testing.T) {
     assert.Equal(t, "TOKEN_PASS", table.Database[0][table.Schema["Token"]],
         "updateBeaconField should update Token")
 
-    passJSON, _ := json.Marshal(userMap{"USER_PASS":true})
-    updateBeaconField("Users", passJSON, "INST_ADDR")
-    assert.Equal(t, string(passJSON), table.Database[0][table.Schema["Users"]],
+    userPass := userMap{"USER_PASS":true}
+    updateBeaconField("Users", userPass, "INST_ADDR")
+    assert.Equal(t, userPass, table.Database[0][table.Schema["Users"]],
         "updateBeaconField should update Users")
 
     updateBeaconField("InstanceAddress", "INST_ADDR_PASS", "INST_ADDR")
