@@ -33,6 +33,15 @@ var (
     KeyNotFoundError = errors.New("databases: given key not found")
 )
 
+type Table struct {
+    db DBInterface
+    table string
+    schema Schema
+}
+
+type Schema map[string]string
+type Filter map[string]interface{}
+
 type DBInterface interface {
     Begin() (*sql.Tx, error)
     Close() error
@@ -45,31 +54,32 @@ type DBInterface interface {
     SetMaxIdleConns(int)
 }
 
-type Table struct {
-    db DBInterface
-    table string
-    schema Schema
+type TableInterface interface {
+    Insert(string, interface{})(error)
+    Update(string, interface{})(error)
+    SelectRow(string, interface{})(error)
+    InsertSchema(map[string]interface{})(error)
+    UpdateSchema(map[string]interface{}, map[string]interface{})(error)
+    SelectRowSchema([]string, Filter, interface{})(error)
+    SelectSchema([]string, Filter)(*Scanner, error)
 }
-
-type Schema map[string]string
-type Filter map[string]interface{}
 
 const (
     keyColumn string = "keyColumn"
     valueColumn string = "valueColumn"
 )
 
-func NewTable(db DBInterface, table string) *Table {
+func NewTable(db DBInterface, table string) TableInterface {
     this := &Table{db, table, nil}
     this.drop()
     this.init()
     return this
 }
 
-func NewSchemaTable(db DBInterface, table string, schema Schema) *Table {
+func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface {
     this := &Table{db, table, schema}
     this.drop()
-    this.InitSchema()
+    this.initSchema()
     return this
 }
 
@@ -80,7 +90,7 @@ func (this *Table) init() {
     this.db.Exec(query)
 }
 
-func (this *Table) InitSchema() {
+func (this *Table) initSchema() {
     if len(this.schema) == 0 {
         panic("No schema given to database")
     }
@@ -112,18 +122,6 @@ func (this *Table) drop() {
     this.db.Exec(query)
 }
 
-func (this *Table) Insert(key string, value interface{}) error {
-    json, _ := json.Marshal(value)
-    query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (($1), ($2));`,
-        this.table, keyColumn, valueColumn)
-
-    _, err := this.db.Exec(query, key, string(json))
-
-    if err != nil {
-        fmt.Println(err.Error())
-    }
-    return err
-}
 
 func (this *Table) getValueOf(orig interface{}, col string) interface{} {
     colType := this.schema[col]
@@ -144,6 +142,19 @@ func (this *Table) getValueOf(orig interface{}, col string) interface{} {
     }
     
     return orig
+}
+
+func (this *Table) Insert(key string, value interface{}) error {
+    json, _ := json.Marshal(value)
+    query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (($1), ($2));`,
+        this.table, keyColumn, valueColumn)
+
+    _, err := this.db.Exec(query, key, string(json))
+
+    if err != nil {
+        fmt.Println(err.Error())
+    }
+    return err
 }
 
 func (this *Table) InsertSchema(values map[string]interface{}) error {

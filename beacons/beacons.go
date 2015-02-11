@@ -40,7 +40,7 @@ var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
 )
 
-var beacons *databases.Table
+var beacons databases.TableInterface
 
 var schema = databases.Schema {
     "InstanceAddress" : "text UNIQUE PRIMARY KEY",
@@ -58,7 +58,7 @@ type beaconData struct {
 
 type userMap map[string]interface{}
 
-func getDBSingleton() *databases.Table {
+func getDBSingleton() databases.TableInterface {
     if beacons == nil {
         panic("Beacons database not initialized")
     }
@@ -71,10 +71,10 @@ func Init() {
     }
 }
 
-func createDatabaseEntryFor(beacon beaconData) databases.Filter {
+func createDatabaseEntryFor(beacon beaconData) map[string]interface{} {
     usersJson, _ := json.Marshal(beacon.Users)
     
-    return databases.Filter{
+    return map[string]interface{}{
         "InstanceAddress" : beacon.InstanceAddress,
         "BeaconAddress" : beacon.BeaconAddress,
         "Token" : beacon.Token,

@@ -18,8 +18,8 @@ import (
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func SetupTestingTable(db *databases.MockDatabase) {
-    beacons = databases.NewTable(db, "test_table")
+func SetupTestingTable(table *databases.MockTable) {
+    beacons = table
 }
 
 func TeardownTestingTable() {
