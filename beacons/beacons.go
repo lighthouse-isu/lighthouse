@@ -26,8 +26,8 @@ import (
 
     beaconStructs "github.com/lighthouse/beacon/structs"
 
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons/aliases"
-
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -37,6 +37,10 @@ const (
 )
 
 var beacons *databases.Table
+
+var (
+    NotEnoughParametersError = errors.New("beacons: not enough parameters given")
+)
 
 type Beacon struct {
     Address string
@@ -108,13 +112,13 @@ func Handle(r *mux.Router) {
         AddBeacon(instance, beacon)
     }
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleAddUserToBeacon).Methods("PUT")
+    r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
+    r.HandleFunc("/user/{Endpoint:.*}", handleRemoveUserFromBeacon).Methods("DELETE")
 
-    r.HandleFunc("/address/{Instance}/{Address}", handleUpdateBeaconAddress).Methods("PUT")
+    r.HandleFunc("/address/{Endpoint:.*}", handleUpdateBeaconAddress).Methods("PUT")
 
-    r.HandleFunc("/token/{Instance}", handleUpdateBeaconToken).Methods("PUT")
+    r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
 
@@ -139,7 +143,8 @@ func writeResponse(err error, w http.ResponseWriter) {
     var code int
 
     switch err {
-        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+        case databases.KeyNotFoundError, databases.NoUpdateError, 
+            databases.EmptyKeyError, NotEnoughParametersError:
             code = http.StatusBadRequest
 
         case nil:
@@ -157,10 +162,14 @@ func writeResponse(err error, w http.ResponseWriter) {
 }
 
 func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "UserId"})
+    if ok == false || len(params) < 2 {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
+    instance := getInstanceAlias(params["Instance"])
+    userId := params["UserId"]
 
     beacon, err := GetBeacon(instance)
 
@@ -173,10 +182,16 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "UserId"})
+    if ok == false || len(params) < 2 {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
+    fmt.Println(params)
+
+    instance := getInstanceAlias(params["Instance"])
+    userId := params["UserId"]
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -188,10 +203,14 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
+    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "Address"})
+    if ok == false || len(params) < 2 {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
 
-    instance := getInstanceAlias(vars["Instance"])
-    address := vars["Address"]
+    instance := getInstanceAlias(params["Instance"])
+    address := params["Address"]
 
     beacon, err := GetBeacon(instance)
     if err == nil {
@@ -203,7 +222,13 @@ func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-    instance := getInstanceAlias(mux.Vars(r)["Instance"])
+    params, ok := handlers.GetEndpointParams(r, []string{"Instance"})
+    if ok == false || len(params) < 1 {
+        writeResponse(NotEnoughParametersError, w)
+        return
+    }
+
+    instance := getInstanceAlias(params["Instance"])
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
