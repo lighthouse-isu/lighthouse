@@ -14,7 +14,10 @@
 
 package databases
 
-import ()
+import (
+    "errors"
+    "reflect"
+)
 
 /*
     The purpose of MockTable is to be able to create custom mocks for datatbases
@@ -69,12 +72,13 @@ func (t *MockTable) SelectSchema(c []string, w Filter)(s *Scanner, e error) {
     return
 }
 
-func CommonTestingTable(schema Schema) *databases.MockTable {
-    table := &databases.MockTable{make([][]interface{}), make(map[string]int)}
+func CommonTestingTable(schema Schema) *MockTable {
+    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int)}
 
     i := 0
     for k, _ := range schema {
         table.Schema[k] = i
+        i += 1
     }
 
     table.MockInsertSchema = func(values map[string]interface{})(error) {
@@ -84,17 +88,24 @@ func CommonTestingTable(schema Schema) *databases.MockTable {
             addition[table.Schema[k]] = v
         }
 
+        for _, row := range table.Database {
+            if reflect.DeepEqual(row, addition) {
+                return errors.New("duplicate row")
+            }
+        }
+
         table.Database = append(table.Database, addition)
 
         return nil
     }
 
     table.MockUpdateSchema = func(to, where map[string]interface{})(error) {
+        updated := false
         for _, row := range table.Database {
 
             applies := true
             for col, val := range where {
-                if table.Database[table.Schema[col]] != val {
+                if row[table.Schema[col]] != val {
                     applies = false
                     break
                 }
@@ -104,18 +115,31 @@ func CommonTestingTable(schema Schema) *databases.MockTable {
                 for col, val := range to {
                     row[table.Schema[col]] = val
                 }
+                updated = true
             }
         }
+
+        if !updated {
+            return errors.New("no update")
+        }
+
         return nil
     }
 
-    table.MockSelectRowSchema = func(cols []string, where databases.Filter, dest interface{})(error) {
+    table.MockSelectRowSchema = func(cols []string, where Filter, dest interface{})(error) {
+
+        if cols == nil {
+            cols = make([]string, len(table.Schema))
+            for col, i := range table.Schema {
+                cols[i] = col
+            }
+        }
 
         for _, row := range table.Database {
 
             applies := true
             for col, val := range where {
-                if table.Database[table.Schema[col]] != val {
+                if row[table.Schema[col]] != val {
                     applies = false
                     break
                 }
@@ -126,10 +150,11 @@ func CommonTestingTable(schema Schema) *databases.MockTable {
                 for _, col := range cols {
                     rv.FieldByName(col).Set(reflect.ValueOf(row[table.Schema[col]]))
                 }
+                return nil
             }
         }
 
-        return nil
+        return errors.New("not found")
     }
 
     return table

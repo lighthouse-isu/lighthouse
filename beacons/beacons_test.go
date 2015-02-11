@@ -16,7 +16,6 @@ package beacons
 
 import (
     "testing"
-    "reflect"
     "encoding/json"
 
     "github.com/stretchr/testify/assert"
@@ -24,89 +23,199 @@ import (
     "github.com/lighthouse/lighthouse/databases"
 )
 
-var database map[string]interface{}
-
-func makeTestingDatabase(t *testing.T) *databases.MockTable {
-    table := &databases.MockTable{}
-
-    database = map[string]interface{}{
-        "InstanceAddress" : "",
-        "BeaconAddress" : "",
-        "Token" : "",
-        "Users" : nil,
-    }
-
-    table.MockInsertSchema = func(values map[string]interface{})(error) {
-        for k, v := range values {
-            database[k] = v
-        }
-        return nil
-    }
-
-    table.MockUpdateSchema = func(to, where map[string]interface{})(error) {
-        for k, v := range to {
-            database[k] = v
-        }
-        return nil
-    }
-
-    table.MockSelectRowSchema = func(cols []string, where databases.Filter, dest interface{})(error) {
-        rv := reflect.ValueOf(dest).Elem()
-        for _, col := range cols {
-            rv.FieldByName(col).Set(reflect.ValueOf(database[col]))
-        }
-        return nil
-    }
-
-    return table
-}
-
 func Test_AddBeaconData(t *testing.T) {
-    SetupTestingTable(makeTestingDatabase(t))
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
     defer TeardownTestingTable()
 
-    users := userMap{"USER_PASS":true}
-    userJSON, _ := json.Marshal(users)
+    users := userMap{"USER":true}
 
     testBeaconData := beaconData{
-        "INST_ADDR_PASS", "BEACON_ADDR_PASS", "TOKEN_PASS", users,
+        "INST_ADDR", "BEACON_ADDR", "TOKEN", users,
     }
 
     addBeacon(testBeaconData)
 
-    assert.Equal(t, "INST_ADDR_PASS", database["InstanceAddress"],
+    assert.Equal(t, 1, len(table.Database),
+        "Database should have new element after AddBeacon")
+
+    assert.Equal(t, "INST_ADDR", table.Database[0][table.Schema["InstanceAddress"]],
         "AddBeacon should set InstanceAddress")
 
-    assert.Equal(t, "BEACON_ADDR_PASS", database["BeaconAddress"],
-        "AddBeacon should set InstanceAddress")
+    assert.Equal(t, "BEACON_ADDR", table.Database[0][table.Schema["BeaconAddress"]],
+        "AddBeacon should set BeaconAddress")
 
-    assert.Equal(t, "TOKEN_PASS", database["Token"],
-        "AddBeacon should set InstanceAddress")
+    assert.Equal(t, "TOKEN", table.Database[0][table.Schema["Token"]],
+        "AddBeacon should set Token")
 
-    assert.Equal(t, string(userJSON), database["Users"],
-        "AddBeacon should set InstanceAddress")
+    assert.Equal(t, users, table.Database[0][table.Schema["Users"]],
+        "AddBeacon should set Users")
 }
 
 func Test_UpdateBeaconData(t *testing.T) {
-    SetupTestingTable(makeTestingDatabase(t))
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
     defer TeardownTestingTable()
 
-    /*
-    testBeaconData := beaconData{
-        "INST_ADDR", "BEACON_ADDR_FAIL", "TOKEN_FAIL", userMap{"USER_FAIL":true},
+    testBeaconData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR_FAIL", 
+        "Token" : "TOKEN_FAIL", 
+        "Users" : userMap{"USER_FAIL":true},
     }
 
-    updateBeaconData := beaconData{
-        "INST_ADDR", "BEACON_ADDR_PASS", "TOKEN_PASS", userMap{"USER_PASS":true},
-    }
+    table.InsertSchema(testBeaconData)
 
     updateBeaconField("BeaconAddress", "BEACON_ADDR_PASS", "INST_ADDR")
-    */
+    assert.Equal(t, "BEACON_ADDR_PASS", table.Database[0][table.Schema["BeaconAddress"]],
+        "updateBeaconField should update BeaconAddress")
+
+    updateBeaconField("Token", "TOKEN_PASS", "INST_ADDR")
+    assert.Equal(t, "TOKEN_PASS", table.Database[0][table.Schema["Token"]],
+        "updateBeaconField should update Token")
+
+    passJSON, _ := json.Marshal(userMap{"USER_PASS":true})
+    updateBeaconField("Users", passJSON, "INST_ADDR")
+    assert.Equal(t, string(passJSON), table.Database[0][table.Schema["Users"]],
+        "updateBeaconField should update Users")
+
+    updateBeaconField("InstanceAddress", "INST_ADDR_PASS", "INST_ADDR")
+    assert.Equal(t, "INST_ADDR_PASS", table.Database[0][table.Schema["InstanceAddress"]],
+        "updateBeaconField should update InstanceAddress")
+}
+
+func Test_GetBeaconAddress_Found(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    users := userMap{"USER":true}
+
+    testBeaconData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : users,
+    }
+
+    table.InsertSchema(testBeaconData)
+
+    res, err := GetBeaconAddress("INST_ADDR")
+
+    assert.Nil(t, err, 
+        "GetBeaconAddress should not return error beacon was found")
+
+    assert.Equal(t, "BEACON_ADDR", res, 
+        "GetBeaconAddress should give correct address")
+}
+
+func Test_GetBeaconAddress_NotFound(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    res, err := GetBeaconAddress("BAD_ADDR")
+
+    assert.NotNil(t, err, 
+        "GetBeaconAddress should forward errors")
+
+    assert.Equal(t, "", res, 
+        "GetBeaconAddress should give empty string on error")
+}
+
+func Test_GetBeaconData_Found(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    users := userMap{"USER":true}
+
+    testBeaconData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : users,
+    }
+
+    table.InsertSchema(testBeaconData)
+
+    res, err := getBeaconData("INST_ADDR")
+
+    assert.Nil(t, err, "getBeaconData should not return error beacon was found")
+
+    key := beaconData{"INST_ADDR", "BEACON_ADDR", "TOKEN", users}
+    assert.Equal(t, key, res, 
+        "getBeaconData should give correct beaconData")
 }
 
 func Test_GetBeaconData_NotFound(t *testing.T) {
-    SetupTestingTable(makeTestingDatabase(t))
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
     defer TeardownTestingTable()
 
-    //res, err := getBeaconData("TEST_INST")
+    res, err := getBeaconData("BAD_INST")
+
+    assert.NotNil(t, err, "getBeaconData should forward errors")
+
+    assert.Equal(t, beaconData{}, res, 
+        "getBeaconData should give empty beaconData on error")
+}
+
+func Test_GetBeaconToken_NotFound(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    res, err := GetBeaconToken("BAD_INST", "junk user")
+
+    assert.NotNil(t, err, "GetBeaconToken should forward errors")
+
+    assert.Equal(t, "", res, 
+        "GetBeaconToken should give empty token on error")
+}
+
+func Test_GetBeaconToken_NotPermitted(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    testBeaconData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{},
+    }
+
+    table.InsertSchema(testBeaconData)
+
+    res, err := GetBeaconToken("INST_ADDR", "BAD_USER")
+
+    assert.NotNil(t, err, 
+        "GetBeaconToken should return error on bad permissions")
+
+    assert.Equal(t, "", res, 
+        "GetBeaconToken should give empty token on bad permissions")
+}
+
+func Test_GetBeaconToken_Valid(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupTestingTable(table)
+    defer TeardownTestingTable()
+
+    testBeaconData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"USER":true},
+    }
+
+    table.InsertSchema(testBeaconData)
+
+    res, err := GetBeaconToken("INST_ADDR", "USER")
+
+    assert.Nil(t, err, 
+        "GetBeaconToken should return nil error on success")
+
+    assert.Equal(t, "TOKEN", res, 
+        "GetBeaconToken should give corrent token")
 }

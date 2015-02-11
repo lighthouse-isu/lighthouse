@@ -45,8 +45,10 @@ func (this *Scanner) Scan(dest interface{}) error {
 
         rv := reflect.ValueOf(dest).Elem()
         for i, colName := range columns {
-            setVal := this.table.getValueOf(row[i], colName)
-            rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+            setVal := this.table.convertOutput(row[i], colName)
+            if setVal != nil {
+                rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+            }
         }
     } else {
         return this.rows.Err()

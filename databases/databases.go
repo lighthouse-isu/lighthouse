@@ -122,8 +122,18 @@ func (this *Table) drop() {
     this.db.Exec(query)
 }
 
+func (this *Table) convertInput(orig interface{}, col string) interface{} {
+    colType := this.schema[col]
 
-func (this *Table) getValueOf(orig interface{}, col string) interface{} {
+    if strings.Contains(colType, "json") {
+        b, _ := json.Marshal(orig)
+        return b
+    }
+    
+    return orig
+}
+
+func (this *Table) convertOutput(orig interface{}, col string) interface{} {
     colType := this.schema[col]
 
     if strings.Contains(colType, "text") {
@@ -168,10 +178,11 @@ func (this *Table) InsertSchema(values map[string]interface{}) error {
             valBuf.WriteString(",")
         }
         colBuf.WriteString(col)
+
         s := fmt.Sprintf(`($%d)`, i + 1)
         valBuf.WriteString(s)
 
-        queryVals[i] = val
+        queryVals[i] = this.convertInput(val, col)
 
         i += 1
     }
@@ -219,7 +230,7 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
         buffer.WriteString(" = ")
         buffer.WriteString(fmt.Sprintf("($%d)", i))
 
-        vals[i - 1] = val
+        vals[i - 1] = this.convertInput(val, col)
         i += 1
     }
 
@@ -338,8 +349,10 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
 
     rv := reflect.ValueOf(dest).Elem()
     for i, colName := range columns {
-        setVal := this.getValueOf(values[i], colName)
-        rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+        setVal := this.convertOutput(values[i], colName)
+        if setVal != nil {
+            rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+        }
     }
 
     if err != nil {

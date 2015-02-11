@@ -71,19 +71,14 @@ func Init() {
     }
 }
 
-func createDatabaseEntryFor(beacon beaconData) map[string]interface{} {
-    usersJson, _ := json.Marshal(beacon.Users)
-    
-    return map[string]interface{}{
+func addBeacon(beacon beaconData) error {
+    entry := map[string]interface{}{
         "InstanceAddress" : beacon.InstanceAddress,
         "BeaconAddress" : beacon.BeaconAddress,
         "Token" : beacon.Token,
-        "Users" : string(usersJson),
+        "Users" : beacon.Users,
     }
-}
 
-func addBeacon(beacon beaconData) error {
-    entry := createDatabaseEntryFor(beacon)
     return getDBSingleton().InsertSchema(entry)
 }
 
@@ -130,6 +125,11 @@ func GetBeaconToken(instance, user string) (string, error) {
 
     if err != nil {
         return "", err
+    }
+
+    // Database gives nil on empty map
+    if beacon.Users == nil {
+        return "", TokenPermissionError
     }
 
     _, ok := beacon.Users[user]
@@ -221,13 +221,12 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
     beacon, err := getBeaconData(instance)
 
     if err == nil {
-        if beacon.Users == nil { // JSON gives nil on empty map
-            beacon.Users = make(userMap)
+        if beacon.Users == nil {
+            beacon.Users = userMap{userId : true}
+        } else {
+            beacon.Users[userId] = true
         }
-
-        beacon.Users[userId] = true
-        newUsers, _ := json.Marshal(beacon.Users)
-        err = updateBeaconField("Users", newUsers, instance)
+        err = updateBeaconField("Users", beacon.Users, instance)
     }
 
     writeResponse(err, w)
@@ -243,15 +242,7 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
 
     if err == nil {
         delete(beacon.Users, userId)
-        var newUsers []byte
-
-        if len(beacon.Users) > 0 {
-            newUsers, _ = json.Marshal(beacon.Users)
-        } else {
-            newUsers = []byte("{}")
-        }
-
-        err = updateBeaconField("Users", newUsers, instance)
+        err = updateBeaconField("Users", beacon.Users, instance)
     }
 
     writeResponse(err, w)
