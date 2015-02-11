@@ -19,6 +19,7 @@ import (
     "bytes"
     "strings"
     "errors"
+    "reflect"
     "encoding/json"
 
     "database/sql"
@@ -67,7 +68,6 @@ func NewTable(db DBInterface, table string) *Table {
 
 func NewSchemaTable(db DBInterface, table string, schema Schema) *Table {
     this := &Table{db, table, schema}
-    this.drop() //check if table already exists, instead of drop?
     this.InitSchema()
     return this
 }
@@ -237,7 +237,7 @@ func (this *Table) SelectRow(key string, value interface{}) error {
     return err
 }
 
-func (this *Table) SelectRowSchema(columns []string, where Filter, value interface{}) error {
+func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
     var buffer bytes.Buffer
 
     buffer.WriteString("SELECT ")
@@ -260,21 +260,22 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, value interfa
     buffer.WriteString(this.table)
 
     whereVals := make([]interface{}, len(where))
+    if where != nil {
+        i := 1
+        buffer.WriteString(" WHERE ")
 
-    i := 1
-    buffer.WriteString(" WHERE ")
+        for col, val := range where {
+            if i != 1 {
+                buffer.WriteString(" && ")
+            }
 
-    for col, val := range where {
-        if i != 1 {
-            buffer.WriteString(" && ")
+            buffer.WriteString(col)
+            buffer.WriteString(" = ")
+            buffer.WriteString(fmt.Sprintf("($%d)", i))
+
+            whereVals[i - 1] = val
+            i += 1
         }
-
-        buffer.WriteString(col)
-        buffer.WriteString(" = ")
-        buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-        whereVals[i - 1] = val
-        i += 1
     }
 
     buffer.WriteString(";")
@@ -299,42 +300,19 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, value interfa
 
     err := row.Scan(valuePtrs...)
 
+    rv := reflect.ValueOf(dest)
+    for i, colName := range columns {
+        rv.FieldByName(colName).Set(reflect.ValueOf(values[i]))
+    }
+
     if err != nil {
         return err
     }
 
-    var jsonBuff bytes.Buffer
-
-    jsonBuff.WriteString("{")
-
-    if columns != nil {
-        for _, col := range columns {
-            jsonBuff.WriteString(fmt.Sprintf(`"%s":%s,`, 
-                col, getJSONFormatFor(col, this.schema)))
-        }
-    } else {
-        for col, _ := range this.schema { 
-            jsonBuff.WriteString(fmt.Sprintf(`"%s":%s,`, 
-                col, getJSONFormatFor(col, this.schema)))
-        }
-    }
-
-    jsonBytes := jsonBuff.Bytes()
-    jsonBytes[len(jsonBytes) - 1] = '}' // Trailing comma
-
-    for i, val := range values {
-        if b, ok := val.([]byte); ok {
-            values[i] = string(b)
-        }
-    }
-
-    jsonStr := fmt.Sprintf(jsonBuff.String(), values...)
-
-    fmt.Println(jsonStr)
-
-    return json.Unmarshal([]byte(jsonStr), value)
+    return err
 }
 
+//Unused?
 func getJSONFormatFor(col string, schema Schema) string {
     if strings.Contains(schema[col], "text") {
         return `"%v"`
@@ -354,6 +332,7 @@ func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Ro
     return
 }
 
+//Unused?
 func (this *Table) SelectSchema(columns []string, filter Filter) (*Scanner, error) {
     var buffer bytes.Buffer
 
