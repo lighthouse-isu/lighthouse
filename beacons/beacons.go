@@ -36,20 +36,27 @@ const (
     HEADER_TOKEN_KEY = "Token"
 )
 
+var (
+    TokenPermissionError = errors.New("beacons: user not permitted to access token")
+)
+
 var beacons *databases.Table
 
 var schema = databases.Schema {
     "InstanceAddress" : "text UNIQUE PRIMARY KEY",
-    "Address" : "text",
+    "BeaconAddress" : "text",
     "Token" : "text",
     "Users" : "json",
 }
 
-type Beacon struct {
-    Address string
+type beaconData struct {
+    InstanceAddress string
+    BeaconAddress string
     Token string
-    Users map[string]bool
+    Users userMap
 }
+
+type userMap map[string]interface{}
 
 func getDBSingleton() *databases.Table {
     if beacons == nil {
@@ -64,45 +71,77 @@ func Init() {
     }
 }
 
-func createDatabaseEntryFor(instance string, beacon Beacon) databases.Filter {
+func createDatabaseEntryFor(beacon beaconData) databases.Filter {
     usersJson, _ := json.Marshal(beacon.Users)
     
     return databases.Filter{
-        "InstanceAddress" : instance,
-        "Address" : beacon.Address,
+        "InstanceAddress" : beacon.InstanceAddress,
+        "BeaconAddress" : beacon.BeaconAddress,
         "Token" : beacon.Token,
         "Users" : string(usersJson),
     }
 }
 
-func AddBeacon(instance string, beacon Beacon) error {
-    entry := createDatabaseEntryFor(instance, beacon)
+func addBeacon(beacon beaconData) error {
+    entry := createDatabaseEntryFor(beacon)
     return getDBSingleton().InsertSchema(entry)
 }
 
-func UpdateBeacon(instance string, beacon Beacon) error {
-    to := createDatabaseEntryFor(instance, beacon)
+func updateBeaconField(field string, val interface{}, instance string) error {
+    to := databases.Filter{field : val}
     where := databases.Filter{"InstanceAddress": instance}
 
     return getDBSingleton().UpdateSchema(to, where)
 }
 
-func GetBeacon(instance string) (Beacon, error) {
-    var beacon Beacon
+func getBeaconData(instance string) (beaconData, error) {
+    var beacon beaconData
     where := databases.Filter{"InstanceAddress" : instance}
-    columns := []string{"Address" , "Token", "Users"}
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+    err := getDBSingleton().SelectRowSchema(nil, where, &beacon)
 
     if err != nil {
-        fmt.Println(err)
-        return Beacon{"", "", make(map[string]bool)}, err
+        return beaconData{}, err
     }
    
     return beacon, nil
 }
 
-func LoadBeacons() map[string]Beacon {
+func GetBeaconAddress(instance string) (string, error) {
+    var beacon beaconData
+    where := databases.Filter{"InstanceAddress" : instance}
+    columns := []string{"BeaconAddress"}
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+
+    if err != nil {
+        return "", err
+    }
+   
+    return beacon.BeaconAddress, nil
+}
+
+func GetBeaconToken(instance, user string) (string, error) {
+    var beacon beaconData
+    where := databases.Filter{"InstanceAddress" : instance}
+    columns := []string{"Token", "Users"}
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+
+    if err != nil {
+        return "", err
+    }
+
+    _, ok := beacon.Users[user]
+
+    if !ok {
+        return "", TokenPermissionError
+    }
+   
+    return beacon.Token, nil
+}
+
+func LoadBeacons() []beaconData {
     var fileName string
     if _, err := os.Stat("/config/beacon_permissions.json"); os.IsNotExist(err) {
         fileName = "./config/beacon_permissions.json"
@@ -112,26 +151,17 @@ func LoadBeacons() map[string]Beacon {
 
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var beacons []struct {
-        Address string
-        Beacon Beacon
-    }
-
+    var beacons []beaconData
     json.Unmarshal(configFile, &beacons)
 
-    perms := make(map[string]Beacon)
-    for _, beacon := range beacons {
-        perms[beacon.Address] = beacon.Beacon
-    }
-
-    return perms
+    return beacons
 }
 
 func Handle(r *mux.Router) {
     beacons := LoadBeacons()
 
-    for instance, beacon := range beacons {
-        AddBeacon(instance, beacon)
+    for _, beacon := range beacons {
+        addBeacon(beacon)
     }
 
     r.HandleFunc("/user/{Instance}/{Id}", handleAddUserToBeacon).Methods("PUT")
@@ -188,11 +218,16 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
     instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
-    beacon, err := GetBeacon(instance)
+    beacon, err := getBeaconData(instance)
 
     if err == nil {
+        if beacon.Users == nil { // JSON gives nil on empty map
+            beacon.Users = make(userMap)
+        }
+
         beacon.Users[userId] = true
-        err = UpdateBeacon(instance, beacon)
+        newUsers, _ := json.Marshal(beacon.Users)
+        err = updateBeaconField("Users", newUsers, instance)
     }
 
     writeResponse(err, w)
@@ -204,10 +239,19 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
     instance := getInstanceAlias(vars["Instance"])
     userId := vars["Id"]
 
-    beacon, err := GetBeacon(instance)
+    beacon, err := getBeaconData(instance)
+
     if err == nil {
         delete(beacon.Users, userId)
-        err = UpdateBeacon(instance, beacon)
+        var newUsers []byte
+
+        if len(beacon.Users) > 0 {
+            newUsers, _ = json.Marshal(beacon.Users)
+        } else {
+            newUsers = []byte("{}")
+        }
+
+        err = updateBeaconField("Users", newUsers, instance)
     }
 
     writeResponse(err, w)
@@ -219,11 +263,7 @@ func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
     instance := getInstanceAlias(vars["Instance"])
     address := vars["Address"]
 
-    beacon, err := GetBeacon(instance)
-    if err == nil {
-        beacon.Address = address
-        err = UpdateBeacon(instance, beacon)
-    }
+    err := updateBeaconField("BeaconAddress", address, instance)
 
     writeResponse(err, w)
 }
@@ -245,11 +285,7 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    beacon, _ := GetBeacon(instance)
-    if err == nil {
-        beacon.Token = token
-        err = UpdateBeacon(instance, beacon)
-    }
+    err = updateBeaconField("Token", token, instance)
 
     writeResponse(err, w)
 }
@@ -260,23 +296,23 @@ func handleCreate(r *http.Request) (int, error) {
         return http.StatusInternalServerError, err
     }
 
-    var beaconData struct {
+    var beaconInfo struct {
         Address string
         Token string
         Users []string
     }
 
-    err = json.Unmarshal(reqBody, &beaconData)
+    err = json.Unmarshal(reqBody, &beaconInfo)
     if err != nil {
         return http.StatusInternalServerError, err
     }
 
-    beacon := Beacon{beaconData.Address, beaconData.Token, make(map[string]bool)}
-    for _, user := range beaconData.Users {
+    beacon := beaconData{"", beaconInfo.Address, beaconInfo.Token, make(userMap)}
+    for _, user := range beaconInfo.Users {
         beacon.Users[user] = true
     }
 
-    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.Address)
+    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.BeaconAddress)
 
     req, err := http.NewRequest("GET", vmsTarget, nil)
     if err != nil {
@@ -284,7 +320,7 @@ func handleCreate(r *http.Request) (int, error) {
     }
 
     // Assuming user has permission to access token since they provided it
-    req.Header.Set(HEADER_TOKEN_KEY, beaconData.Token)
+    req.Header.Set(HEADER_TOKEN_KEY, beaconInfo.Token)
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
@@ -310,8 +346,8 @@ func handleCreate(r *http.Request) (int, error) {
     }
 
     for _, vm := range vms {
-        address := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
-        err = AddBeacon(address, beacon)
+        beacon.InstanceAddress = fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
+        err = addBeacon(beacon)
     }
 
     return http.StatusOK, nil

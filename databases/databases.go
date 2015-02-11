@@ -68,6 +68,7 @@ func NewTable(db DBInterface, table string) *Table {
 
 func NewSchemaTable(db DBInterface, table string, schema Schema) *Table {
     this := &Table{db, table, schema}
+    this.drop()
     this.InitSchema()
     return this
 }
@@ -124,6 +125,27 @@ func (this *Table) Insert(key string, value interface{}) error {
     return err
 }
 
+func (this *Table) getValueOf(orig interface{}, col string) interface{} {
+    colType := this.schema[col]
+
+    if strings.Contains(colType, "text") {
+        return string(orig.([]byte))
+    }
+
+    if strings.Contains(colType, "json") {
+        var read interface{}
+
+        err := json.Unmarshal(orig.([]byte), &read)
+        if err != nil {
+            return orig
+        }
+
+        return read
+    }
+    
+    return orig
+}
+
 func (this *Table) InsertSchema(values map[string]interface{}) error {
     var colBuf, valBuf bytes.Buffer
     queryVals := make([]interface{}, len(values))
@@ -178,7 +200,7 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
     i := 1
 
     for col, val := range to {
-        if i != len(where) + 1 {
+        if i != 1 {
             buffer.WriteString(", ")
         }
 
@@ -299,10 +321,14 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     err := row.Scan(valuePtrs...)
+    if err != nil {
+        return err
+    }
 
-    rv := reflect.ValueOf(dest)
+    rv := reflect.ValueOf(dest).Elem()
     for i, colName := range columns {
-        rv.FieldByName(colName).Set(reflect.ValueOf(values[i]))
+        setVal := this.getValueOf(values[i], colName)
+        rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
     }
 
     if err != nil {
@@ -310,14 +336,6 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     return err
-}
-
-//Unused?
-func getJSONFormatFor(col string, schema Schema) string {
-    if strings.Contains(schema[col], "text") {
-        return `"%v"`
-    }
-    return `%v`
 }
 
 //Deprecated (Really, don't ever use this. It's going away in a week)
@@ -384,5 +402,5 @@ func (this *Table) SelectSchema(columns []string, filter Filter) (*Scanner, erro
         return nil, err
     }
 
-    return &Scanner{rows}, nil
+    return &Scanner{rows, this}, nil
 }

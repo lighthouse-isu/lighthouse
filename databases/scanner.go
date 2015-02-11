@@ -21,6 +21,7 @@ import (
 
 type Scanner struct {
 	rows *sql.Rows
+    table *Table
 }
 
 func (this *Scanner) Scan(dest interface{}) error {
@@ -42,9 +43,10 @@ func (this *Scanner) Scan(dest interface{}) error {
     if canScan {
 	    this.rows.Scan(rowPtrs...)
 
-        rv := reflect.ValueOf(dest)
+        rv := reflect.ValueOf(dest).Elem()
         for i, colName := range columns {
-            rv.FieldByName(colName).Set(reflect.ValueOf(row[i]))
+            setVal := this.table.getValueOf(row[i], colName)
+            rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
         }
     } else {
         return this.rows.Err()
