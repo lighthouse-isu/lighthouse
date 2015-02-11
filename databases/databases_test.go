@@ -48,6 +48,10 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData, Schema) {
         call["query_row"] = testParameterPair{s, i}
         return nil
     }
+    db.MockQuery = func(s string, i ...interface{}) (*sql.Rows, error) {
+        call["query"] = testParameterPair{s, i}
+        return nil, errors.New("junk")
+    }
 
     return db, call, schema
 }
@@ -136,7 +140,6 @@ func Test_InsertSchema(t *testing.T) {
     assert.True(t, strings.Contains(q, "test_table"),
         "Insertion Exec call should contain table name")
     
-    //I hate maps
     var firstCol, lastCol string
     locs := map[string]int {
         "Id" : strings.Index(q, "Id"),
@@ -263,6 +266,38 @@ func Test_SelectRowSchema(t *testing.T) {
 
     q := call["query_row"].query
     args := call["query_row"].args[0].([]interface{})
+
+    assert.True(t, strings.Contains(q, "SELECT"),
+        "Row query should contain SELECT")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Query should contain table name")
+
+    for _, col := range columns {
+        assert.True(t, strings.Contains(q, col),
+            "Row query should contain column name")
+    }
+
+    assert.True(t, strings.Contains(q, "WHERE"),
+        "Row query should contain WHERE")
+    assert.True(t, strings.Contains(q, "Id"),
+        "Row query should contain filter column")
+    assert.Equal(t, 1, args[0].(int),
+        "Row query parameters should contain filter values")
+}
+
+func Test_SelectSchema(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+
+    columns := []string {"Id", "Name", "Age"}
+    filter := Filter {
+        "Id" : 1,
+    }
+
+    table.SelectSchema(columns, filter)
+
+    q := call["query"].query
+    args := call["query"].args[0].([]interface{})
 
     assert.True(t, strings.Contains(q, "SELECT"),
         "Row query should contain SELECT")
