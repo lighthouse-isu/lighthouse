@@ -18,8 +18,12 @@ import (
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func SetupTestingTable(table *databases.MockTable) {
+func SetupCustomTestingTable(table *databases.MockTable) {
     beacons = table
+}
+
+func SetupTestingTable() {
+    beacons = databases.CommonTestingTable(schema) // schema defined in beacons.go
 }
 
 func TeardownTestingTable() {

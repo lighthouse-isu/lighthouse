@@ -58,10 +58,7 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData, Schema) {
 
 func Test_NewTable(t *testing.T) {
     db, call, _ := makeTestingDatabase(t)
-    table := NewTable(db, "test_table")
-
-    assert.Equal(t, db, table.db, "Database pointer not stored properly")
-    assert.Equal(t, "test_table", table.table, "Table name not stored properly")
+    NewTable(db, "test_table")
 
     q := call["exec"].query
 
@@ -73,11 +70,7 @@ func Test_NewTable(t *testing.T) {
 
 func Test_NewSchemaTable(t *testing.T) {
     db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
-
-    assert.Equal(t, db, table.db, "Database pointer not stored properly")
-    assert.Equal(t, "test_table", table.table, "Table name not stored properly")
-    assert.Equal(t, schema, table.schema, "Table schema not stored properly")
+    NewSchemaTable(db, "test_table", schema)
 
     q := call["exec"].query
 

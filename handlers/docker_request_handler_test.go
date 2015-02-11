@@ -24,7 +24,6 @@ import (
 
     "github.com/stretchr/testify/assert"
 
-    "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/beacons"
 )
 
@@ -34,8 +33,6 @@ import (
     single handler function.  The purpose of this server is to emulate various
     types of real Docker responses and test proper handling of them.
 */
-
-var mockBeaconsDB = databases.CommonTestingDatabase()
 
 // Helper to perform test server setup.  Returns a *Server which will
 // need to be closed at the end of the calling test
@@ -63,7 +60,7 @@ func SetupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
     Purpose: GET and DELETE requests
 */
 func Test_DockerRequestHandler_GET(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
@@ -94,7 +91,7 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
     Tests docker request forwarding requests with query params
 */
 func Test_DockerRequestHandler_query_params(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
@@ -130,7 +127,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
     Purpose: POST and PUT requests
 */
 func Test_DockerRequestHandler_POST(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     testBody := []byte("TestBody")
@@ -168,7 +165,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
     Purpose: Ensuring that we handle either bad endpoints, or bad URLS
 */
 func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     w := httptest.NewRecorder()
@@ -191,7 +188,7 @@ func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
     Purpose: Ensuring that we forward remote error correctly
 */
 func Test_DockerRequestHandler_ServerError(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
@@ -221,7 +218,7 @@ func Test_DockerRequestHandler_ServerError(t *testing.T) {
     Purpose: Ensuring that we forward remote error correctly
 */
 func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
-    beacons.SetupTestingTable(mockBeaconsDB)
+    beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {

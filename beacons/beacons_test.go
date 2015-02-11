@@ -25,7 +25,7 @@ import (
 
 func Test_AddBeaconData(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     users := userMap{"USER":true}
@@ -54,7 +54,7 @@ func Test_AddBeaconData(t *testing.T) {
 
 func Test_UpdateBeaconData(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     testBeaconData := map[string]interface{}{
@@ -86,7 +86,7 @@ func Test_UpdateBeaconData(t *testing.T) {
 
 func Test_GetBeaconAddress_Found(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     users := userMap{"USER":true}
@@ -111,7 +111,7 @@ func Test_GetBeaconAddress_Found(t *testing.T) {
 
 func Test_GetBeaconAddress_NotFound(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     res, err := GetBeaconAddress("BAD_ADDR")
@@ -125,7 +125,7 @@ func Test_GetBeaconAddress_NotFound(t *testing.T) {
 
 func Test_GetBeaconData_Found(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     users := userMap{"USER":true}
@@ -150,7 +150,7 @@ func Test_GetBeaconData_Found(t *testing.T) {
 
 func Test_GetBeaconData_NotFound(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     res, err := getBeaconData("BAD_INST")
@@ -163,7 +163,7 @@ func Test_GetBeaconData_NotFound(t *testing.T) {
 
 func Test_GetBeaconToken_NotFound(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     res, err := GetBeaconToken("BAD_INST", "junk user")
@@ -176,7 +176,7 @@ func Test_GetBeaconToken_NotFound(t *testing.T) {
 
 func Test_GetBeaconToken_NotPermitted(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     testBeaconData := map[string]interface{}{
@@ -199,7 +199,7 @@ func Test_GetBeaconToken_NotPermitted(t *testing.T) {
 
 func Test_GetBeaconToken_Valid(t *testing.T) {
     table := databases.CommonTestingTable(schema)
-    SetupTestingTable(table)
+    SetupCustomTestingTable(table)
     defer TeardownTestingTable()
 
     testBeaconData := map[string]interface{}{
