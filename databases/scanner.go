@@ -15,24 +15,44 @@
 package databases
 
 import (
-    "fmt"
-    "encoding/json"
-
+    "reflect"
     "database/sql"
 )
 
 type Scanner struct {
-	sql.Rows
-	jsonFmt string
-	columnCount int
+	rows *sql.Rows
 }
 
 func (this *Scanner) Scan(dest interface{}) error {
-	row := make([]interface{}, this.columnCount)
+    columns, err := this.rows.Columns()
 
-	this.Rows.Scan(row...)
+    if err != nil {
+        return err
+    }
 
-	jsonStr := fmt.Sprintf(this.jsonFmt, row...)
+	row := make([]interface{}, len(columns))
+    rowPtrs := make([]interface{}, len(columns))
 
-	return json.Unmarshal([]byte(jsonStr), dest)
+    for i := 0; i < len(row); i++ {
+        rowPtrs[i] = &row[i]
+    }
+
+    canScan := this.rows.Next()
+
+    if canScan {
+	    this.rows.Scan(rowPtrs...)
+
+        rv := reflect.ValueOf(dest)
+        for i, colName := range columns {
+            rv.FieldByName(colName).Set(reflect.ValueOf(row[i]))
+        }
+    } else {
+        return this.rows.Err()
+    }
+
+    return nil
+}
+
+func (this *Scanner) Close() error {
+    return this.rows.Close()
 }

@@ -320,6 +320,7 @@ func getJSONFormatFor(col string, schema Schema) string {
     return `%v`
 }
 
+//Deprecated (Really, don't ever use this. It's going away in a week)
 func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Row) {
     var vals = make([]interface{}, len(queryParams))
 
@@ -332,7 +333,6 @@ func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Ro
     return
 }
 
-//Unused?
 func (this *Table) SelectSchema(columns []string, filter Filter) (*Scanner, error) {
     var buffer bytes.Buffer
 
@@ -383,22 +383,6 @@ func (this *Table) SelectSchema(columns []string, filter Filter) (*Scanner, erro
     if err != nil {
         return nil, err
     }
-   
-    var jsonBuff bytes.Buffer
 
-    jsonBuff.WriteString("{")
-
-    if columns != nil {
-        for _, col := range columns {
-            jsonBuff.WriteString(fmt.Sprintf("%s:%%v,", col))
-        }
-    } else {
-        for col, _ := range this.schema { 
-            jsonBuff.WriteString(fmt.Sprintf("%s:%%v,", col))
-        }
-    }
-
-    jsonBuff.WriteString("}")
-
-    return &Scanner{*rows, jsonBuff.String(), len(this.schema)}, nil
+    return &Scanner{rows}, nil
 }
