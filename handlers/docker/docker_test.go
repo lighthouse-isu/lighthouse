@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handlers
+package docker
 
 import (
     "testing"
@@ -26,6 +26,7 @@ import (
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/handlers"
 )
 
 /*
@@ -75,7 +76,7 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -110,7 +111,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/?test=pass", nil)
-    info := HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -148,7 +149,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(testBody))
-    info := HandlerInfo{"", "localhost:8080", &RequestBody{string(testBody)}, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{string(testBody)}, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -173,7 +174,7 @@ func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -203,7 +204,7 @@ func Test_DockerRequestHandler_ServerError(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -233,7 +234,7 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 

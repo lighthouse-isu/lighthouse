@@ -20,10 +20,10 @@ import (
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/provider"
-    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
+    "github.com/lighthouse/lighthouse/handlers/docker"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -37,7 +37,6 @@ const (
 func ServeIndex(w http.ResponseWriter, r *http.Request) {
     http.ServeFile(w, r, "static/index.html")
 }
-
 
 func main() {
 
@@ -58,11 +57,7 @@ func main() {
 
     versionRouter := baseRouter.PathPrefix(API_VERSION_0_2).Subrouter()
 
-    dockerRouter := versionRouter.PathPrefix("/d")
-    hostRouter := dockerRouter.PathPrefix("/{Host}").Methods("GET", "POST", "PUT", "DELETE").Subrouter()
-    hostRouter.HandleFunc("/{DockerURL:.*}", handlers.DockerHandler)
-
-
+    docker.Handle(versionRouter.PathPrefix("/d").Subrouter())
     provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     auth.Handle(versionRouter)
