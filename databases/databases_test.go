@@ -17,6 +17,7 @@ package databases
 import (
     "testing"
     "strings"
+    "fmt"
     "errors"
     "database/sql"
 
@@ -30,9 +31,14 @@ type testParameterPair struct {
 
 type testCallData map[string]testParameterPair
 
-func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData) {
+func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData, Schema) {
     db := &MockDatabase{}
     call := make(testCallData)
+    schema := Schema {
+        "Id" : "serial primary key",
+        "Name" : "text",
+        "Age" : "integer",
+    }
 
     db.MockExec = func(s string, i ...interface{}) (sql.Result, error) {
         call["exec"] = testParameterPair{s, i}
@@ -43,11 +49,11 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData) {
         return nil
     }
 
-    return db, call
+    return db, call, schema
 }
 
 func Test_NewTable(t *testing.T) {
-    db, call := makeTestingDatabase(t)
+    db, call, _ := makeTestingDatabase(t)
     table := NewTable(db, "test_table")
 
     assert.Equal(t, db, table.db, "Database pointer not stored properly")
@@ -61,8 +67,31 @@ func Test_NewTable(t *testing.T) {
         "Table creation Exec call should contain table name")
 }
 
+func Test_NewSchemaTable(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+
+    assert.Equal(t, db, table.db, "Database pointer not stored properly")
+    assert.Equal(t, "test_table", table.table, "Table name not stored properly")
+    assert.Equal(t, schema, table.schema, "Table schema not stored properly")
+
+    q := call["exec"].query
+
+    assert.True(t, strings.Contains(q, "CREATE"), 
+        "Database setup should CREATE table")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Table creation Exec call should contain table name")
+
+    for col, dataType := range schema {
+        assert.True(t, strings.Contains(q, col),
+            fmt.Sprintf("Table should be created with schema column %s", col))
+        assert.True(t, strings.Contains(q, dataType),
+            fmt.Sprintf("Table should create %s with type %s", col, dataType))
+    }
+}
+
 func Test_Insert(t *testing.T) {
-    db, call := makeTestingDatabase(t)
+    db, call, _ := makeTestingDatabase(t)
     table := NewTable(db, "test_table")
 
     table.Insert("TEST_KEY", "TEST_VAL")
@@ -81,8 +110,76 @@ func Test_Insert(t *testing.T) {
         "Insertion call should encode given value as JSON")
 }
 
+func Test_InsertSchema(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+    
+    newData := map[string]interface{}{
+        "Id" : "DEFAULT",
+        "Name" : "John Doe",
+        "Age" : 42,
+    }
+    
+    revData := map[interface{}]string {
+        "DEFAULT" : "Id",
+        "John Doe" : "Name",
+        42 : "Age",
+    }
+
+    table.InsertSchema(newData)
+
+    q := call["exec"].query
+    args := call["exec"].args[0].([]interface{})
+
+    assert.True(t, strings.Contains(q, "INSERT"),
+        "Insert query should contain INSERT")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Insertion Exec call should contain table name")
+    
+    //I hate maps
+    var firstCol, lastCol string
+    locs := map[string]int {
+        "Id" : strings.Index(q, "Id"),
+        "Name" : strings.Index(q, "Name"),
+        "Age" : strings.Index(q, "Age"),
+    }
+    
+    assert.True(t, locs["Age"] >= 0, "Query should contain 'Age' column")
+    assert.True(t, locs["Name"] >= 0, "Query should contain 'Name' column")
+    assert.True(t, locs["Id"] >= 0, "Query should contain 'Id' column")
+    
+    firstCol = min(locs, min(locs, "Id", "Name"), "Age")
+    lastCol = max(locs, max(locs, "Id", "Name"), "Age")
+
+    assert.Equal(t, newData[firstCol], args[0],
+        fmt.Sprintf("Query param for %s is incorrect", firstCol))
+    assert.Equal(t, newData[lastCol], args[2],
+        fmt.Sprintf("Query param for %s is incorrect", lastCol))
+
+    midCol := revData[args[1]] != firstCol &&
+              revData[args[1]] != lastCol &&
+              revData[args[1]] != ""
+
+    assert.True(t, midCol,
+        fmt.Sprintf("Middle query param %v is incorrect", args[1]))
+}
+
+func min(locs map[string]int, a, b string) string {
+    if locs[a] < locs[b] {
+        return a
+    }
+    return b
+}
+
+func max(locs map[string]int, a, b string) string {
+    if locs[a] > locs[b] {
+        return a
+    }
+    return b
+}
+
 func Test_Update(t *testing.T) {
-    db, call := makeTestingDatabase(t)
+    db, call, _ := makeTestingDatabase(t)
     table := NewTable(db, "test_table")
 
     table.Update("TEST_KEY", "TEST_VAL")
@@ -101,8 +198,42 @@ func Test_Update(t *testing.T) {
         "Insertion call should encode given value as JSON")
 }
 
+func Test_UpdateSchema(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+    
+    to := map[string]interface{} {
+        "Name": "Jane Doe",
+    }
+
+    where := map[string]interface{} {
+        "Id" : 1,
+    }
+
+    table.UpdateSchema(to, where)
+    q := call["exec"].query
+    args := call["exec"].args[0].([]interface{})
+
+    assert.True(t, strings.Contains(q, "UPDATE"),
+        "Update query should contain UPDATE")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Update Exec call should contain table name")
+    assert.True(t, strings.Contains(q, "Name"),
+        "Update query should to contain column name")
+    assert.True(t, strings.Contains(q, "Id"),
+        "Update query should contain where column name")
+    assert.True(t, strings.Index(q, "Name") < strings.Index(q, "Id"),
+        "Update query should contain to column before where column")
+
+    assert.Equal(t, "Jane Doe", args[0].(string),
+        "Update query should update name")
+    assert.Equal(t, 1, args[1].(int),
+        "Update query should look for Id")
+
+}
+
 func Test_SelectRow(t *testing.T) {
-    db, call := makeTestingDatabase(t)
+    db, call, _ := makeTestingDatabase(t)
     table := NewTable(db, "test_table")
 
     table.SelectRow("TEST_KEY", nil)
@@ -117,4 +248,36 @@ func Test_SelectRow(t *testing.T) {
 
     assert.Equal(t, "TEST_KEY", args[0].(string),
         "Query should be given correct key")
+}
+
+func Test_SelectRowSchema(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+
+    columns := []string {"Id", "Name", "Age"}
+    filter := Filter {
+        "Id" : 1,
+    }
+
+    table.SelectRowSchema(columns, filter, nil)
+
+    q := call["query_row"].query
+    args := call["query_row"].args[0].([]interface{})
+
+    assert.True(t, strings.Contains(q, "SELECT"),
+        "Row query should contain SELECT")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Query should contain table name")
+
+    for _, col := range columns {
+        assert.True(t, strings.Contains(q, col),
+            "Row query should contain column name")
+    }
+
+    assert.True(t, strings.Contains(q, "WHERE"),
+        "Row query should contain WHERE")
+    assert.True(t, strings.Contains(q, "Id"),
+        "Row query should contain filter column")
+    assert.Equal(t, 1, args[0].(int),
+        "Row query parameters should contain filter values")
 }
