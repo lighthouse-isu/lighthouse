@@ -17,17 +17,16 @@ package handlers
 import (
     "testing"
     "net/http"
+    "strings"
     "net/http/httptest"
     "bytes"
     "io/ioutil"
-    "strings"
     "regexp"
 
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
-
     "github.com/lighthouse/lighthouse/databases"
 )
 
@@ -106,15 +105,17 @@ func Test_GetHandlerInfo(t *testing.T) {
     router := mux.NewRouter()
     var info HandlerInfo
 
-    router.HandleFunc("/{Host}/{DockerURL}",
+    router.HandleFunc("/{Endpoint:.*}",
         func(w http.ResponseWriter, r *http.Request) {
-            info = GetHandlerInfo(r)
+            info, _ = GetHandlerInfo(r)
     })
 
-    r, _ := http.NewRequest("GET", "/TestHost/TestEndpoint", nil)
+    r, _ := http.NewRequest("GET", "/TestHost/Test%2FEndpoint", nil)
+    r.RequestURI = "/TestHost/Test%2FEndpoint"
+
     router.ServeHTTP(httptest.NewRecorder(), r)
 
-    expected := HandlerInfo{"TestEndpoint", "TestHost", nil, r}
+    expected := HandlerInfo{"Test/Endpoint", "TestHost", nil, r}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")

@@ -36,6 +36,7 @@ const (
 
 var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
+    NotEnoughParametersError = errors.New("beacons: not enough parameters given")
 )
 
 var beacons databases.TableInterface
@@ -124,13 +125,11 @@ func Handle(r *mux.Router) {
         addBeacon(beacon)
     }
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleAddUserToBeacon).Methods("PUT")
+    r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
 
-    r.HandleFunc("/user/{Instance}/{Id}", handleRemoveUserFromBeacon).Methods("DELETE")
+    r.HandleFunc("/user/{Endpoint:.*}", handleRemoveUserFromBeacon).Methods("DELETE")
 
-    r.HandleFunc("/address/{Instance}/{Address}", handleUpdateBeaconAddress).Methods("PUT")
-
-    r.HandleFunc("/token/{Instance}", handleUpdateBeaconToken).Methods("PUT")
+    r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
 
@@ -161,7 +160,7 @@ func Handle(r *mux.Router) {
 
     }).Methods("GET")
 
-    r.HandleFunc("/list/{Beacon}", func(w http.ResponseWriter, r *http.Request) {
+    r.HandleFunc("/list/{Beacon:.*}", func(w http.ResponseWriter, r *http.Request) {
         beacon := mux.Vars(r)["Beacon"]
 
         user := session.GetValueOrDefault(r, "auth", "email", "").(string)

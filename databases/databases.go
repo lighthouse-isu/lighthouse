@@ -175,7 +175,15 @@ func (this *Table) InsertSchema(values map[string]interface{}) error {
 
     query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
         this.table, colBuf.String(), valBuf.String())
-    _, err := this.db.Exec(query, queryVals...)
+    res, err := this.db.Exec(query, queryVals...)
+
+    if err == nil {
+        cnt, err := res.RowsAffected()
+
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
 
     if err != nil {
         fmt.Println(err.Error())
@@ -239,7 +247,15 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
 
     query := buffer.String()
 
-    _, err := this.db.Exec(query, vals...)
+    res, err := this.db.Exec(query, vals...)
+
+    if err == nil {
+        cnt, err := res.RowsAffected()
+
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
 
     if err != nil {
         fmt.Println(err.Error())
@@ -318,7 +334,17 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
 }
 
 func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
-    
+
+    if columns == nil {
+        columns = make([]string, len(this.schema))
+
+        i := 0
+        for col, _ := range this.schema {
+            columns[i] = col
+            i += 1
+        }
+    }
+
     query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
     row := this.db.QueryRow(query, queryVals...)
 
@@ -326,13 +352,8 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
         return errors.New("unknown database error")
     }
 
-    colCount := len(this.schema)
-    if columns != nil {
-        colCount = len(columns)
-    }
-
-    values := make([]interface{}, colCount)
-    valuePtrs := make([]interface{}, colCount)
+    values := make([]interface{}, len(columns))
+    valuePtrs := make([]interface{}, len(values))
 
     for i := 0; i < len(values); i++ {
         valuePtrs[i] = &values[i]

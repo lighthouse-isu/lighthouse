@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package handlers
+package docker
 
 import (
     "fmt"
@@ -20,8 +20,11 @@ import (
     "io/ioutil"
     "bytes"
 
+    "github.com/gorilla/mux"
+
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/handlers"
 )
 
 /*
@@ -30,9 +33,9 @@ import (
 
     Will only write to the given ResponseWriter on success.
 
-    RETURN: nil on succes.  A non-nil *HandlerError on failure
+    RETURN: nil on succes.  A non-nil *handlers.HandlerError on failure
 */
-func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError {
+func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *handlers.HandlerError {
     email := session.GetValueOrDefault(info.Request, "auth", "email", "").(string)
     beaconAddress, err := beacons.GetBeaconAddress(info.Host)
 
@@ -63,7 +66,7 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
 
     req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
     if err != nil {
-        return &HandlerError{500, "control", "Failed to create " + method + " request"}
+        return &handlers.HandlerError{500, "control", "Failed to create " + method + " request"}
     }
 
     if requestIsToBeacon {
@@ -73,19 +76,19 @@ func DockerRequestHandler(w http.ResponseWriter, info HandlerInfo) *HandlerError
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        return &HandlerError{500, "control", method + " request failed"}
+        return &handlers.HandlerError{500, "control", method + " request failed"}
     }
 
     // Close body after return
     defer resp.Body.Close()
 
     if resp.StatusCode > 299 {
-        return &HandlerError{resp.StatusCode, "docker", resp.Status}
+        return &handlers.HandlerError{resp.StatusCode, "docker", resp.Status}
     }
 
     body, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        return &HandlerError{500, "control", "Failed reading response body"}
+        return &handlers.HandlerError{500, "control", "Failed reading response body"}
     }
 
     w.WriteHeader(resp.StatusCode)
@@ -104,13 +107,21 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     // Ready all HTTP form data for the handlers
     r.ParseForm()
 
-    info := GetHandlerInfo(r)
+    info, ok := handlers.GetHandlerInfo(r)
 
-    var customHandlers = CustomHandlerMap{
+    if !ok {
+        handlers.WriteError(w, handlers.HandlerError {
+            http.StatusBadRequest, 
+            "control", "could not get required data for handler",
+        })
+        return
+    }
+
+    var customHandlers = handlers.CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,
     }
 
-    runCustomHandlers, err := RunCustomHandlers(info, customHandlers)
+    runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)
 
     // On success, send request to Docker
     if err == nil {
@@ -119,6 +130,10 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     // On error, rollback
     if err != nil {
-        Rollback(w, *err, info, runCustomHandlers)
+        handlers.Rollback(w, *err, info, runCustomHandlers)
     }
+}
+
+func Handle(r *mux.Router) {
+    r.HandleFunc("/{Endpoint:.*}", DockerHandler)
 }
