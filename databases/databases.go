@@ -84,6 +84,11 @@ func (this *Table) initSchema() {
             buffer.WriteString(", ")
         }
 
+        // JSON type doesn't have an equality operator which breaks queries
+        if strings.Contains(colType, "json") {
+            colType = "text"
+        }
+
         buffer.WriteString(col)
         buffer.WriteString(" ")
         buffer.WriteString(colType)
@@ -108,7 +113,7 @@ func (this *Table) convertInput(orig interface{}, col string) interface{} {
 
     if strings.Contains(colType, "json") {
         b, _ := json.Marshal(orig)
-        return b
+        return string(b)
     }
     
     return orig

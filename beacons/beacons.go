@@ -24,6 +24,8 @@ import (
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/session"
+
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -142,7 +144,9 @@ func Handle(r *mux.Router) {
 
     r.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
 
-        beacons, err := getBeaconsList()
+        user := session.GetValueOrDefault(r, "auth", "email", "").(string)
+
+        beacons, err := getBeaconsList(user)
         var output []byte
 
         if err == nil {

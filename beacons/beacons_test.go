@@ -221,7 +221,7 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
         "GetBeaconToken should give corrent token")
 }
 
-func Test_ListBeacons(t *testing.T) {
+func Test_ListBeacons_ValidUser(t *testing.T) {
     table := databases.CommonTestingTable(schema)
     SetupCustomTestingTable(table)
     defer TeardownTestingTable()
@@ -229,7 +229,7 @@ func Test_ListBeacons(t *testing.T) {
     keyList := make([]string, 0)
 
     for i := 1; i <= 2; i++ {
-        beaconList, err := getBeaconsList()
+        beaconList, err := getBeaconsList("USER")
 
         assert.Nil(t, err, "getBeaconList returned an error")
 
@@ -237,17 +237,47 @@ func Test_ListBeacons(t *testing.T) {
             "getBeaconList output differed from key")
 
         newBeacon := map[string]interface{} {
-            "InstanceAddress" : fmt.Sprintf("INST_ADDR %d", i), 
-            "BeaconAddress" :   fmt.Sprintf("BEACON_ADDR %d", i), 
-            "Token" :           fmt.Sprintf("TOKEN %d", i), 
-            "Users" :           userMap{fmt.Sprintf("USER %d", i):true},
+            "InstanceAddress" : "INST_ADDR", 
+            "BeaconAddress" : fmt.Sprintf("BEACON_ADDR %d", i), 
+            "Token" : "TOKEN", 
+            "Users" : userMap{"USER":true},
         }
 
         keyList = append(keyList, newBeacon["BeaconAddress"].(string))
         table.InsertSchema(newBeacon)
     }
 
-    beaconList, err := getBeaconsList()
+    beaconList, err := getBeaconsList("USER")
+
+    assert.Nil(t, err, "getBeaconList returned an error")
+    assert.Equal(t, keyList, beaconList)
+}
+
+func Test_ListBeacons_BadUser(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupCustomTestingTable(table)
+    defer TeardownTestingTable()
+
+    goodBeacon := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR 1", 
+        "BeaconAddress" : "BEACON_ADDR 1", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"GOOD_USER":true},
+    }
+
+    badBeacon := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR 2", 
+        "BeaconAddress" : "BEACON_ADDR 2", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"BAD_USER":true},
+    }
+
+    keyList := []string{"BEACON_ADDR 1",}
+
+    table.InsertSchema(goodBeacon)
+    table.InsertSchema(badBeacon)
+
+    beaconList, err := getBeaconsList("GOOD_USER")
 
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, beaconList)

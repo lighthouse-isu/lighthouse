@@ -53,10 +53,9 @@ func getBeaconData(instance string) (beaconData, error) {
     return beacon, nil
 }
 
-func getBeaconsList() ([]string, error) {
-    beacons := make([]string, 0)
+func getBeaconsList(user string) ([]string, error) {
     opts := databases.SelectOptions{Distinct : true}
-    cols := []string{"BeaconAddress"}
+    cols := []string{"BeaconAddress", "Users"}
 
     scanner, err := getDBSingleton().SelectSchema(cols, nil, opts)
 
@@ -64,13 +63,27 @@ func getBeaconsList() ([]string, error) {
         return nil, err
     }
 
+    beacons := make([]string, 0)
+    seenBeacons := make(map[string]bool)
+
     for scanner.Next() {
-        var address struct {
+        var beacon struct {
             BeaconAddress string
+            Users userMap
         }
 
-        scanner.Scan(&address)
-        beacons = append(beacons, address.BeaconAddress)
+        scanner.Scan(&beacon)
+
+        if _, ok := beacon.Users[user]; ok {
+
+            address := beacon.BeaconAddress
+
+            if _, found := seenBeacons[address]; !found {
+                beacons = append(beacons, address)
+                seenBeacons[address] = true
+            }
+        }
+        
     }
    
     return beacons, nil
