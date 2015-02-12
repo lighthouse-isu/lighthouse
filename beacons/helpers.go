@@ -22,7 +22,16 @@ func getDBSingleton() databases.TableInterface {
     return beacons
 }
 
-func addBeacon(beacon beaconData) error {
+func instanceExists(instance string) bool {
+    var testInstance struct { InstanceAddress string }
+    columns := []string{"InstanceAddress"}
+    where := databases.Filter{"InstanceAddress" : instance}
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &testInstance)
+    return err != databases.NoRowsError
+}
+
+func addInstance(beacon beaconData) error {
     entry := map[string]interface{}{
         "InstanceAddress" : beacon.InstanceAddress,
         "BeaconAddress" : beacon.BeaconAddress,

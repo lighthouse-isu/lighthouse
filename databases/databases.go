@@ -30,6 +30,7 @@ var (
     NoUpdateError = errors.New("databases: no rows updated")
     UnknownError = errors.New("databases: unknown error")
     KeyNotFoundError = errors.New("databases: given key not found")
+    NoRowsError = errors.New("databases: result was empty")
 )
 
 type Table struct {
@@ -335,7 +336,7 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
 
 func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
 
-    if columns == nil {
+    if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 
         i := 0
@@ -360,6 +361,11 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     err := row.Scan(valuePtrs...)
+
+    if err == sql.ErrNoRows {
+        return NoRowsError
+    }
+
     if err != nil {
         return err
     }

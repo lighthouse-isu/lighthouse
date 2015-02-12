@@ -35,7 +35,7 @@ func Test_AddBeaconData(t *testing.T) {
         "INST_ADDR", "BEACON_ADDR", "TOKEN", users,
     }
 
-    addBeacon(testBeaconData)
+    addInstance(testBeaconData)
 
     assert.Equal(t, 1, len(table.Database),
         "Database should have new element after AddBeacon")

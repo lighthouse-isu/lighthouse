@@ -21,11 +21,14 @@ import (
 	"encoding/json"
 	"io/ioutil"
 
+    "github.com/gorilla/mux"
+
 	beaconStructs "github.com/lighthouse/beacon/structs"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/session"
 )
 
 func getInstanceAlias(instance string) string {
@@ -41,7 +44,7 @@ func writeResponse(err error, w http.ResponseWriter) {
 
     switch err {
         case databases.KeyNotFoundError, databases.NoUpdateError, 
-            databases.EmptyKeyError, NotEnoughParametersError:
+                databases.EmptyKeyError, NotEnoughParametersError:
             code = http.StatusBadRequest
 
         case nil:
@@ -126,10 +129,13 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
     writeResponse(err, w)
 }
 
-func handleCreate(r *http.Request) (int, error) {
+func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
+
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
     }
 
     var beaconInfo struct {
@@ -140,10 +146,14 @@ func handleCreate(r *http.Request) (int, error) {
 
     err = json.Unmarshal(reqBody, &beaconInfo)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
     }
 
     beacon := beaconData{"", beaconInfo.Address, beaconInfo.Token, userMap{}}
+
+    currentUser := session.GetValueOrDefault(r, "auth", "email", "").(string)
+    beacon.Users[currentUser] = true
+
     for _, user := range beaconInfo.Users {
         beacon.Users[user] = true
     }
@@ -152,7 +162,7 @@ func handleCreate(r *http.Request) (int, error) {
 
     req, err := http.NewRequest("GET", vmsTarget, nil)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
     }
 
     // Assuming user has permission to access token since they provided it
@@ -160,31 +170,70 @@ func handleCreate(r *http.Request) (int, error) {
 
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
     }
 
     defer resp.Body.Close()
 
-    if resp.StatusCode != http.StatusOK {
-        return resp.StatusCode, errors.New("beacon error")
-    }
-
     vmsBody, err := ioutil.ReadAll(resp.Body)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        err = errors.New(string(vmsBody))
+        return
     }
 
     var vms []beaconStructs.VM
 
     err = json.Unmarshal(vmsBody, &vms)
     if err != nil {
-        return http.StatusInternalServerError, err
+        return
     }
 
     for _, vm := range vms {
         beacon.InstanceAddress = fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
-        addBeacon(beacon)
+        
+        if !instanceExists(beacon.InstanceAddress) {
+            addInstance(beacon)
+        }
     }
 
-    return http.StatusOK, nil
+    return
+}
+
+func handleListBeacon(w http.ResponseWriter, r *http.Request) {
+    user := session.GetValueOrDefault(r, "auth", "email", "").(string)
+
+    beacons, err := getBeaconsList(user)
+    var output []byte
+
+    if err == nil {
+        output, err = json.Marshal(beacons)
+    } 
+
+    if err != nil {
+        writeResponse(err, w) 
+    } else {
+        fmt.Fprint(w, string(output))
+    }
+}
+
+func handleListInstances(w http.ResponseWriter, r *http.Request) {
+    beacon := mux.Vars(r)["Beacon"]
+    user := session.GetValueOrDefault(r, "auth", "email", "").(string)
+
+    instances, err := getInstancesList(beacon, user)
+    var output []byte
+
+    if err == nil {
+        output, err = json.Marshal(instances)
+    } 
+
+    if err != nil {
+        writeResponse(err, w) 
+    } else {
+        fmt.Fprint(w, string(output))
+    }
 }

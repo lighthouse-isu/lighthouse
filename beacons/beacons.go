@@ -16,15 +16,11 @@ package beacons
 
 import (
     "os"
-    "fmt"
     "errors"
     "io/ioutil"
-    "net/http"
     "encoding/json"
 
     "github.com/gorilla/mux"
-
-    "github.com/lighthouse/lighthouse/session"
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
@@ -122,7 +118,7 @@ func Handle(r *mux.Router) {
     beacons := LoadBeacons()
 
     for _, beacon := range beacons {
-        addBeacon(beacon)
+        addInstance(beacon)
     }
 
     r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
@@ -131,52 +127,9 @@ func Handle(r *mux.Router) {
 
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
-    r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
+    r.HandleFunc("/create", handleBeaconCreate).Methods("POST")
 
-        code, err := handleCreate(r)
-        w.WriteHeader(code) 
-        if err != nil {
-            fmt.Fprint(w, err)
-        }
+    r.HandleFunc("/list", handleListBeacon).Methods("GET")
 
-    }).Methods("POST")
-
-    r.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
-
-        user := session.GetValueOrDefault(r, "auth", "email", "").(string)
-
-        beacons, err := getBeaconsList(user)
-        var output []byte
-
-        if err == nil {
-            output, err = json.Marshal(beacons)
-        } 
-
-        if err != nil {
-            writeResponse(err, w) 
-        } else {
-            fmt.Fprint(w, string(output))
-        }
-
-    }).Methods("GET")
-
-    r.HandleFunc("/list/{Beacon:.*}", func(w http.ResponseWriter, r *http.Request) {
-        beacon := mux.Vars(r)["Beacon"]
-
-        user := session.GetValueOrDefault(r, "auth", "email", "").(string)
-
-        instances, err := getInstancesList(beacon, user)
-        var output []byte
-
-        if err == nil {
-            output, err = json.Marshal(instances)
-        } 
-
-        if err != nil {
-            writeResponse(err, w) 
-        } else {
-            fmt.Fprint(w, string(output))
-        }
-
-    }).Methods("GET")
+    r.HandleFunc("/list/{Beacon:.*}", handleListInstances).Methods("GET")
 }
