@@ -134,18 +134,13 @@ func Test_InsertSchema(t *testing.T) {
         "Insertion Exec call should contain table name")
     
     var firstCol, lastCol string
-    locs := map[string]int {
-        "Id" : strings.Index(q, "Id"),
-        "Name" : strings.Index(q, "Name"),
-        "Age" : strings.Index(q, "Age"),
-    }
     
-    assert.True(t, locs["Age"] >= 0, "Query should contain 'Age' column")
-    assert.True(t, locs["Name"] >= 0, "Query should contain 'Name' column")
-    assert.True(t, locs["Id"] >= 0, "Query should contain 'Id' column")
+    assert.True(t, strings.Index(q, "Id") >= 0, "Query should contain 'Age' column")
+    assert.True(t, strings.Index(q, "Name") >= 0, "Query should contain 'Name' column")
+    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Id' column")
     
-    firstCol = min(locs, min(locs, "Id", "Name"), "Age")
-    lastCol = max(locs, max(locs, "Id", "Name"), "Age")
+    firstCol = firstSubstr(q, firstSubstr(q, "Id", "Name"), "Age")
+    lastCol = lastSubstr(q, lastSubstr(q, "Id", "Name"), "Age")
 
     assert.Equal(t, newData[firstCol], args[0],
         fmt.Sprintf("Query param for %s is incorrect", firstCol))
@@ -160,15 +155,15 @@ func Test_InsertSchema(t *testing.T) {
         fmt.Sprintf("Middle query param %v is incorrect", args[1]))
 }
 
-func min(locs map[string]int, a, b string) string {
-    if locs[a] < locs[b] {
+func firstSubstr(src, a, b string) string {
+    if strings.Index(src, a) <= strings.Index(src, b) {
         return a
     }
     return b
 }
 
-func max(locs map[string]int, a, b string) string {
-    if locs[a] > locs[b] {
+func lastSubstr(src, a, b string) string {
+    if strings.Index(src, a) >= strings.Index(src, b) {
         return a
     }
     return b
