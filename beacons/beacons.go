@@ -24,10 +24,6 @@ import (
 
     "github.com/gorilla/mux"
 
-    beaconStructs "github.com/lighthouse/beacon/structs"
-
-    "github.com/lighthouse/lighthouse/beacons/aliases"
-
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -58,48 +54,10 @@ type beaconData struct {
 
 type userMap map[string]interface{}
 
-func getDBSingleton() databases.TableInterface {
-    if beacons == nil {
-        panic("Beacons database not initialized")
-    }
-    return beacons
-}
-
 func Init() {
     if beacons == nil {
         beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", schema)
     }
-}
-
-func addBeacon(beacon beaconData) error {
-    entry := map[string]interface{}{
-        "InstanceAddress" : beacon.InstanceAddress,
-        "BeaconAddress" : beacon.BeaconAddress,
-        "Token" : beacon.Token,
-        "Users" : beacon.Users,
-    }
-
-    return getDBSingleton().InsertSchema(entry)
-}
-
-func updateBeaconField(field string, val interface{}, instance string) error {
-    to := databases.Filter{field : val}
-    where := databases.Filter{"InstanceAddress": instance}
-
-    return getDBSingleton().UpdateSchema(to, where)
-}
-
-func getBeaconData(instance string) (beaconData, error) {
-    var beacon beaconData
-    where := databases.Filter{"InstanceAddress" : instance}
-
-    err := getDBSingleton().SelectRowSchema(nil, where, &beacon)
-
-    if err != nil {
-        return beaconData{}, err
-    }
-   
-    return beacon, nil
 }
 
 func GetBeaconAddress(instance string) (string, error) {
@@ -181,165 +139,25 @@ func Handle(r *mux.Router) {
         }
 
     }).Methods("POST")
-}
 
-func getInstanceAlias(instance string) string {
-    alias, err := aliases.GetAlias(instance)
-    if err != nil {
-        return instance
-    }
-    return alias
-}
+    r.HandleFunc("/list", func(w http.ResponseWriter, r *http.Request) {
 
-func writeResponse(err error, w http.ResponseWriter) {
-    var code int
+        beacons, err := getBeaconsList()
+        var output []byte
 
-    switch err {
-        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
-            code = http.StatusBadRequest
+        if err == nil {
+            output, err = json.Marshal(beacons)
+        } 
 
-        case nil:
-            code = http.StatusOK
-
-        default:
-            code = http.StatusInternalServerError
-    }
-
-    w.WriteHeader(code)
-
-    if err != nil {
-        fmt.Fprint(w, err)
-    }
-}
-
-func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
-
-    beacon, err := getBeaconData(instance)
-
-    if err == nil {
-        if beacon.Users == nil {
-            beacon.Users = userMap{userId : true}
+        if err != nil {
+            writeResponse(err, w) 
         } else {
-            beacon.Users[userId] = true
+            fmt.Fprint(w, string(output))
         }
-        err = updateBeaconField("Users", beacon.Users, instance)
-    }
 
-    writeResponse(err, w)
-}
+    }).Methods("GET")
 
-func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-
-    instance := getInstanceAlias(vars["Instance"])
-    userId := vars["Id"]
-
-    beacon, err := getBeaconData(instance)
-
-    if err == nil {
-        delete(beacon.Users, userId)
-        err = updateBeaconField("Users", beacon.Users, instance)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
-    vars := mux.Vars(r)
-
-    instance := getInstanceAlias(vars["Instance"])
-    address := vars["Address"]
-
-    err := updateBeaconField("BeaconAddress", address, instance)
-
-    writeResponse(err, w)
-}
-
-func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-    instance := getInstanceAlias(mux.Vars(r)["Instance"])
-
-    reqBody, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        writeResponse(err, w)
-        return
-    }
-
-    var token string
-
-    err = json.Unmarshal(reqBody, &token)
-    if err != nil {
-        writeResponse(err, w)
-        return
-    }
-
-    err = updateBeaconField("Token", token, instance)
-
-    writeResponse(err, w)
-}
-
-func handleCreate(r *http.Request) (int, error) {
-    reqBody, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    var beaconInfo struct {
-        Address string
-        Token string
-        Users []string
-    }
-
-    err = json.Unmarshal(reqBody, &beaconInfo)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    beacon := beaconData{"", beaconInfo.Address, beaconInfo.Token, make(userMap)}
-    for _, user := range beaconInfo.Users {
-        beacon.Users[user] = true
-    }
-
-    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.BeaconAddress)
-
-    req, err := http.NewRequest("GET", vmsTarget, nil)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    // Assuming user has permission to access token since they provided it
-    req.Header.Set(HEADER_TOKEN_KEY, beaconInfo.Token)
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return resp.StatusCode, errors.New("beacon error")
-    }
-
-    vmsBody, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    var vms []beaconStructs.VM
-
-    err = json.Unmarshal(vmsBody, &vms)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    for _, vm := range vms {
-        beacon.InstanceAddress = fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
-        err = addBeacon(beacon)
-    }
-
-    return http.StatusOK, nil
+    r.HandleFunc("/list/{Endpoint:.*}", func(w http.ResponseWriter, r *http.Request) {
+        // TODO
+    }).Methods("GET")
 }

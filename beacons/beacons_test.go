@@ -17,6 +17,8 @@ package beacons
 import (
     "testing"
 
+    "fmt"
+
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/databases"
@@ -217,4 +219,36 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
 
     assert.Equal(t, "TOKEN", res, 
         "GetBeaconToken should give corrent token")
+}
+
+func Test_ListBeacons(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupCustomTestingTable(table)
+    defer TeardownTestingTable()
+
+    keyList := make([]string, 0)
+
+    for i := 1; i <= 2; i++ {
+        beaconList, err := getBeaconsList()
+
+        assert.Nil(t, err, "getBeaconList returned an error")
+
+        assert.Equal(t, keyList, beaconList, 
+            "getBeaconList output differed from key")
+
+        newBeacon := map[string]interface{} {
+            "InstanceAddress" : fmt.Sprintf("INST_ADDR %d", i), 
+            "BeaconAddress" :   fmt.Sprintf("BEACON_ADDR %d", i), 
+            "Token" :           fmt.Sprintf("TOKEN %d", i), 
+            "Users" :           userMap{fmt.Sprintf("USER %d", i):true},
+        }
+
+        keyList = append(keyList, newBeacon["BeaconAddress"].(string))
+        table.InsertSchema(newBeacon)
+    }
+
+    beaconList, err := getBeaconsList()
+
+    assert.Nil(t, err, "getBeaconList returned an error")
+    assert.Equal(t, keyList, beaconList)
 }
