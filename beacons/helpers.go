@@ -88,3 +88,40 @@ func getBeaconsList(user string) ([]string, error) {
    
     return beacons, nil
 }
+
+func getInstancesList(beacon, user string) ([]string, error) {
+    opts := databases.SelectOptions{Distinct : true}
+    cols := []string{"InstanceAddress", "Users"}
+    where := databases.Filter{"BeaconAddress": beacon}
+
+    scanner, err := getDBSingleton().SelectSchema(cols, where, opts)
+
+    if err != nil {
+        return nil, err
+    }
+
+    instances := make([]string, 0)
+    InstanceAddress := make(map[string]bool)
+
+    for scanner.Next() {
+        var instance struct {
+            InstanceAddress string
+            Users userMap
+        }
+
+        scanner.Scan(&instance)
+
+        if _, ok := instance.Users[user]; ok {
+
+            address := instance.InstanceAddress
+
+            if _, found := InstanceAddress[address]; !found {
+                instances = append(instances, address)
+                InstanceAddress[address] = true
+            }
+        }
+        
+    }
+   
+    return instances, nil
+}

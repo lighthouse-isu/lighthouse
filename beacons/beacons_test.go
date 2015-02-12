@@ -282,3 +282,65 @@ func Test_ListBeacons_BadUser(t *testing.T) {
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, beaconList)
 }
+
+func Test_ListInstances_ValidUser(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupCustomTestingTable(table)
+    defer TeardownTestingTable()
+
+    keyList := make([]string, 0)
+
+    for i := 1; i <= 2; i++ {
+        instanceList, err := getInstancesList("BEACON_ADDR", "USER")
+
+        assert.Nil(t, err, "getBeaconList returned an error")
+
+        assert.Equal(t, keyList, instanceList, 
+            "getBeaconList output differed from key")
+
+        newInstance := map[string]interface{} {
+            "InstanceAddress" : fmt.Sprintf("INST_ADDR %d", i), 
+            "BeaconAddress" : "BEACON_ADDR", 
+            "Token" : "TOKEN", 
+            "Users" : userMap{"USER":true},
+        }
+
+        keyList = append(keyList, newInstance["InstanceAddress"].(string))
+        table.InsertSchema(newInstance)
+    }
+
+    instanceList, err := getInstancesList("BEACON_ADDR", "USER")
+
+    assert.Nil(t, err, "getBeaconList returned an error")
+    assert.Equal(t, keyList, instanceList)
+}
+
+func Test_ListInstances_BadUser(t *testing.T) {
+    table := databases.CommonTestingTable(schema)
+    SetupCustomTestingTable(table)
+    defer TeardownTestingTable()
+
+    goodInstance := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR 1", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"GOOD_USER":true},
+    }
+
+    badInstance := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR 2", 
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"BAD_USER":true},
+    }
+
+    keyList := []string{"INST_ADDR 1",}
+
+    table.InsertSchema(goodInstance)
+    table.InsertSchema(badInstance)
+
+    instanceList, err := getInstancesList("BEACON_ADDR", "GOOD_USER")
+
+    assert.Nil(t, err, "getBeaconList returned an error")
+    assert.Equal(t, keyList, instanceList)
+}

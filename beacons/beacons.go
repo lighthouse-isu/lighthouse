@@ -161,7 +161,23 @@ func Handle(r *mux.Router) {
 
     }).Methods("GET")
 
-    r.HandleFunc("/list/{Endpoint:.*}", func(w http.ResponseWriter, r *http.Request) {
-        // TODO
+    r.HandleFunc("/list/{Beacon}", func(w http.ResponseWriter, r *http.Request) {
+        beacon := mux.Vars(r)["Beacon"]
+
+        user := session.GetValueOrDefault(r, "auth", "email", "").(string)
+
+        instances, err := getInstancesList(beacon, user)
+        var output []byte
+
+        if err == nil {
+            output, err = json.Marshal(instances)
+        } 
+
+        if err != nil {
+            writeResponse(err, w) 
+        } else {
+            fmt.Fprint(w, string(output))
+        }
+
     }).Methods("GET")
 }
