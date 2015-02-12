@@ -34,7 +34,7 @@ type MockTable struct {
     MockInsertSchema    func(map[string]interface{})(error)
     MockUpdateSchema    func(map[string]interface{}, map[string]interface{})(error)
     MockSelectRowSchema func([]string, Filter, interface{})(error)
-    MockSelectSchema    func([]string, Filter)(*Scanner, error)
+    MockSelectSchema    func([]string, Filter, SelectOptions)(ScannerInterface, error)
 }
 
 func (t *MockTable) Insert(s string, i interface{})(e error) {
@@ -67,8 +67,8 @@ func (t *MockTable) SelectRowSchema(c []string, w Filter, d interface{})(e error
     return
 }
 
-func (t *MockTable) SelectSchema(c []string, w Filter)(s *Scanner, e error) {
-    if t.MockSelectSchema != nil { return t.MockSelectSchema(c, w) }
+func (t *MockTable) SelectSchema(c []string, w Filter, opts SelectOptions)(s ScannerInterface, e error) {
+    if t.MockSelectSchema != nil { return t.MockSelectSchema(c, w, opts) }
     return
 }
 
@@ -155,6 +155,49 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         return errors.New("not found")
+    }
+
+    table.MockSelectSchema = func(cols []string, where Filter, opts SelectOptions)(ScannerInterface, error) {
+
+        if cols == nil {
+            cols = make([]string, len(table.Schema))
+            for col, i := range table.Schema {
+                cols[i] = col
+            }
+        }
+
+        entries := make([][]interface{}, 0)
+
+        for _, row := range table.Database {
+
+            applies := true
+            for col, val := range where {
+                if row[table.Schema[col]] != val {
+                    applies = false
+                    break
+                }
+            }
+
+            newEntry := make([]interface{}, len(cols))
+            for i, col := range cols {
+                newEntry[i] = row[table.Schema[col]]
+            }
+
+            if applies && opts.Distinct {
+                for _, oldEntry := range entries {
+                    if reflect.DeepEqual(newEntry, oldEntry) {
+                        applies = false
+                        break
+                    }
+                }
+            }
+
+            if applies {
+                entries = append(entries, newEntry)
+            }
+        }
+
+        return CommonTestingScanner(entries, cols), nil
     }
 
     return table

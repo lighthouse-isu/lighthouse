@@ -287,7 +287,7 @@ func Test_SelectSchema(t *testing.T) {
         "Id" : 1,
     }
 
-    table.SelectSchema(columns, filter)
+    table.SelectSchema(columns, filter, SelectOptions{})
 
     q := call["query"].query
     args := call["query"].args[0].([]interface{})

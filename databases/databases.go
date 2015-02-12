@@ -23,7 +23,6 @@ import (
     "encoding/json"
 
     "database/sql"
-    "database/sql/driver"
 )
 
 var (
@@ -39,30 +38,12 @@ type Table struct {
     schema Schema
 }
 
+type SelectOptions struct {
+    Distinct bool
+}
+
 type Schema map[string]string
 type Filter map[string]interface{}
-
-type DBInterface interface {
-    Begin() (*sql.Tx, error)
-    Close() error
-    Driver() driver.Driver
-    Exec(string, ...interface{}) (sql.Result, error)
-    Ping() error
-    Prepare(string) (*sql.Stmt, error)
-    Query(string, ...interface{}) (*sql.Rows, error)
-    QueryRow(string, ...interface{}) *sql.Row
-    SetMaxIdleConns(int)
-}
-
-type TableInterface interface {
-    Insert(string, interface{})(error)
-    Update(string, interface{})(error)
-    SelectRow(string, interface{})(error)
-    InsertSchema(map[string]interface{})(error)
-    UpdateSchema(map[string]interface{}, map[string]interface{})(error)
-    SelectRowSchema([]string, Filter, interface{})(error)
-    SelectSchema([]string, Filter)(*Scanner, error)
-}
 
 const (
     keyColumn string = "keyColumn"
@@ -281,10 +262,14 @@ func (this *Table) SelectRow(key string, value interface{}) error {
     return err
 }
 
-func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
+func buildQueryFrom(table string, columns []string, where Filter, opts SelectOptions) (string, []interface{})  {
     var buffer bytes.Buffer
 
     buffer.WriteString("SELECT ")
+
+    if opts.Distinct {
+        buffer.WriteString("DISTINCT ")
+    }
 
     if columns == nil {
         buffer.WriteString("*")
@@ -301,7 +286,7 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     buffer.WriteString(" FROM ") 
-    buffer.WriteString(this.table)
+    buffer.WriteString(table)
 
     whereVals := make([]interface{}, len(where))
     if where != nil {
@@ -323,8 +308,14 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     buffer.WriteString(";")
-    query := buffer.String()
-    row := this.db.QueryRow(query, whereVals...)
+
+    return buffer.String(), whereVals
+}
+
+func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
+    
+    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
+    row := this.db.QueryRow(query, queryVals...)
 
     if row == nil {
         return errors.New("unknown database error")
@@ -375,56 +366,13 @@ func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Ro
     return
 }
 
-func (this *Table) SelectSchema(columns []string, filter Filter) (*Scanner, error) {
-    var buffer bytes.Buffer
-
-    buffer.WriteString("SELECT ")
-
-    if columns == nil {
-        buffer.WriteString("*")
-    } else {
-        first := true
-        for _, col := range columns {
-            if !first {
-                buffer.WriteString(", ")
-            }
-            buffer.WriteString(col)
-
-            first = false
-        }
-    }
-
-    buffer.WriteString(" FROM ") 
-    buffer.WriteString(this.table)
-
-    var vals = make([]interface{}, len(filter))
-
-    if len(filter) > 0 {
-        buffer.WriteString(" WHERE ")
-
-        i := 0
-
-        for col, val := range filter {
-            if i != 0 {
-                buffer.WriteString(" && ")
-            }
-
-            buffer.WriteString(col)
-            buffer.WriteString("=")
-            buffer.WriteString(fmt.Sprintf("($%d)", i + 1))
-
-            vals[i] = val
-        }
-    }
-
-    buffer.WriteString(";")
-
-    query := buffer.String()
-    rows, err := this.db.Query(query, vals...)
+func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
+    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
+    rows, err := this.db.Query(query, queryVals...)
 
     if err != nil {
         return nil, err
     }
 
-    return &Scanner{rows, this}, nil
+    return &Scanner{*rows, this, columns}, nil
 }
