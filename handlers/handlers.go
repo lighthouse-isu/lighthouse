@@ -15,10 +15,13 @@
 package handlers
 
 import (
-    "net/http"
     "regexp"
+    "strings"
+    "net/http"
+    "net/url"
     "encoding/json"
     "io/ioutil"
+
     "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
@@ -152,11 +155,17 @@ func WriteError(w http.ResponseWriter, err HandlerError) {
 
     RETURN: A HandlerInfo extracted from the request
 */
-func GetHandlerInfo(r *http.Request) HandlerInfo {
-    vars := mux.Vars(r)
+func GetHandlerInfo(r *http.Request) (HandlerInfo, bool) {
     var info HandlerInfo
 
-    hostAlias := vars["Host"]
+    params, ok := GetEndpointParams(r, []string{"Host", "DockerEndpoint"})
+
+    if ok == false || len(params) < 2 {
+        return HandlerInfo{}, false
+    }
+
+    hostAlias := params["Host"]
+
     value, err := aliases.GetAlias(hostAlias)
     if err == nil {
         info.Host = value
@@ -164,11 +173,11 @@ func GetHandlerInfo(r *http.Request) HandlerInfo {
         info.Host = hostAlias // Unknown alias, just use what was given
     }
 
-    info.DockerEndpoint = vars["DockerURL"]
+    info.DockerEndpoint = params["DockerEndpoint"]
     info.Body = GetRequestBody(r)
     info.Request = r
 
-    return info
+    return info, true
 }
 
 /*
@@ -190,4 +199,38 @@ func GetRequestBody(r *http.Request) *RequestBody {
     json.Unmarshal(reqBody, &body)
 
     return &body
+}
+
+/*
+    Retrieves the parameters of a generic endpoint scheme.  The endpoint to 
+    extract MUST be given as `mux.Vars(r)["Endpoint"]`. A map keyed by fields in the
+    given array is returned.  If there are more keys than fields in the endpoint, the 
+    remaining keys are ignored.  If there are more fields than keys, the last key will
+    hold the entire remaining endpoint.
+
+    RETURN: A map keyed on the given fields and true on success, nil and false otherwise
+*/
+func GetEndpointParams(r *http.Request, names []string) (map[string]string, bool) {
+    endpoint, ok := mux.Vars(r)["Endpoint"]
+
+    if !ok {
+        return nil, false
+    }
+
+    params := make(map[string]string, len(names))
+
+    uri := r.RequestURI[len(r.URL.Path) - len(endpoint):]
+    parts := strings.SplitN(uri, "/", len(names))
+
+    for i, part := range parts {
+        param, err := url.QueryUnescape(part)
+        
+        if err != nil {
+            return nil, false
+        }
+
+        params[names[i]] = param
+    }
+
+    return params, true
 }

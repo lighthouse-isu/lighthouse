@@ -23,7 +23,13 @@ import (
 
 var cookieStore = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
 
-func GetValueOrDefault(r *http.Request, sessionKey, key string, def interface{}) interface{} {
+func GetValueOK(r *http.Request, sessionKey string, key interface{}) (interface{}, bool) {
+    session := GetSession(r, sessionKey)
+    val, ok := session.Values[key]
+    return val, ok
+}
+
+func GetValueOrDefault(r *http.Request, sessionKey string, key, def interface{}) interface{} {
     session := GetSession(r, sessionKey)
     val, ok := session.Values[key]
     if ok {
@@ -32,7 +38,7 @@ func GetValueOrDefault(r *http.Request, sessionKey, key string, def interface{})
     return def
 }
 
-func SetValue(r *http.Request, sessionKey, key string, value interface{}) {
+func SetValue(r *http.Request, sessionKey string, key, value interface{}) {
     session := GetSession(r, sessionKey)
     session.Values[key] = value
 }
