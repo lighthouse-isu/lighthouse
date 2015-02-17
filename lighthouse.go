@@ -19,11 +19,6 @@ import (
     "net/http"
 
     "github.com/lighthouse/lighthouse/auth"
-<<<<<<< HEAD
-    "github.com/lighthouse/lighthouse/handlers"
-=======
-    "github.com/lighthouse/lighthouse/provider"
->>>>>>> master
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
