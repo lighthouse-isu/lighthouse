@@ -12,6 +12,7 @@
 package beacons
 
 import (
+    "github.com/lighthouse/lighthouse/auth"
 	"github.com/lighthouse/lighthouse/databases"
 )
 
@@ -36,7 +37,6 @@ func addInstance(beacon beaconData) error {
         "InstanceAddress" : beacon.InstanceAddress,
         "BeaconAddress" : beacon.BeaconAddress,
         "Token" : beacon.Token,
-        "Users" : beacon.Users,
     }
 
     return getDBSingleton().InsertSchema(entry)
@@ -62,9 +62,9 @@ func getBeaconData(instance string) (beaconData, error) {
     return beacon, nil
 }
 
-func getBeaconsList(user string) ([]string, error) {
+func getBeaconsList(user *auth.User) ([]string, error) {
     opts := databases.SelectOptions{Distinct : true}
-    cols := []string{"BeaconAddress", "Users"}
+    cols := []string{"BeaconAddress"}
 
     scanner, err := getDBSingleton().SelectSchema(cols, nil, opts)
 
@@ -74,17 +74,14 @@ func getBeaconsList(user string) ([]string, error) {
 
     beacons := make([]string, 0)
     seenBeacons := make(map[string]bool)
+    var beacon struct {
+        BeaconAddress string
+    }
 
     for scanner.Next() {
-        var beacon struct {
-            BeaconAddress string
-            Users userMap
-        }
-
         scanner.Scan(&beacon)
 
-        if _, ok := beacon.Users[user]; ok {
-
+        if user.CanAccessBeacon(beacon.BeaconAddress) {
             address := beacon.BeaconAddress
 
             if _, found := seenBeacons[address]; !found {
@@ -92,15 +89,18 @@ func getBeaconsList(user string) ([]string, error) {
                 seenBeacons[address] = true
             }
         }
-        
     }
    
     return beacons, nil
 }
 
-func getInstancesList(beacon, user string) ([]string, error) {
+func getInstancesList(beacon string, user *auth.User) ([]string, error) {
+    if !user.CanAccessBeacon(beacon) {
+        return []string{}, nil
+    }
+
     opts := databases.SelectOptions{Distinct : true}
-    cols := []string{"InstanceAddress", "Users"}
+    cols := []string{"InstanceAddress"}
     where := databases.Filter{"BeaconAddress": beacon}
 
     scanner, err := getDBSingleton().SelectSchema(cols, where, opts)
@@ -110,26 +110,20 @@ func getInstancesList(beacon, user string) ([]string, error) {
     }
 
     instances := make([]string, 0)
-    InstanceAddress := make(map[string]bool)
+    seenAddresses := make(map[string]bool)
+    var instance struct {
+        InstanceAddress string
+    }
 
     for scanner.Next() {
-        var instance struct {
-            InstanceAddress string
-            Users userMap
-        }
-
         scanner.Scan(&instance)
 
-        if _, ok := instance.Users[user]; ok {
+        address := instance.InstanceAddress
 
-            address := instance.InstanceAddress
-
-            if _, found := InstanceAddress[address]; !found {
-                instances = append(instances, address)
-                InstanceAddress[address] = true
-            }
-        }
-        
+        if _, found := seenAddresses[address]; !found {
+            instances = append(instances, address)
+            seenAddresses[address] = true
+        }        
     }
    
     return instances, nil

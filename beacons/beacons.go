@@ -17,11 +17,13 @@ package beacons
 import (
     "os"
     "errors"
+    "net/http"
     "io/ioutil"
     "encoding/json"
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -41,17 +43,13 @@ var schema = databases.Schema {
     "InstanceAddress" : "text UNIQUE PRIMARY KEY",
     "BeaconAddress" : "text",
     "Token" : "text",
-    "Users" : "json",
 }
 
 type beaconData struct {
     InstanceAddress string
     BeaconAddress string
     Token string
-    Users userMap
 }
-
-type userMap map[string]interface{}
 
 func Init() {
     if beacons == nil {
@@ -73,10 +71,10 @@ func GetBeaconAddress(instance string) (string, error) {
     return beacon.BeaconAddress, nil
 }
 
-func GetBeaconToken(instance, user string) (string, error) {
+func TryGetBeaconToken(instance string, r *http.Request) (string, error) {
     var beacon beaconData
     where := databases.Filter{"InstanceAddress" : instance}
-    columns := []string{"Token", "Users"}
+    columns := []string{"BeaconAddress", "Token"}
 
     err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
 
@@ -84,14 +82,7 @@ func GetBeaconToken(instance, user string) (string, error) {
         return "", err
     }
 
-    // Database gives nil on empty map
-    if beacon.Users == nil {
-        return "", TokenPermissionError
-    }
-
-    _, ok := beacon.Users[user]
-
-    if !ok {
+    if !auth.GetCurrentUser(r).CanAccessBeacon(beacon.BeaconAddress) {
         return "", TokenPermissionError
     }
    
@@ -120,10 +111,6 @@ func Handle(r *mux.Router) {
     for _, beacon := range beacons {
         addInstance(beacon)
     }
-
-    r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
-
-    r.HandleFunc("/user/{Endpoint:.*}", handleRemoveUserFromBeacon).Methods("DELETE")
 
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
