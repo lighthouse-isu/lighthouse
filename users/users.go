@@ -19,7 +19,7 @@ import (
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var users *databases.Table
+var users databases.TableInterface
 
 type User struct {
     Email string
@@ -27,7 +27,7 @@ type User struct {
     Password string
 }
 
-func getDBSingleton() *databases.Table {
+func getDBSingleton() databases.TableInterface {
     if users == nil {
         panic("Users database not initialized")
     }

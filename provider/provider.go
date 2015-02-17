@@ -41,8 +41,8 @@ func DecideProvider(providers []*models.Provider) *models.Provider {
 
 func Handle(r *mux.Router) {
     selectedProvider := DecideProvider([]*models.Provider{
-        gce.Provider,
         local.Provider,
+        gce.Provider,
     })
 
     logging.Info(

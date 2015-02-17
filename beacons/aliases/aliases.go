@@ -24,9 +24,9 @@ import (
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var aliases *databases.Table
+var aliases databases.TableInterface
 
-func getDBSingleton() *databases.Table {
+func getDBSingleton() databases.TableInterface {
     if aliases == nil {
         panic("Aliases database not initialized")
     }

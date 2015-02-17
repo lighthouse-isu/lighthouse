@@ -16,18 +16,12 @@ package beacons
 
 import (
     "os"
-    "fmt"
     "errors"
     "io/ioutil"
-    "net/http"
     "encoding/json"
 
     "github.com/gorilla/mux"
 
-    beaconStructs "github.com/lighthouse/beacon/structs"
-
-    "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -36,51 +30,75 @@ const (
     HEADER_TOKEN_KEY = "Token"
 )
 
-var beacons *databases.Table
-
 var (
+    TokenPermissionError = errors.New("beacons: user not permitted to access token")
     NotEnoughParametersError = errors.New("beacons: not enough parameters given")
 )
 
-type Beacon struct {
-    Address string
-    Token string
-    Users map[string]bool
+var beacons databases.TableInterface
+
+var schema = databases.Schema {
+    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
+    "BeaconAddress" : "text",
+    "Token" : "text",
+    "Users" : "json",
 }
 
-func getDBSingleton() *databases.Table {
-    if beacons == nil {
-        panic("Beacons database not initialized")
-    }
-    return beacons
+type beaconData struct {
+    InstanceAddress string
+    BeaconAddress string
+    Token string
+    Users userMap
 }
+
+type userMap map[string]interface{}
 
 func Init() {
     if beacons == nil {
-        beacons = databases.NewTable(postgres.Connection(), "beacons")
+        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", schema)
     }
 }
 
-func AddBeacon(instance string, beacon Beacon) error {
-    return getDBSingleton().Insert(instance, beacon)
-}
+func GetBeaconAddress(instance string) (string, error) {
+    var beacon beaconData
+    where := databases.Filter{"InstanceAddress" : instance}
+    columns := []string{"BeaconAddress"}
 
-func UpdateBeacon(instance string, beacon Beacon) error {
-    return getDBSingleton().Update(instance, beacon)
-}
-
-func GetBeacon(instance string) (Beacon, error) {
-    var beacon Beacon
-    err := getDBSingleton().SelectRow(instance, &beacon)
+    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
 
     if err != nil {
-        return Beacon{"", "", make(map[string]bool)}, err
+        return "", err
     }
    
-    return beacon, nil
+    return beacon.BeaconAddress, nil
 }
 
-func LoadBeacons() map[string]Beacon {
+func GetBeaconToken(instance, user string) (string, error) {
+    var beacon beaconData
+    where := databases.Filter{"InstanceAddress" : instance}
+    columns := []string{"Token", "Users"}
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+
+    if err != nil {
+        return "", err
+    }
+
+    // Database gives nil on empty map
+    if beacon.Users == nil {
+        return "", TokenPermissionError
+    }
+
+    _, ok := beacon.Users[user]
+
+    if !ok {
+        return "", TokenPermissionError
+    }
+   
+    return beacon.Token, nil
+}
+
+func LoadBeacons() []beaconData {
     var fileName string
     if _, err := os.Stat("/config/beacon_permissions.json"); os.IsNotExist(err) {
         fileName = "./config/beacon_permissions.json"
@@ -90,228 +108,28 @@ func LoadBeacons() map[string]Beacon {
 
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var beacons []struct {
-        Address string
-        Beacon Beacon
-    }
-
+    var beacons []beaconData
     json.Unmarshal(configFile, &beacons)
 
-    perms := make(map[string]Beacon)
-    for _, beacon := range beacons {
-        perms[beacon.Address] = beacon.Beacon
-    }
-
-    return perms
+    return beacons
 }
 
 func Handle(r *mux.Router) {
     beacons := LoadBeacons()
 
-    for instance, beacon := range beacons {
-        AddBeacon(instance, beacon)
+    for _, beacon := range beacons {
+        addInstance(beacon)
     }
 
     r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
 
     r.HandleFunc("/user/{Endpoint:.*}", handleRemoveUserFromBeacon).Methods("DELETE")
 
-    r.HandleFunc("/address/{Endpoint:.*}", handleUpdateBeaconAddress).Methods("PUT")
-
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
-    r.HandleFunc("/create", func(w http.ResponseWriter, r *http.Request) {
+    r.HandleFunc("/create", handleBeaconCreate).Methods("POST")
 
-        code, err := handleCreate(r)
-        w.WriteHeader(code) 
-        if err != nil {
-            fmt.Fprint(w, err)
-        }
+    r.HandleFunc("/list", handleListBeacon).Methods("GET")
 
-    }).Methods("POST")
-}
-
-func getInstanceAlias(instance string) string {
-    alias, err := aliases.GetAlias(instance)
-    if err != nil {
-        return instance
-    }
-    return alias
-}
-
-func writeResponse(err error, w http.ResponseWriter) {
-    var code int
-
-    switch err {
-        case databases.KeyNotFoundError, databases.NoUpdateError, 
-            databases.EmptyKeyError, NotEnoughParametersError:
-            code = http.StatusBadRequest
-
-        case nil:
-            code = http.StatusOK
-
-        default:
-            code = http.StatusInternalServerError
-    }
-
-    w.WriteHeader(code)
-
-    if err != nil {
-        fmt.Fprint(w, err)
-    }
-}
-
-func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "UserId"})
-    if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    instance := getInstanceAlias(params["Instance"])
-    userId := params["UserId"]
-
-    beacon, err := GetBeacon(instance)
-
-    if err == nil {
-        beacon.Users[userId] = true
-        err = UpdateBeacon(instance, beacon)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "UserId"})
-    if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    fmt.Println(params)
-
-    instance := getInstanceAlias(params["Instance"])
-    userId := params["UserId"]
-
-    beacon, err := GetBeacon(instance)
-    if err == nil {
-        delete(beacon.Users, userId)
-        err = UpdateBeacon(instance, beacon)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleUpdateBeaconAddress(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Instance", "Address"})
-    if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    instance := getInstanceAlias(params["Instance"])
-    address := params["Address"]
-
-    beacon, err := GetBeacon(instance)
-    if err == nil {
-        beacon.Address = address
-        err = UpdateBeacon(instance, beacon)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Instance"})
-    if ok == false || len(params) < 1 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    instance := getInstanceAlias(params["Instance"])
-
-    reqBody, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        writeResponse(err, w)
-        return
-    }
-
-    var token string
-
-    err = json.Unmarshal(reqBody, &token)
-    if err != nil {
-        writeResponse(err, w)
-        return
-    }
-
-    beacon, _ := GetBeacon(instance)
-    if err == nil {
-        beacon.Token = token
-        err = UpdateBeacon(instance, beacon)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleCreate(r *http.Request) (int, error) {
-    reqBody, err := ioutil.ReadAll(r.Body)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    var beaconData struct {
-        Address string
-        Token string
-        Users []string
-    }
-
-    err = json.Unmarshal(reqBody, &beaconData)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    beacon := Beacon{beaconData.Address, beaconData.Token, make(map[string]bool)}
-    for _, user := range beaconData.Users {
-        beacon.Users[user] = true
-    }
-
-    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.Address)
-
-    req, err := http.NewRequest("GET", vmsTarget, nil)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    // Assuming user has permission to access token since they provided it
-    req.Header.Set(HEADER_TOKEN_KEY, beaconData.Token)
-
-    resp, err := http.DefaultClient.Do(req)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return resp.StatusCode, errors.New("beacon error")
-    }
-
-    vmsBody, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    var vms []beaconStructs.VM
-
-    err = json.Unmarshal(vmsBody, &vms)
-    if err != nil {
-        return http.StatusInternalServerError, err
-    }
-
-    for _, vm := range vms {
-        address := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
-        AddBeacon(address, beacon)
-    }
-
-    return http.StatusOK, nil
+    r.HandleFunc("/list/{Beacon:.*}", handleListInstances).Methods("GET")
 }

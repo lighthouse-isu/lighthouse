@@ -37,14 +37,14 @@ import (
 */
 func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *handlers.HandlerError {
     email := session.GetValueOrDefault(info.Request, "auth", "email", "").(string)
-    beaconInstance, err := beacons.GetBeacon(info.Host)
+    beaconAddress, err := beacons.GetBeaconAddress(info.Host)
 
     requestIsToBeacon := err == nil
 
     var targetAddress, targetEndpoint string
 
     if requestIsToBeacon {
-        targetAddress = beaconInstance.Address
+        targetAddress = beaconAddress
         targetEndpoint = fmt.Sprintf("d/%s/%s", info.Host, info.DockerEndpoint)
     } else {
         targetAddress = info.Host
@@ -69,8 +69,9 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         return &handlers.HandlerError{500, "control", "Failed to create " + method + " request"}
     }
 
-    if requestIsToBeacon && beaconInstance.Users[email] {
-        req.Header.Set(beacons.HEADER_TOKEN_KEY, beaconInstance.Token)
+    if requestIsToBeacon {
+        token, _ := beacons.GetBeaconToken(info.Host, email)
+        req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 
     resp, err := http.DefaultClient.Do(req)
