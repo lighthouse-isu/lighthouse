@@ -43,8 +43,10 @@ func writeResponse(err error, w http.ResponseWriter) {
     var code int
 
     switch err {
-        case databases.KeyNotFoundError, databases.NoUpdateError, 
-                databases.EmptyKeyError, NotEnoughParametersError:
+        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+            code = http.StatusBadRequest
+
+        case NotEnoughParametersError, DuplicateInstanceError:
             code = http.StatusBadRequest
 
         case nil:
@@ -152,14 +154,25 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
 
     currentUser := auth.GetCurrentUser(r)
 
-    for _, vm := range vms {
-        beacon.InstanceAddress = fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
+    instances := make([]string, len(vms))
+
+    for i, vm := range vms {
+        instanceAddr := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
         
-        if !instanceExists(beacon.InstanceAddress) {
-            addInstance(beacon)
-            auth.SetUserBeaconAuthLevel(*currentUser, beacon.BeaconAddress, auth.OwnerAuthLevel)
+        if instanceExists(instanceAddr) {
+            err = DuplicateInstanceError
+            return
         }
+
+        instances[i] = instanceAddr
     }
+
+    for _, instance := range instances {
+        beacon.InstanceAddress = instance
+        addInstance(beacon)
+    }
+
+    auth.SetUserBeaconAuthLevel(currentUser, beacon.BeaconAddress, auth.OwnerAuthLevel)
 
     return
 }

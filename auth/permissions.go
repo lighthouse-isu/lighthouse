@@ -14,30 +14,80 @@
 
 package auth
 
-type Permission struct {
-	Beacons map[string]int
-}
+type Permission map[string]interface{}
 
 const (
 	AccessAuthLevel = 0
 	ModifyAuthLevel = 1
-	OwnerAuthLevel = 1
+	OwnerAuthLevel = 2
 )
 
-func (this *User) CanViewUser(otherUser User) bool {
-    return this.AuthLevel > otherUser.AuthLevel
+func NewPermission() *Permission {
+	return &Permission{
+		"Beacons" : make(map[string]interface{}),
+	}
 }
 
-func (this *User) CanModifyUser(otherUser User) bool {
-    return this.AuthLevel > otherUser.AuthLevel
+func (this *User) GetAuthLevel(field, key string) int {
+	fieldInter, ok := this.Permissions[field]
+	if !ok {
+		return -1
+	}
+
+	fieldVal, ok := fieldInter.(map[string]interface{})
+	if !ok {
+		return -1
+	}
+
+	val, ok := fieldVal[key]
+	if !ok {
+		return -1
+	}
+
+	i, ok := val.(int)
+	if !ok {
+		return -1
+	}
+
+	return i
+}
+
+func (this *User) SetAuthLevel(field, key string, level int) {
+	fieldInter, ok := this.Permissions[field]
+	if !ok {
+		return
+	}
+
+	fieldVal, _ := fieldInter.(map[string]interface{})
+	if fieldVal == nil {
+		fieldVal = make(map[string]interface{})
+	}
+
+	if level < DefaultAuthLevel {
+		delete(fieldVal, key)
+	} else {
+		fieldVal[key] = level
+	}
+
+	this.Permissions[field] = fieldVal
+}
+
+func (this *User) CanViewUser(otherUser *User) bool {
+    return this.Email == otherUser.Email || 
+    	this.AuthLevel > otherUser.AuthLevel
+}
+
+func (this *User) CanModifyUser(otherUser *User) bool {
+    return this.Email == otherUser.Email || 
+    	this.AuthLevel > otherUser.AuthLevel
 }
 
 func (this *User) CanAccessBeacon(beaconAddress string) bool {
-	level, found := this.Permissions.Beacons[beaconAddress]
-	return found && level >= AccessAuthLevel
+	level := this.GetAuthLevel("Beacons", beaconAddress)
+	return level >= AccessAuthLevel
 }
 
 func (this *User) CanModifyBeacon(beaconAddress string) bool {
-	level, found := this.Permissions.Beacons[beaconAddress]
-	return found && level >= ModifyAuthLevel
+	level := this.GetAuthLevel("Beacons", beaconAddress)
+	return level >= ModifyAuthLevel
 }

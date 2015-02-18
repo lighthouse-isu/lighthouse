@@ -21,13 +21,26 @@ import (
 
     "github.com/stretchr/testify/assert"
 
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func Test_AddBeaconData(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
+func setupTests() (table *databases.MockTable, teardown func()) {
+    table = databases.CommonTestingTable(schema)
     SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    auth.SetupTestingTable()
+
+    teardown = func() {
+        TeardownTestingTable()
+        auth.TeardownTestingTable()
+    }
+
+    return
+}
+
+func Test_AddBeaconData(t *testing.T) {
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := beaconData{
         "INST_ADDR", "BEACON_ADDR", "TOKEN",
@@ -49,9 +62,8 @@ func Test_AddBeaconData(t *testing.T) {
 }
 
 func Test_UpdateBeaconData(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
@@ -75,9 +87,8 @@ func Test_UpdateBeaconData(t *testing.T) {
 }
 
 func Test_GetBeaconAddress_Found(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
@@ -97,9 +108,8 @@ func Test_GetBeaconAddress_Found(t *testing.T) {
 }
 
 func Test_GetBeaconAddress_NotFound(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    _, teardown := setupTests()
+    defer teardown()
 
     res, err := GetBeaconAddress("BAD_ADDR")
 
@@ -111,9 +121,8 @@ func Test_GetBeaconAddress_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconData_Found(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
@@ -133,9 +142,8 @@ func Test_GetBeaconData_Found(t *testing.T) {
 }
 
 func Test_GetBeaconData_NotFound(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    _, teardown := setupTests()
+    defer teardown()
 
     res, err := getBeaconData("BAD_INST")
 
@@ -146,22 +154,25 @@ func Test_GetBeaconData_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconToken_NotFound(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    _, teardown := setupTests()
+    defer teardown()
 
-    res, err := TryGetBeaconToken("BAD_INST", "junk user")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BAD_ADDR", auth.OwnerAuthLevel)
 
-    assert.NotNil(t, err, "TryGetBeaconToken should forward errors")
+    res, err := TryGetBeaconToken("BAD_ADDR", user)
+
+    assert.NotNil(t, err,
+        "TryGetBeaconToken should forward errors")
 
     assert.Equal(t, "", res, 
         "TryGetBeaconToken should give empty token on error")
 }
 
 func Test_GetBeaconToken_NotPermitted(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
@@ -171,7 +182,10 @@ func Test_GetBeaconToken_NotPermitted(t *testing.T) {
 
     table.InsertSchema(testBeaconData)
 
-    res, err := TryGetBeaconToken("INST_ADDR", "BAD_USER")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+
+    res, err := TryGetBeaconToken("BEACON_ADDR", user)
 
     assert.NotNil(t, err, 
         "TryGetBeaconToken should return error on bad permissions")
@@ -181,9 +195,8 @@ func Test_GetBeaconToken_NotPermitted(t *testing.T) {
 }
 
 func Test_GetBeaconToken_Valid(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     testBeaconData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
@@ -193,7 +206,13 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
 
     table.InsertSchema(testBeaconData)
 
-    res, err := TryGetBeaconToken("INST_ADDR", "USER")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR", auth.OwnerAuthLevel)
+
+    res, err := TryGetBeaconToken("INST_ADDR", user)
+
+    t.Log(user)
 
     assert.Nil(t, err, 
         "TryGetBeaconToken should return nil error on success")
@@ -203,42 +222,45 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
 }
 
 func Test_ListBeacons_ValidUser(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
+
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
 
     keyList := make([]string, 0)
 
     for i := 1; i <= 2; i++ {
-        beaconList, err := getBeaconsList("USER")
+        beaconList, err := getBeaconsList(user)
 
         assert.Nil(t, err, "getBeaconList returned an error")
 
         assert.Equal(t, keyList, beaconList, 
             "getBeaconList output differed from key")
 
+        addr := fmt.Sprintf("BEACON_ADDR %d", i)
+
         newBeacon := map[string]interface{} {
             "InstanceAddress" : "INST_ADDR", 
-            "BeaconAddress" : fmt.Sprintf("BEACON_ADDR %d", i), 
+            "BeaconAddress" : addr, 
             "Token" : "TOKEN", 
         }
+
+        auth.SetUserBeaconAuthLevel(user, addr, auth.OwnerAuthLevel)
 
         keyList = append(keyList, newBeacon["BeaconAddress"].(string))
         table.InsertSchema(newBeacon)
     }
 
-    beaconList, err := getBeaconsList("USER")
+    beaconList, err := getBeaconsList(user)
 
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, beaconList)
-
-    t.Fail()
 }
 
 func Test_ListBeacons_BadUser(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     goodBeacon := map[string]interface{} {
         "InstanceAddress" : "INST_ADDR 1", 
@@ -252,28 +274,34 @@ func Test_ListBeacons_BadUser(t *testing.T) {
         "Token" : "TOKEN", 
     }
 
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR 1", auth.OwnerAuthLevel)
+
+
     keyList := []string{"BEACON_ADDR 1",}
 
     table.InsertSchema(goodBeacon)
     table.InsertSchema(badBeacon)
 
-    beaconList, err := getBeaconsList("GOOD_USER")
+    beaconList, err := getBeaconsList(user)
 
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, beaconList)
-
-    t.Fail()
 }
 
 func Test_ListInstances_ValidUser(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
+
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR", auth.OwnerAuthLevel)
 
     keyList := make([]string, 0)
 
     for i := 1; i <= 2; i++ {
-        instanceList, err := getInstancesList("BEACON_ADDR", "USER")
+        instanceList, err := getInstancesList("BEACON_ADDR", user)
 
         assert.Nil(t, err, "getBeaconList returned an error")
 
@@ -286,44 +314,44 @@ func Test_ListInstances_ValidUser(t *testing.T) {
             "Token" : "TOKEN",
         }
 
+
         keyList = append(keyList, newInstance["InstanceAddress"].(string))
         table.InsertSchema(newInstance)
     }
 
-    instanceList, err := getInstancesList("BEACON_ADDR", "USER")
+    instanceList, err := getInstancesList("BEACON_ADDR", user)
 
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, instanceList)
-
-    t.Fail()
 }
 
 func Test_ListInstances_BadUser(t *testing.T) {
-    table := databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-    defer TeardownTestingTable()
+    table, teardown := setupTests()
+    defer teardown()
 
     goodInstance := map[string]interface{} {
         "InstanceAddress" : "INST_ADDR 1", 
-        "BeaconAddress" : "BEACON_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR 1", 
         "Token" : "TOKEN",
     }
 
     badInstance := map[string]interface{} {
         "InstanceAddress" : "INST_ADDR 2", 
-        "BeaconAddress" : "BEACON_ADDR", 
+        "BeaconAddress" : "BEACON_ADDR 2", 
         "Token" : "TOKEN",
     }
+
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR 1", auth.OwnerAuthLevel)
 
     keyList := []string{"INST_ADDR 1",}
 
     table.InsertSchema(goodInstance)
     table.InsertSchema(badInstance)
 
-    instanceList, err := getInstancesList("BEACON_ADDR", "GOOD_USER")
+    instanceList, err := getInstancesList("BEACON_ADDR 1", user)
 
     assert.Nil(t, err, "getBeaconList returned an error")
     assert.Equal(t, keyList, instanceList)
-
-    t.Fail()
 }

@@ -22,6 +22,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
 )
@@ -68,7 +69,8 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     }
 
     if requestIsToBeacon {
-        token, _ := beacons.TryGetBeaconToken(info.Host, info.Request)
+        user := auth.GetCurrentUser(info.Request)
+        token, _ := beacons.TryGetBeaconToken(info.Host, user)
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 

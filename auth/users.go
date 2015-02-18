@@ -73,16 +73,21 @@ func createUserWithAuthLevel(email, salt, password string, level int) error {
         "Salt" : salt,
         "Password" : password,
         "AuthLevel" : level,
-        "Permissions" : Permission{},
+        "Permissions" : *NewPermission(),
     }
 
     return getDBSingleton().InsertSchema(user)
 }
 
-func GetUser(email string) (user *User, err error) {
+func GetUser(email string) (*User, error) {
+    var user User
     where := databases.Filter{"Email" : email}
-    err = getDBSingleton().SelectRowSchema(nil, where, &user)
-    return
+    err := getDBSingleton().SelectRowSchema(nil, where, &user)
+
+    if err != nil {
+        return nil, err
+    }
+    return &user, nil
 }
 
 func GetCurrentUser(r *http.Request) *User {
@@ -91,13 +96,9 @@ func GetCurrentUser(r *http.Request) *User {
     return user
 }
 
-func SetUserBeaconAuthLevel(user User, beacon string, level int) error {
-    if level < DefaultAuthLevel {
-        delete(user.Permissions.Beacons, beacon)
-    } else {
-        user.Permissions.Beacons[beacon] = level
-    }
-
+func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
+    user.SetAuthLevel("Beacons", beacon, level)
+    
     to := map[string]interface{}{"Permissions" : user.Permissions}
     where := map[string]interface{}{"Email" : user.Email}
 
@@ -106,7 +107,7 @@ func SetUserBeaconAuthLevel(user User, beacon string, level int) error {
 
 func handleListUsers(w http.ResponseWriter, r *http.Request) {
     currentUser := GetCurrentUser(r)
-    userList, err := getAllUsers(*currentUser)
+    userList, err := getAllUsers(currentUser)
 
     var userJson []byte
     if err == nil {
@@ -133,7 +134,7 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
 
     currentUser := GetCurrentUser(r)
 
-    if !currentUser.CanViewUser(*reqUser) {
+    if !currentUser.CanViewUser(reqUser) {
         w.WriteHeader(http.StatusNotFound)
         return
     }
@@ -162,7 +163,9 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
     defer func() { 
         w.WriteHeader(code)
-        fmt.Fprint(w, err) 
+        if err != nil {
+            fmt.Fprint(w, err) 
+        }
     }()
 
     reqEmail := mux.Vars(r)["Email"]
@@ -175,12 +178,12 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 
     currentUser := GetCurrentUser(r)
 
-    if !currentUser.CanViewUser(*reqUser) {
+    if !currentUser.CanViewUser(reqUser) {
         code = http.StatusNotFound
         return
     }
 
-    if !currentUser.CanModifyUser(*reqUser) {
+    if !currentUser.CanModifyUser(reqUser) {
         code = http.StatusUnauthorized
         return
     }
@@ -199,55 +202,13 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    updateValues := make(map[string]interface{})
-    updateValues["Permissions"] = reqUser.Permissions
-
-    if _, ok := userUpdate["AuthLevel"]; ok {
-        if level, ok := userUpdate["AuthLevel"].(int); ok {
-
-            if level > currentUser.AuthLevel {
-                code = http.StatusUnauthorized
-                return
-            } 
-
-        } else {
-            code = http.StatusBadRequest
-            return
-        }
-
-        updateValues["AuthLevel"] = userUpdate["AuthLevel"]
-    }
-
-    if _, ok := userUpdate["Password"]; ok {
-
-        if password, ok := userUpdate["Password"].(string); ok {
-
-            newPassword := SaltPassword(password, reqUser.Salt)
-            updateValues["AuthLevel"] = newPassword
-
-        } else {
-            code = http.StatusBadRequest
-            return
-        }
-    }
-
-    if _, ok := userUpdate["Beacons"]; ok {
-        if beacons, ok := userUpdate["Beacons"].(map[string]int); ok {
-            for beacon, level := range beacons {
-                if currentUser.CanModifyBeacon(beacon) {
-
-                    if level < DefaultAuthLevel {
-                        delete(reqUser.Permissions.Beacons, beacon)
-                    } else if level <= currentUser.Permissions.Beacons[beacon] {
-                        reqUser.Permissions.Beacons[beacon] = level
-                    }
-                }
-            }
-        }
+    values, code := parseUserUpdateRequest(currentUser, reqUser, userUpdate)
+    if code != http.StatusOK {
+        return
     }
 
     where := map[string]interface{}{"Email" : reqEmail}
-    err = getDBSingleton().UpdateSchema(userUpdate, where)
+    err = getDBSingleton().UpdateSchema(values, where)
 
     if err == nil {
         code = http.StatusInternalServerError
@@ -261,7 +222,9 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
     defer func() { 
         w.WriteHeader(code)
-        fmt.Fprint(w, err) 
+        if err != nil {
+            fmt.Fprint(w, err) 
+        }
     }()
 
     currentUser := GetCurrentUser(r)
@@ -298,9 +261,10 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-func getAllUsers(currentUser User) ([]string, error) {
+func getAllUsers(currentUser *User) ([]string, error) {
     opts := databases.SelectOptions{}
-    userRows, err := getDBSingleton().SelectSchema(nil, nil, opts)
+    cols := []string{"Email", "AuthLevel"}
+    userRows, err := getDBSingleton().SelectSchema(cols, nil, opts)
 
     if err != nil {
         return nil, err
@@ -316,10 +280,60 @@ func getAllUsers(currentUser User) ([]string, error) {
             return nil, err
         }
 
-        if currentUser.CanViewUser(user) {
+        if currentUser.CanViewUser(&user) {
             list = append(list, user.Email)
         }
     }
 
     return list, nil
+}
+
+func parseUserUpdateRequest(curUser, modUser *User, updates map[string]interface{}) (map[string]interface{}, int) {
+    updateValues := make(map[string]interface{})
+    updateValues["Permissions"] = modUser.Permissions
+
+    if _, ok := updates["AuthLevel"]; ok {
+        if level, ok := updates["AuthLevel"].(int); ok {
+
+            if level > curUser.AuthLevel {
+                return nil, http.StatusUnauthorized
+            } else if level < DefaultAuthLevel {
+                return nil, http.StatusBadRequest
+            }
+
+        } else {
+            return nil, http.StatusBadRequest
+        }
+
+        updateValues["AuthLevel"] = updates["AuthLevel"]
+    }
+
+    if _, ok := updates["Password"]; ok {
+        if password, ok := updates["Password"].(string); ok {
+
+            newPassword := SaltPassword(password, modUser.Salt)
+            updateValues["Password"] = newPassword
+
+        } else {
+            return nil, http.StatusBadRequest
+        }
+    }
+
+    if _, ok := updates["Beacons"]; ok {
+        if beacons, ok := updates["Beacons"].(map[string]int); ok {
+            for beacon, level := range beacons {
+
+                ok := curUser.CanModifyBeacon(beacon) && 
+                    level <= curUser.GetAuthLevel("Beacons", beacon)
+
+                if ok {
+                    modUser.SetAuthLevel("Beacons", beacon, level)
+                } else {
+                    return nil, http.StatusUnauthorized
+                }
+            }
+        }
+    }
+
+    return updateValues, http.StatusOK
 }

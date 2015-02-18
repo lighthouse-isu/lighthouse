@@ -38,7 +38,6 @@ func addInstance(beacon beaconData) error {
         "BeaconAddress" : beacon.BeaconAddress,
         "Token" : beacon.Token,
     }
-
     return getDBSingleton().InsertSchema(entry)
 }
 

@@ -17,7 +17,6 @@ package beacons
 import (
     "os"
     "errors"
-    "net/http"
     "io/ioutil"
     "encoding/json"
 
@@ -35,6 +34,7 @@ const (
 var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
     NotEnoughParametersError = errors.New("beacons: not enough parameters given")
+    DuplicateInstanceError = errors.New("beacons: tried to add an instance which already exists")
 )
 
 var beacons databases.TableInterface
@@ -71,7 +71,7 @@ func GetBeaconAddress(instance string) (string, error) {
     return beacon.BeaconAddress, nil
 }
 
-func TryGetBeaconToken(instance string, r *http.Request) (string, error) {
+func TryGetBeaconToken(instance string, user *auth.User) (string, error) {
     var beacon beaconData
     where := databases.Filter{"InstanceAddress" : instance}
     columns := []string{"BeaconAddress", "Token"}
@@ -82,7 +82,7 @@ func TryGetBeaconToken(instance string, r *http.Request) (string, error) {
         return "", err
     }
 
-    if !auth.GetCurrentUser(r).CanAccessBeacon(beacon.BeaconAddress) {
+    if !user.CanAccessBeacon(beacon.BeaconAddress) {
         return "", TokenPermissionError
     }
    
