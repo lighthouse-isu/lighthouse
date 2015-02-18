@@ -279,7 +279,7 @@ func Test_ParseUserUpdateRequest_Beacons_Valid(t *testing.T) {
 	modUser := &User{Permissions: modPerms}
 
 	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]int{
+	updates["Beacons"] = map[string]interface{}{
 		"Beacon 1" : ModifyAuthLevel,
 		"Beacon 2" : AccessAuthLevel,
 		"Beacon 3" : -1,
@@ -293,7 +293,7 @@ func Test_ParseUserUpdateRequest_Beacons_Valid(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, ModifyAuthLevel, beacons["Beacon 1"])
 	assert.Equal(t, AccessAuthLevel, beacons["Beacon 2"])
-	assert.True(t, !found) // Beacon 3 removed
+	assert.False(t, found) // Beacon 3 removed
 }
 
 func Test_ParseUserUpdateRequest_Beacons_CantModify(t *testing.T) {
@@ -308,7 +308,7 @@ func Test_ParseUserUpdateRequest_Beacons_CantModify(t *testing.T) {
 	modUser := &User{Permissions: modPerms}
 
 	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]int{
+	updates["Beacons"] = map[string]interface{}{
 		"Beacon" : AccessAuthLevel,
 	}
 
@@ -329,7 +329,7 @@ func Test_ParseUserUpdateRequest_Beacons_TooHigh(t *testing.T) {
 	modUser := &User{Permissions: modPerms}
 
 	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]int{
+	updates["Beacons"] = map[string]interface{}{
 		"Beacon" : OwnerAuthLevel,
 	}
 
