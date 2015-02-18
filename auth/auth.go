@@ -148,7 +148,7 @@ func Handle(r *mux.Router) {
 
     userRoute := r.PathPrefix("/users").Subrouter()
 
-    userRoute.HandleFunc("/list", handleListUsers).Methods("PUT")
+    userRoute.HandleFunc("/list", handleListUsers).Methods("GET")
 
     userRoute.HandleFunc("/{Email}", handleGetUser).Methods("GET")
 

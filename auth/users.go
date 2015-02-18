@@ -143,7 +143,7 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
         AuthLevel int
         Permissions Permission
     }{
-        currentUser.AuthLevel, currentUser.Permissions,
+        reqUser.AuthLevel, reqUser.Permissions,
     }
 
     userJson, err := json.Marshal(userInfo)
@@ -210,7 +210,7 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
     where := map[string]interface{}{"Email" : reqEmail}
     err = getDBSingleton().UpdateSchema(values, where)
 
-    if err == nil {
+    if err != nil {
         code = http.StatusInternalServerError
         return
     }
@@ -261,6 +261,27 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func interfaceToInt(value interface{}) int {
+    switch i := value.(type) {
+        case int:
+            return i
+        case int8:
+            return int(i)
+        case int16:
+            return int(i)
+        case int32:
+            return int(i)
+        case int64:
+            return int(i)
+        case float32:
+            return int(i)
+        case float64:
+            return int(i)
+    }
+
+    return -1
+}
+
 func getAllUsers(currentUser *User) ([]string, error) {
     opts := databases.SelectOptions{}
     cols := []string{"Email", "AuthLevel"}
@@ -293,19 +314,15 @@ func parseUserUpdateRequest(curUser, modUser *User, updates map[string]interface
     updateValues["Permissions"] = modUser.Permissions
 
     if _, ok := updates["AuthLevel"]; ok {
-        if level, ok := updates["AuthLevel"].(int); ok {
+        level := interfaceToInt(updates["AuthLevel"])
 
-            if level > curUser.AuthLevel {
-                return nil, http.StatusUnauthorized
-            } else if level < DefaultAuthLevel {
-                return nil, http.StatusBadRequest
-            }
-
-        } else {
+        if level > curUser.AuthLevel {
+            return nil, http.StatusUnauthorized
+        } else if level < DefaultAuthLevel {
             return nil, http.StatusBadRequest
         }
 
-        updateValues["AuthLevel"] = updates["AuthLevel"]
+        updateValues["AuthLevel"] = level
     }
 
     if _, ok := updates["Password"]; ok {
@@ -320,8 +337,10 @@ func parseUserUpdateRequest(curUser, modUser *User, updates map[string]interface
     }
 
     if _, ok := updates["Beacons"]; ok {
-        if beacons, ok := updates["Beacons"].(map[string]int); ok {
-            for beacon, level := range beacons {
+        if beacons, ok := updates["Beacons"].(map[string]interface{}); ok {
+            for beacon, val := range beacons {
+
+                level := interfaceToInt(val)
 
                 ok := curUser.CanModifyBeacon(beacon) && 
                     level <= curUser.GetAuthLevel("Beacons", beacon)

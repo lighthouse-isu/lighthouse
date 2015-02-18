@@ -44,12 +44,7 @@ func (this *User) GetAuthLevel(field, key string) int {
 		return -1
 	}
 
-	i, ok := val.(int)
-	if !ok {
-		return -1
-	}
-
-	return i
+	return interfaceToInt(val)
 }
 
 func (this *User) SetAuthLevel(field, key string, level int) {
