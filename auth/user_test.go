@@ -17,8 +17,13 @@ package auth
 import (
 	"testing"
 
+	"strings"
 	"net/http"
+	"net/http/httptest"
+	"encoding/json"
+	"bytes"
 
+	"github.com/gorilla/mux"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/lighthouse/lighthouse/session"
@@ -34,6 +39,27 @@ func setupTests() (table *databases.MockTable, teardown func()) {
     }
 
     return
+}
+
+func addUsers(table *databases.MockTable, users ...User) {
+	for _, user := range users {
+
+		table.InsertSchema(map[string]interface{}{
+	    	"Email" : user.Email,
+	    	"Salt" : user.Salt,
+	    	"Password" : user.Password,
+	    	"AuthLevel" : user.AuthLevel,
+	    	"Permissions" : user.Permissions,
+	    })
+	}
+}
+
+func handleAndServe(endpoint string, f http.HandlerFunc, r *http.Request) *httptest.ResponseRecorder {
+    w := httptest.NewRecorder()
+    m := mux.NewRouter()
+    m.HandleFunc(endpoint, f)
+    m.ServeHTTP(w, r)
+    return w
 }
 
 func Test_CreateUser(t *testing.T) {
@@ -88,13 +114,7 @@ func Test_GetUser_Valid(t *testing.T) {
 	    "EMAIL", "SALT", "PASSWORD", 3, perms,
 	}
 
-    table.InsertSchema(map[string]interface{}{
-    	"Email" : keyUser.Email,
-    	"Salt" : keyUser.Salt,
-    	"Password" : keyUser.Password,
-    	"AuthLevel" : keyUser.AuthLevel,
-    	"Permissions" : perms,
-    })
+    addUsers(table, keyUser)
 
     user, err := GetUser(keyUser.Email)
 
@@ -130,13 +150,7 @@ func Test_GetCurrentUser(t *testing.T) {
 	    "EMAIL", "SALT", "PASSWORD", 3, perms,
 	}
 
-    table.InsertSchema(map[string]interface{}{
-    	"Email" : keyUser.Email,
-    	"Salt" : keyUser.Salt,
-    	"Password" : keyUser.Password,
-    	"AuthLevel" : keyUser.AuthLevel,
-    	"Permissions" : perms,
-    })
+    addUsers(table, keyUser)
 
     user := GetCurrentUser(r)
 
@@ -158,12 +172,9 @@ func Test_SetUserBeaconAuthLevel(t *testing.T) {
     	"OVERWRITE" : 1, "NEW": 2,
     }
 
-    table.InsertSchema(map[string]interface{}{
-    	"Email" : "EMAIL",
-    	"Permissions" : perms,
-    })
-
     user := &User{Email: "EMAIL", Permissions: perms,}
+
+    addUsers(table, *user)
 
     SetUserBeaconAuthLevel(user, "OVERWRITE", 1)
     SetUserBeaconAuthLevel(user, "NEW", 2)
@@ -180,21 +191,12 @@ func Test_GetAllUsers(t *testing.T) {
 
 	current := &User{Email: "current", AuthLevel: 1}
 
-	table.InsertSchema(map[string]interface{}{
-    	"Email" : "current", "AuthLevel" : 1,
-    })
-
-	table.InsertSchema(map[string]interface{}{
-    	"Email" : "lower", "AuthLevel" : 0,
-    })
-
-	table.InsertSchema(map[string]interface{}{
-    	"Email" : "equal", "AuthLevel" : 1,
-    })
-
-	table.InsertSchema(map[string]interface{}{
-    	"Email" : "higher", "AuthLevel" : 2,
-    })
+	addUsers(table, 
+		*current,
+		User{Email : "lower",   AuthLevel : 0},
+    	User{Email : "equal",   AuthLevel : 1},
+		User{Email : "higher",  AuthLevel : 2},
+    )
 
     users, _ := getAllUsers(current)
 
@@ -337,3 +339,182 @@ func Test_ParseUserUpdateRequest_Beacons_TooHigh(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Nil(t, vals)
 }
+
+func Test_HandleListUsers(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+    keyEmail := "EMAIL"
+
+	w := httptest.NewRecorder()
+	r, _ := http.NewRequest("GET", "/", nil)
+    session.SetValue(r, "auth", "email", keyEmail)
+
+    addUsers(table, User{Email: keyEmail})
+
+    http.Handler(http.HandlerFunc(handleListUsers)).ServeHTTP(w, r)
+
+    assert.Equal(t, http.StatusOK, w.Code)
+    assert.True(t, strings.Contains(w.Body.String(), keyEmail))
+}
+
+func Test_HandleGetUsers_Valid(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+    keyEmail := "EMAIL"
+
+	r, _ := http.NewRequest("GET", "/EMAIL", nil)
+
+    session.SetValue(r, "auth", "email", keyEmail)
+    addUsers(table, User{Email: keyEmail, AuthLevel: 2})
+
+    w := handleAndServe("/{Email}", handleGetUser, r)
+
+    assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func Test_HandleGetUsers_NotFound(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+	r, _ := http.NewRequest("GET", "/BAD", nil)
+
+    session.SetValue(r, "auth", "email", "USER")
+    addUsers(
+    	table, 
+    	User{Email: "USER", AuthLevel: 0},
+    )
+
+    w := handleAndServe("/{Email}", handleGetUser, r)
+
+    assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func Test_HandleGetUsers_NotAuthorized(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+	r, _ := http.NewRequest("GET", "/ADMIN", nil)
+
+    session.SetValue(r, "auth", "email", "USER")
+    addUsers(
+    	table, 
+    	User{Email: "ADMIN", AuthLevel: 2},
+    	User{Email: "USER", AuthLevel: 0},
+    )
+
+    w := handleAndServe("/{Email}", handleGetUser, r)
+
+    assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func Test_HandleUpdateUser_Valid(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+    keyUser := User{
+    	Email : "USER",
+    	AuthLevel : 1,
+    	Password : SaltPassword("PASSWORD", ""),
+    	Permissions : map[string]interface{} {
+    		"Beacons" : map[string]interface{} {
+    			"BEACON" : AccessAuthLevel,
+    		},
+    	},
+    }
+
+    baseUser := User{
+    	Email : "USER",
+    	AuthLevel : 2,
+    	Password : "OLD",
+    	Permissions : map[string]interface{} {
+    		"Beacons" : map[string]interface{} {
+    			"BEACON" : OwnerAuthLevel,
+    		},
+    	},
+    }
+
+    addUsers(table, baseUser)
+
+    updateJSON, _ := json.Marshal(
+    	map[string]interface{}{
+	    	"AuthLevel" : 1,
+	    	"Password" : "PASSWORD",
+	    	"Beacons" : map[string]interface{} {
+	    		"BEACON" : AccessAuthLevel,
+	    	},
+    })
+
+	r, _ := http.NewRequest("PUT", "/USER", bytes.NewBuffer(updateJSON))
+
+    session.SetValue(r, "auth", "email", "USER")
+
+    w := handleAndServe("/{Email}", handleUpdateUser, r)
+
+    var user User
+    table.SelectRowSchema(nil, nil, &user)
+
+    assert.Equal(t, http.StatusOK, w.Code)
+    assert.Equal(t, keyUser, user)
+}
+
+func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+    keyUser := User{
+    	Email : "USER",
+    	AuthLevel : 0,
+    	Password : "OLD",
+    	Permissions : map[string]interface{} {
+    		"Beacons" : map[string]interface{} {
+    			"BEACON" : OwnerAuthLevel,
+    		},
+    	},
+    }
+
+    addUsers(table, keyUser)
+
+    updateJSON, _ := json.Marshal(
+    	map[string]interface{}{"AuthLevel" : 1},
+    )
+
+	r, _ := http.NewRequest("PUT", "/USER", bytes.NewBuffer(updateJSON))
+
+    session.SetValue(r, "auth", "email", "USER")
+
+    w := handleAndServe("/{Email}", handleUpdateUser, r)
+
+    var user User
+    table.SelectRowSchema(nil, nil, &user)
+
+    assert.Equal(t, http.StatusUnauthorized, w.Code)
+    assert.Equal(t, keyUser, user)
+}
+
+func Test_HandleCreateUser_Valid(t *testing.T) {
+	table, teardown := setupTests()
+    defer teardown()
+
+    admin := User{Email : "ADMIN", AuthLevel : 1}
+    addUsers(table, admin)
+
+    add := map[string]string{"Email": "USER", "Password": "PASSWORD"}
+    addJSON, _ := json.Marshal(add)
+
+	r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(addJSON))
+    session.SetValue(r, "auth", "email", "ADMIN")
+
+    w := handleAndServe("/", handleCreateUser, r)
+
+    var user User
+    where := databases.Filter{"Email" : "USER"}
+    table.SelectRowSchema(nil, where, &user)
+
+    assert.Equal(t, http.StatusOK, w.Code)
+    assert.Equal(t, "USER", user.Email)
+    assert.Equal(t, SaltPassword("PASSWORD", user.Salt), user.Password)
+    assert.Equal(t, 0, user.AuthLevel)
+}
+
