@@ -22,29 +22,40 @@ const (
 	OwnerAuthLevel = 2
 )
 
-func NewPermission() *Permission {
-	return &Permission{
+func NewPermission() Permission {
+	return Permission{
 		"Beacons" : make(map[string]interface{}),
 	}
 }
 
+func (this *User) convertPermissionsFromDB() {
+	for _, permInter := range this.Permissions {
+
+		permSet := permInter.(map[string]interface{})
+
+		for perm, level := range permSet {
+			val, ok := level.(float64)
+			if ok {
+				permSet[perm] = int(val)
+			} else {
+				permSet[perm] = level.(int)
+			}
+		} 
+	}
+}
+
 func (this *User) GetAuthLevel(field, key string) int {
-	fieldInter, ok := this.Permissions[field]
+	permMap, ok := this.Permissions[field]
 	if !ok {
 		return -1
 	}
 
-	fieldVal, ok := fieldInter.(map[string]interface{})
+	val, ok := permMap.(map[string]interface{})[key]
 	if !ok {
 		return -1
 	}
 
-	val, ok := fieldVal[key]
-	if !ok {
-		return -1
-	}
-
-	return interfaceToInt(val)
+	return val.(int)
 }
 
 func (this *User) SetAuthLevel(field, key string, level int) {

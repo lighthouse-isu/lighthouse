@@ -21,7 +21,7 @@ import (
 )
 
 func Test_NewPermission(t *testing.T) {
-	permissions := *NewPermission()
+	permissions := NewPermission()
 
 	_, beaconOK := permissions["Beacons"]
 	assert.True(t, beaconOK, "NewPermission should have 'Beacons'")
@@ -29,11 +29,10 @@ func Test_NewPermission(t *testing.T) {
 
 func Test_GetAuthLevel(t *testing.T) {
 	user := &User{}
-	user.Permissions = *NewPermission()
+	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
 		"GOOD" : 1,
-		"WRONG TYPE" : "OOPS",
 	}
 
 	user.Permissions["Beacons"] = beaconPerms
@@ -45,7 +44,7 @@ func Test_GetAuthLevel(t *testing.T) {
 
 func Test_SetAuthLevel(t *testing.T) {
 	user := &User{}
-	user.Permissions = *NewPermission()
+	user.Permissions = NewPermission()
 
 	user.SetAuthLevel("Beacons", "KEY", 1)
 	user.SetAuthLevel("Beacons", "OVERWRITE", 0)
@@ -89,7 +88,7 @@ func Test_CanModifyUser(t *testing.T) {
 
 func Test_CanAccessBeacon(t *testing.T) {
 	user := &User{}
-	user.Permissions = *NewPermission()
+	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
 		"access" : AccessAuthLevel,
@@ -107,7 +106,7 @@ func Test_CanAccessBeacon(t *testing.T) {
 
 func Test_CanModifyBeacon(t *testing.T) {
 	user := &User{}
-	user.Permissions = *NewPermission()
+	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
 		"access" : AccessAuthLevel,

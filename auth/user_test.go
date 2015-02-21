@@ -17,6 +17,7 @@ package auth
 import (
 	"testing"
 
+    "fmt"
 	"strings"
 	"net/http"
 	"net/http/httptest"
@@ -73,7 +74,7 @@ func Test_CreateUser(t *testing.T) {
     CreateUser(email, salt, password)
 
     keyUser := User {
-    	email, salt, password, DefaultAuthLevel, *NewPermission(),
+    	email, salt, password, DefaultAuthLevel, NewPermission(),
     }
 
     var actual User
@@ -94,7 +95,7 @@ func Test_CreateUserWithAuthLevel(t *testing.T) {
     createUserWithAuthLevel(email, salt, password, authLevel)
 
     keyUser := User {
-    	email, salt, password, authLevel, *NewPermission(),
+    	email, salt, password, authLevel, NewPermission(),
     }
 
     var actual User
@@ -107,7 +108,7 @@ func Test_GetUser_Valid(t *testing.T) {
 	table, teardown := setupTests()
     defer teardown()
 
-    perms := *NewPermission()
+    perms := NewPermission()
     perms["TestField"] = map[string]interface{}{"TestKey" : 1}
 
     keyUser := User {
@@ -143,7 +144,7 @@ func Test_GetCurrentUser(t *testing.T) {
     r, _ := http.NewRequest("GET", "/", nil)
     session.SetValue(r, "auth", "email", "EMAIL")
 
-    perms := *NewPermission()
+    perms := NewPermission()
     perms["TestField"] = map[string]interface{}{"TestKey" : 1}
 
     keyUser := User {
@@ -165,7 +166,7 @@ func Test_SetUserBeaconAuthLevel(t *testing.T) {
 	table, teardown := setupTests()
     defer teardown()
 
-    perms := *NewPermission()
+    perms := NewPermission()
     perms["Beacons"] = map[string]interface{}{"OVERWRITE" : 0}
 
     keyPerms := map[string]interface{}{
@@ -216,62 +217,55 @@ func Test_ParseUserUpdateRequest_AuthLevel_Valid(t *testing.T) {
 	curUser := &User{AuthLevel: 1}
 	modUser := &User{AuthLevel: 0}
 
-	updates := make(map[string]interface{})
+    var update []byte
 	var vals map[string]interface{}
 	var code int
 
-	updates["AuthLevel"] = 0
-	vals, code = parseUserUpdateRequest(curUser, modUser, updates)
+	update = []byte(`{"AuthLevel" : 1}`)
+	vals, code = parseUserUpdateRequest(curUser, modUser, update)
 	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, updates["AuthLevel"], vals["AuthLevel"])
-
-	updates["AuthLevel"] = 1
-	vals, code = parseUserUpdateRequest(curUser, modUser, updates)
-	assert.Equal(t, http.StatusOK, code)
-	assert.Equal(t, updates["AuthLevel"], vals["AuthLevel"])
+	assert.Equal(t, 1, vals["AuthLevel"])
 }
 
 func Test_ParseUserUpdateRequest_AuthLevel_Invalid(t *testing.T) {
 	curUser := &User{AuthLevel: 1}
 	modUser := &User{AuthLevel: 0}
 
-	updates := make(map[string]interface{})
+	var update []byte
 	var vals map[string]interface{}
 	var code int
 
-	updates["AuthLevel"] = -1
-	vals, code = parseUserUpdateRequest(curUser, modUser, updates)
+	update = []byte(`{"AuthLevel" : -1}`)
+	vals, code = parseUserUpdateRequest(curUser, modUser, update)
 	assert.Equal(t, http.StatusBadRequest, code)
 	assert.Nil(t, vals)
 
-	updates["AuthLevel"] = 2
-	vals, code = parseUserUpdateRequest(curUser, modUser, updates)
+	update = []byte(`{"AuthLevel" : 2}`)
+	vals, code = parseUserUpdateRequest(curUser, modUser, update)
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Nil(t, vals)
 }
 
 func Test_ParseUserUpdateRequest_Password(t *testing.T) {
-	modUser := &User{AuthLevel: 0}
+	modUser := &User{AuthLevel: 0, Password: "OLD"}
 
-	keyPassword := SaltPassword("PASSWORD", modUser.Password)
+	keyPassword := SaltPassword("PASSWORD", modUser.Salt)
 
-	updates := make(map[string]interface{})
-	updates["Password"] = "PASSWORD"
-	
-	vals, code := parseUserUpdateRequest(nil, modUser, updates)
+	update := []byte(`{"Password" : "PASSWORD"}`)
+	vals, code := parseUserUpdateRequest(nil, modUser, update)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Equal(t, keyPassword, vals["Password"])
 }
 
 func Test_ParseUserUpdateRequest_Beacons_Valid(t *testing.T) {
-	curPerms := *NewPermission()
+	curPerms := NewPermission()
 	curPerms["Beacons"] = map[string]interface{}{
 		"Beacon 1" : ModifyAuthLevel,
 		"Beacon 2" : ModifyAuthLevel,
 		"Beacon 3" : ModifyAuthLevel,
 	}
 
-	modPerms := *NewPermission()
+	modPerms := NewPermission()
 	modPerms["Beacons"] = map[string]interface{}{
 		"Beacon 1" : AccessAuthLevel,
 		"Beacon 3" : ModifyAuthLevel,
@@ -280,62 +274,57 @@ func Test_ParseUserUpdateRequest_Beacons_Valid(t *testing.T) {
 	curUser := &User{Permissions: curPerms}
 	modUser := &User{Permissions: modPerms}
 
-	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]interface{}{
-		"Beacon 1" : ModifyAuthLevel,
-		"Beacon 2" : AccessAuthLevel,
-		"Beacon 3" : -1,
-	}
+	updateStr := fmt.Sprintf(
+        `{"Beacons" : {"Beacon 1": %d, "Beacon 2" : %d, "Beacon 3" : %d}}`,
+         ModifyAuthLevel, AccessAuthLevel, -1)
 
-	vals, code := parseUserUpdateRequest(curUser, modUser, updates)
+	vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
+    assert.Equal(t, http.StatusOK, code)
+    if code != http.StatusOK {
+        return
+    }
+
 	perms := vals["Permissions"].(Permission)
 	beacons := perms["Beacons"].(map[string]interface{})
 	_, found := beacons["Beacon 3"]
-
-	assert.Equal(t, http.StatusOK, code)
+	
 	assert.Equal(t, ModifyAuthLevel, beacons["Beacon 1"])
 	assert.Equal(t, AccessAuthLevel, beacons["Beacon 2"])
 	assert.False(t, found) // Beacon 3 removed
 }
 
 func Test_ParseUserUpdateRequest_Beacons_CantModify(t *testing.T) {
-	curPerms := *NewPermission()
+	curPerms := NewPermission()
 	curPerms["Beacons"] = map[string]interface{}{
 		"Beacon" : AccessAuthLevel,
 	}
 
-	modPerms := *NewPermission()
+	modPerms := NewPermission()
 
 	curUser := &User{Permissions: curPerms}
 	modUser := &User{Permissions: modPerms}
 
-	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]interface{}{
-		"Beacon" : AccessAuthLevel,
-	}
+	updateStr := fmt.Sprintf(`{"Beacons" : {"Beacon" : %d}}`, AccessAuthLevel)
 
-	vals, code := parseUserUpdateRequest(curUser, modUser, updates)
+	vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Nil(t, vals)
 }
 
 func Test_ParseUserUpdateRequest_Beacons_TooHigh(t *testing.T) {
-	curPerms := *NewPermission()
+	curPerms := NewPermission()
 	curPerms["Beacons"] = map[string]interface{}{
 		"Beacon" : ModifyAuthLevel,
 	}
 
-	modPerms := *NewPermission()
+	modPerms := NewPermission()
 
 	curUser := &User{Permissions: curPerms}
 	modUser := &User{Permissions: modPerms}
 
-	updates := make(map[string]interface{})
-	updates["Beacons"] = map[string]interface{}{
-		"Beacon" : OwnerAuthLevel,
-	}
+    updateStr := fmt.Sprintf(`{"Beacons" : {"Beacon" : %d}}`, OwnerAuthLevel)
 
-	vals, code := parseUserUpdateRequest(curUser, modUser, updates)
+	vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
 	assert.Equal(t, http.StatusUnauthorized, code)
 	assert.Nil(t, vals)
 }
@@ -476,9 +465,7 @@ func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
 
     addUsers(table, keyUser)
 
-    updateJSON, _ := json.Marshal(
-    	map[string]interface{}{"AuthLevel" : 1},
-    )
+    updateJSON := []byte(`{"AuthLevel" : 1}`)
 
 	r, _ := http.NewRequest("PUT", "/USER", bytes.NewBuffer(updateJSON))
 
