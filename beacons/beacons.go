@@ -129,7 +129,7 @@ func Handle(r *mux.Router) {
 
     r.HandleFunc("/create", handleBeaconCreate).Methods("POST")
 
-    r.HandleFunc("/list", handleListBeacon).Methods("GET")
+    r.HandleFunc("/list", handleListBeacons).Methods("GET")
 
     r.HandleFunc("/list/{Beacon:.*}", handleListInstances).Methods("GET")
 }

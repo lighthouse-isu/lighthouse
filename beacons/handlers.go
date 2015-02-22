@@ -203,7 +203,7 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     return
 }
 
-func handleListBeacon(w http.ResponseWriter, r *http.Request) {
+func handleListBeacons(w http.ResponseWriter, r *http.Request) {
     user := session.GetValueOrDefault(r, "auth", "email", "").(string)
 
     beacons, err := getBeaconsList(user)

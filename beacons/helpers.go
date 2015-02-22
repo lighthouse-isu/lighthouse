@@ -12,6 +12,7 @@
 package beacons
 
 import (
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 	"github.com/lighthouse/lighthouse/databases"
 )
 
@@ -62,7 +63,7 @@ func getBeaconData(instance string) (beaconData, error) {
     return beacon, nil
 }
 
-func getBeaconsList(user string) ([]string, error) {
+func getBeaconsList(user string) ([]aliases.Alias, error) {
     opts := databases.SelectOptions{Distinct : true}
     cols := []string{"BeaconAddress", "Users"}
 
@@ -72,7 +73,7 @@ func getBeaconsList(user string) ([]string, error) {
         return nil, err
     }
 
-    beacons := make([]string, 0)
+    beacons := make([]aliases.Alias, 0)
     seenBeacons := make(map[string]bool)
 
     for scanner.Next() {
@@ -86,9 +87,12 @@ func getBeaconsList(user string) ([]string, error) {
         if _, ok := beacon.Users[user]; ok {
 
             address := beacon.BeaconAddress
+            alias, _ := aliases.GetAliasOf(address)
+
+            pair := aliases.Alias{Alias: alias, Address: address}
 
             if _, found := seenBeacons[address]; !found {
-                beacons = append(beacons, address)
+                beacons = append(beacons, pair)
                 seenBeacons[address] = true
             }
         }
