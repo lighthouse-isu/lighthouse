@@ -22,15 +22,14 @@ import (
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var containers *databases.Table
+var containers databases.TableInterface
 
-var columns = []string {"Id", "AppId", "DockerInstance", "Name"}
-var types = []string {
-        "serial primary key",
-        "integer REFERENCES applications (Id)",
-        "text REFERENCES aliases (keyColumn)",
-        "text",
-    }
+var schema = databases.Schema {
+    "Id" : "serial primary key",
+    "AppId" : "integer REFERENCES applications (Id)",
+    "DockerInstance" : "text REFERENCES aliases (keyColumn)",
+    "Name" : "text",
+}
 
 type Container struct {
     Id int
@@ -39,7 +38,7 @@ type Container struct {
     Name string
 }
 
-func getDBSingleton() *databases.Table {
+func getDBSingleton() databases.TableInterface {
     if containers == nil {
         panic("Containers database not initialized")
     }
@@ -53,30 +52,25 @@ func Init() {
 }
 
 func CreateContainer(AppId int, DockerInstance string, Name string) error {
-    var values []string = make([]string, len(columns))
+    var values map[string]interface{}
     
-    values[0] = "DEFAULT"
-    values[1] = fmt.Sprintf("%d", AppId)
-    values[2] = DockerInstance
-    values[3] = Name
+    values["Id"] = "DEFAULT"
+    values["AppId"] = AppId
+    values["DockerInstance"] = DockerInstance
+    values["Name"] = Name
 
-    return getDBSingleton().InsertSchema(columns, values)
+    return getDBSingleton().InsertSchema(values)
 }
 
-func GetContainer(Id int, container *Container) (err error) {
-    //temporary. need to figure out how best to add to databases package
-    query := "SELECT * FROM containers WHERE Id = ($1)"
-    var queryParams = make([]string, 1)
-    queryParams[0] = fmt.Sprintf("%d", Id)
-    row := getDBSingleton().CustomSelect(query, queryParams)
+func GetContainerById(Id int, container *Container) (err error) {
+    where := databases.Filter{"Id" : Id}
+    columns := make([]string, len(schema))
 
-    if row == nil {
-        return errors.New("unknown database error")
+    for k, _ := range schema {
+        columns = append(columns, k)
     }
-    
-    err = row.Scan(&(container.Id),
-                    &(container.AppId),
-                    &(container.DockerInstance),
-                    &(container.Name))
+
+    err := getDBSingleton().SelectRowSchema(columns, where, container)
+
     return
 }

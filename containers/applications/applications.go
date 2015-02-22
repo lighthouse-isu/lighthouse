@@ -22,20 +22,19 @@ import (
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var applications *databases.Table
+var applications databases.TableInterface
 
-var columns = []string {"Id", "Name"}
-var types = []string {
-    "serial primary key",
-    "text",
+var schema = databases.Schema {
+    "Id" : "serial primary key",
+    "Name" : "text",
 }
 
-type Application struct {
+type applicationData struct {
     Id int
     Name string
 }
 
-func getDBSingleton() *databases.Table {
+func getDBSingleton() databases.TableInterface {
     if applications == nil {
         panic("Applications database not initialized")
     }
@@ -49,25 +48,28 @@ func Init() {
 }
 
 func CreateApplication(Name string) error {
-    var values []string = make([]string, len(columns))
-    values[0] = "DEFAULT"
-    values[1] = Name
+    var values map[string]interface{}
 
-    return getDBSingleton().InsertSchema(columns, values)
+    values["Id"] = "DEFAULT"
+    values["Name"] = Name
+
+    return getDBSingleton().InsertSchema(values)
 }
 
-func getApplication(Id int, application *Application) (err error) {
-    //See GetContainer in containers.go for note
-    query := "SELECT * FROM applications WHERE Id = ($1)"
-    var queryParams = make([]string, 1)
-    queryParams[0] = fmt.Sprintf("%d", Id)
-    row := getDBSingleton().CustomSelect(query, queryParams)
+func getApplicationName(Id int) (string, error) {
+    application applicationData
+    where := databases.Filter{"Id" : Id}
+    columns := make([]string, len(schema))
 
-    if row == nil {
-        return errors.New("unknown database error")
+    for k, _ := range schema {
+        columns = append(columns, k)
     }
 
-    err = row.Scan(&(application.Id), &(application.Name))
+    err := getDBSingleton().SelectRowSchema(columns, where, application)
 
-    return
+    if err != nil {
+        return "", err
+    }
+
+    return application.Name, err
 }
