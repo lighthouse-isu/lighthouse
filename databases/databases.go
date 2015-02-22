@@ -378,10 +378,6 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
         }
     }
 
-    if err != nil {
-        return err
-    }
-
     return err
 }
 
