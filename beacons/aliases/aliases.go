@@ -16,15 +16,24 @@ package aliases
 
 import (
     "os"
+    "fmt"
     "io/ioutil"
+    "net/http"
 
     "encoding/json"
+
+    "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 var aliases databases.TableInterface
+
+var schema = databases.Schema{
+    "Alias" : "text UNIQUE PRIMARY KEY",
+    "Address" : "text",
+}
 
 func getDBSingleton() databases.TableInterface {
     if aliases == nil {
@@ -35,25 +44,54 @@ func getDBSingleton() databases.TableInterface {
 
 func Init() {
     if aliases == nil {
-        aliases = databases.NewTable(postgres.Connection(), "aliases")
+        aliases = databases.NewSchemaTable(postgres.Connection(), "aliases", schema)
 
-        for alias, value := range LoadAliases() {
-            AddAlias(alias, value)
+        for alias, address := range LoadAliases() {
+            AddAlias(alias, address)
         }
     }
 }
 
-func AddAlias(alias, value string) error {
-    return getDBSingleton().Insert(alias, value)
+func AddAlias(alias, address string) error {
+    entry := map[string]interface{}{
+        "Alias" : alias,
+        "Address" : address,
+    }
+
+    return getDBSingleton().InsertSchema(entry)
 }
 
-func UpdateAlias(alias, value string) error {
-    return getDBSingleton().Update(alias, value)
+func UpdateAlias(alias, address string) error {
+    to := databases.Filter{"Address" : address}
+    where := databases.Filter{"Alias": alias}
+
+    return getDBSingleton().UpdateSchema(to, where)
 }
 
-func GetAlias(alias string) (value string, err error) {
-    err = getDBSingleton().SelectRow(alias, &value)
-    return
+func GetAddressOf(alias string) (string, error) {
+    cols := []string{"Address"}
+    where := databases.Filter{"Alias": alias}
+    
+    var val struct {
+        Address string
+    }
+
+    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    
+    return val.Address, err
+}
+
+func GetAliasOf(address string) (string, error) {
+    cols := []string{"Alias"}
+    where := databases.Filter{"Address": address}
+    
+    var val struct {
+        Alias string
+    }
+
+    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    
+    return val.Alias, err
 }
 
 func LoadAliases() map[string]string {
@@ -67,15 +105,72 @@ func LoadAliases() map[string]string {
 
     var data []struct {
         Alias   string
-        Value   string
+        Address   string
     }
 
     json.Unmarshal(configFile, &data)
 
     configAliases := make(map[string]string)
     for _, item := range data {
-        configAliases[item.Alias] = item.Value
+        configAliases[item.Alias] = item.Address
     }
 
     return configAliases
+}
+
+func Handle(r *mux.Router) {
+    aliasConfig := LoadAliases()
+
+    for alias, address := range aliasConfig {
+        fmt.Println(alias)
+        AddAlias(alias, address)
+    }
+
+    r.HandleFunc("/{Alias:.*}", handleUpdateAlias).Methods("PUT")
+}
+
+func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
+    var code int = http.StatusOK
+    var err error = nil
+    defer func(){
+        w.WriteHeader(code)
+        if err != nil {
+            fmt.Fprint(w, err)
+        }
+    }()
+
+    alias := mux.Vars(r)["Alias"]
+
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    var address string
+
+    err = json.Unmarshal(reqBody, &address)
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    if address == "" {
+        code = http.StatusBadRequest
+        return
+    }
+
+    _, res := GetAddressOf(alias)
+    if res == databases.NoRowsError {
+        err = AddAlias(alias, address)
+    } else {
+        err = UpdateAlias(alias, address)
+    }
+
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    return
 }
