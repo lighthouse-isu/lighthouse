@@ -35,6 +35,11 @@ var schema = databases.Schema{
     "Address" : "text",
 }
 
+type Alias struct {
+    Alias string
+    Address string
+}
+
 func getDBSingleton() databases.TableInterface {
     if aliases == nil {
         panic("Aliases database not initialized")
@@ -72,26 +77,30 @@ func GetAddressOf(alias string) (string, error) {
     cols := []string{"Address"}
     where := databases.Filter{"Alias": alias}
     
-    var val struct {
-        Address string
-    }
+    var val Alias
 
     err := getDBSingleton().SelectRowSchema(cols, where, &val)
     
-    return val.Address, err
+    if err != nil {
+        return "", nil
+    }
+
+    return val.Address, nil
 }
 
 func GetAliasOf(address string) (string, error) {
     cols := []string{"Alias"}
     where := databases.Filter{"Address": address}
     
-    var val struct {
-        Alias string
-    }
+    var val Alias
 
     err := getDBSingleton().SelectRowSchema(cols, where, &val)
     
-    return val.Alias, err
+    if err != nil {
+        return "", nil
+    }
+
+    return val.Alias, nil
 }
 
 func LoadAliases() map[string]string {
@@ -103,10 +112,7 @@ func LoadAliases() map[string]string {
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var data []struct {
-        Alias   string
-        Address   string
-    }
+    var data []Alias
 
     json.Unmarshal(configFile, &data)
 
