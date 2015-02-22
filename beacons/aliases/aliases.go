@@ -82,7 +82,7 @@ func GetAddressOf(alias string) (string, error) {
     err := getDBSingleton().SelectRowSchema(cols, where, &val)
     
     if err != nil {
-        return "", nil
+        return "", err
     }
 
     return val.Address, nil
@@ -97,7 +97,7 @@ func GetAliasOf(address string) (string, error) {
     err := getDBSingleton().SelectRowSchema(cols, where, &val)
     
     if err != nil {
-        return "", nil
+        return "", err
     }
 
     return val.Alias, nil
