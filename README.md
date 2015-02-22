@@ -33,7 +33,7 @@ It bridges the gap between providers hosting docker services. Are you running co
 
 ### API
 
-Write your own client! See the API [documentation](https://github.com/lighthouse/lighthouse/wiki/API-Design)
+Write your own client! See the API [documentation](https://github.com/lighthouse/lighthouse/wiki/API-v0.2)
 
 ### Team
 
