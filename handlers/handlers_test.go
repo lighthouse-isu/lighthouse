@@ -27,7 +27,6 @@ import (
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
-    "github.com/lighthouse/lighthouse/databases"
 )
 
 // Helper for GetRequestBody tests
@@ -97,7 +96,7 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
-    aliases.SetupTestingTable(databases.CommonTestingDatabase())
+    aliases.SetupTestingTable()
     defer aliases.TeardownTestingTable()
 
     aliases.AddAlias("TestHost", "TestHost")

@@ -18,8 +18,8 @@ import (
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func SetupTestingTable(db *databases.MockDatabase) {
-    aliases = databases.NewTable(db, "test_table")
+func SetupTestingTable() {
+    aliases = databases.CommonTestingTable(schema)
 }
 
 func TeardownTestingTable() {
