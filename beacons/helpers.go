@@ -138,6 +138,8 @@ func getInstancesList(beacon, user string, refresh bool) ([]instanceData, error)
         return nil, err
     }
 
+    defer scanner.Close()
+
     instances := make([]instanceData, 0)
     InstanceAddress := make(map[string]bool)
 
