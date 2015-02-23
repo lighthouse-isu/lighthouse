@@ -27,11 +27,12 @@ import (
 type MockTable struct {
     Database [][]interface{}
     Schema map[string]int
+    lastUpdateRow int
 
     MockInsert          func(string, interface{})(error)
     MockUpdate          func(string, interface{})(error)
     MockSelectRow       func(string, interface{})(error)
-    MockInsertSchema    func(map[string]interface{})(error)
+    MockInsertSchema    func(map[string]interface{})(int, error)
     MockUpdateSchema    func(map[string]interface{}, map[string]interface{})(error)
     MockSelectRowSchema func([]string, Filter, interface{})(error)
     MockSelectSchema    func([]string, Filter, SelectOptions)(ScannerInterface, error)
@@ -52,7 +53,7 @@ func (t *MockTable) SelectRow(s string, i interface{})(e error) {
     return
 }
 
-func (t *MockTable) InsertSchema(v map[string]interface{})(e error) {
+func (t *MockTable) InsertSchema(v map[string]interface{})(i int, e error) {
     if t.MockInsertSchema != nil { return t.MockInsertSchema(v) }
     return
 }
@@ -73,7 +74,7 @@ func (t *MockTable) SelectSchema(c []string, w Filter, opts SelectOptions)(s Sca
 }
 
 func CommonTestingTable(schema Schema) *MockTable {
-    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int)}
+    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
 
     i := 0
     for k, _ := range schema {
@@ -81,7 +82,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         i += 1
     }
 
-    table.MockInsertSchema = func(values map[string]interface{})(error) {
+    table.MockInsertSchema = func(values map[string]interface{})(int, error) {
         addition := make([]interface{}, len(table.Schema))
 
         for k, v := range values {
@@ -90,13 +91,13 @@ func CommonTestingTable(schema Schema) *MockTable {
 
         for _, row := range table.Database {
             if reflect.DeepEqual(row, addition) {
-                return errors.New("duplicate row")
+                return -1, errors.New("duplicate row")
             }
         }
-
+        table.lastUpdateRow++
         table.Database = append(table.Database, addition)
 
-        return nil
+        return table.lastUpdateRow, nil
     }
 
     table.MockUpdateSchema = func(to, where map[string]interface{})(error) {

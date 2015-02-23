@@ -154,7 +154,7 @@ func (this *Table) Insert(key string, value interface{}) error {
     return err
 }
 
-func (this *Table) InsertSchema(values map[string]interface{}) error {
+func (this *Table) InsertSchema(values map[string]interface{}) (int, error) {
     var colBuf, valBuf bytes.Buffer
     queryVals := make([]interface{}, len(values))
     i := 0
@@ -182,14 +182,16 @@ func (this *Table) InsertSchema(values map[string]interface{}) error {
         cnt, err := res.RowsAffected()
 
         if err == nil && cnt < 1 {
-            return NoUpdateError
+            return -1, NoUpdateError
         }
     }
 
     if err != nil {
         fmt.Println(err.Error())
+        return -1, err
     }
-    return err
+    lastInsert, err := res.LastInsertId()
+    return int(lastInsert), err
 }
 
 func (this *Table) Update(key string, newValue interface{}) (error) {

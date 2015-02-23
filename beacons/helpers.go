@@ -38,8 +38,8 @@ func addInstance(beacon beaconData) error {
         "Token" : beacon.Token,
         "Users" : beacon.Users,
     }
-
-    return getDBSingleton().InsertSchema(entry)
+    _, err := getDBSingleton().InsertSchema(entry)
+    return err
 }
 
 func updateBeaconField(field string, val interface{}, instance string) error {
