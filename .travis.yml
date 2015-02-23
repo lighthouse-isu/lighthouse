@@ -5,4 +5,7 @@ before_install:
 
 script:
   - go test -v -covermode=count -coverprofile=coverage.out
-  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+  - if [ -a coverage.out ]
+  		then
+  		$HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+  	fi
