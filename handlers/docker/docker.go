@@ -19,12 +19,14 @@ import (
     "net/http"
     "io/ioutil"
     "bytes"
+    "regexp"
 
     "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/containers"
 )
 
 /*
@@ -119,6 +121,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     var customHandlers = handlers.CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,
+        regexp.MustCompile("/containers/create.*") : containers.ContainerCreateHandler,
     }
 
     runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)
