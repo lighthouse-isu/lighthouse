@@ -32,7 +32,7 @@ import (
 )
 
 func getInstanceAlias(instance string) string {
-    alias, err := aliases.GetAlias(instance)
+    alias, err := aliases.GetAddressOf(instance)
     if err != nil {
         return instance
     }
