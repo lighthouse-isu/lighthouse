@@ -1,10 +1,9 @@
 language: go
 
-before_install:
-  - sudo pip install codecov
+install:
+  - go get code.google.com/p/go.tools/cmd/cover
+  - go get github.com/mattn/goveralls
 
 script:
-  - go test -coverprofile=coverage.txt -covermode=count
-
-after_success:
-  - codecov
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
