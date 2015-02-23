@@ -118,8 +118,8 @@ func GetBeaconToken(beacon, user string) (string, error) {
 func LoadBeacons() {
     var fileName string
     var err error
-    if _, err = os.Stat("./config/beacon_permissions.dev.json"); err == nil {
-        fileName = "./config/beacon_permissions.dev.json"
+    if _, err = os.Stat("./config/beacon_permissions.json.dev"); err == nil {
+        fileName = "./config/beacon_permissions.json.dev"
     } else if _, err = os.Stat("./config/beacon_permissions.json"); err == nil {
         fileName = "./config/beacon_permissions.json"
     } else {
