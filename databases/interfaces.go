@@ -36,6 +36,7 @@ type TableInterface interface {
     Update(string, interface{})(error)
     SelectRow(string, interface{})(error)
     InsertSchema(map[string]interface{})(int, error)
+    DeleteRowsSchema(Filter) (error)
     UpdateSchema(map[string]interface{}, map[string]interface{})(error)
     SelectRowSchema([]string, Filter, interface{})(error)
     SelectSchema([]string, Filter, SelectOptions)(ScannerInterface, error)

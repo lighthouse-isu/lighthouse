@@ -194,6 +194,48 @@ func (this *Table) InsertSchema(values map[string]interface{}) (int, error) {
     return int(lastInsert), err
 }
 
+func (this *Table) DeleteRowsSchema(where Filter) (error) {
+    var buffer bytes.Buffer
+
+    buffer.WriteString("DELETE FROM ")
+    buffer.WriteString(this.table)
+    buffer.WriteString(" WHERE ")
+    vals := make([]interface{}, len(where))
+    
+    i := 1
+    for col, val := range where {
+        if i != 1 {
+            buffer.WriteString(" && ")
+        }
+
+        buffer.WriteString(col)
+        buffer.WriteString(" = ")
+        buffer.WriteString(fmt.Sprintf("($%d)", i))
+
+        vals[i - 1] = val
+        i += 1
+    }
+
+    buffer.WriteString(";")
+
+    query := buffer.String()
+
+    res, err := this.db.Exec(query, vals...)
+
+    if err == nil {
+        cnt, err := res.RowsAffected()
+
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
+
+    if err != nil {
+        fmt.Println(err.Error())
+    }
+    return err
+}
+
 func (this *Table) Update(key string, newValue interface{}) (error) {
     json, _ := json.Marshal(newValue)
     query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
@@ -381,19 +423,6 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     }
 
     return err
-}
-
-//Deprecated (Really, don't ever use this. It's going away in a week)
-func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Row) {
-    var vals = make([]interface{}, len(queryParams))
-
-    for i, param := range queryParams {
-        vals[i] = param
-    }
-
-    row = this.db.QueryRow(query, vals)
-
-    return
 }
 
 func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
