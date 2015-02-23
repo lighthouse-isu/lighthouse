@@ -115,9 +115,12 @@ func GetBeaconToken(beacon, user string) (string, error) {
     return data.Token, nil
 }
 
-func LoadBeacons() []instanceData {
+func LoadBeacons() {
     var fileName string
-    if _, err := os.Stat("/config/beacon_permissions.json"); os.IsNotExist(err) {
+    var err error
+    if _, err = os.Stat("./config/beacon_permissions.dev.json"); err == nil {
+        fileName = "./config/beacon_permissions.dev.json"
+    } else if _, err = os.Stat("./config/beacon_permissions.json"); err == nil {
         fileName = "./config/beacon_permissions.json"
     } else {
         fileName = "/config/beacon_permissions.json"
@@ -125,18 +128,24 @@ func LoadBeacons() []instanceData {
 
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var instances []instanceData
-    json.Unmarshal(configFile, &instances)
+    var entries struct {
+        Beacons []beaconData
+        Instances []instanceData
+    }
 
-    return instances
+    json.Unmarshal(configFile, &entries)
+
+    for _, beacon := range entries.Beacons {
+        addBeacon(beacon)
+    }
+
+    for _, inst := range entries.Instances {
+        addInstance(inst)
+    }
 }
 
 func Handle(r *mux.Router) {
-    instances := LoadBeacons()
-
-    for _, instance := range instances {
-        addInstance(instance)
-    }
+    LoadBeacons()
 
     r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
 
