@@ -24,7 +24,7 @@ var containers databases.TableInterface
 var schema = databases.Schema {
     "Id" : "serial primary key",
     "AppId" : "integer REFERENCES applications (Id)",
-    "DockerInstance" : "text REFERENCES aliases (keyColumn)",
+    "DockerInstance" : "text",
     "Name" : "text",
 }
 
