@@ -15,9 +15,6 @@
 package applications
 
 import (
-    "fmt"
-    "errors"
-
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -43,33 +40,56 @@ func getDBSingleton() databases.TableInterface {
 
 func Init() {
     if applications == nil {
-        applications = databases.NewSchemaTable(postgres.Connection(), "applications", columns, types)
+        applications = databases.NewSchemaTable(postgres.Connection(), "applications", schema)
     }
 }
 
-func CreateApplication(Name string) error {
-    var values map[string]interface{}
+func CreateApplication(Name string) (int, error) {
+    values := make(map[string]interface{}, len(schema))
 
     values["Id"] = "DEFAULT"
     values["Name"] = Name
 
-    return getDBSingleton().InsertSchema(values)
+    appId, err := getDBSingleton().InsertSchema(values)
+    if err != nil {
+        return -1, err
+    }
+
+    return appId, err
 }
 
-func getApplicationName(Id int) (string, error) {
-    application applicationData
+func GetApplicationName(Id int) (string, error) {
+    var application applicationData
     where := databases.Filter{"Id" : Id}
-    columns := make([]string, len(schema))
+    var columns []string
 
     for k, _ := range schema {
         columns = append(columns, k)
     }
 
-    err := getDBSingleton().SelectRowSchema(columns, where, application)
+    err := getDBSingleton().SelectRowSchema(columns, where, &application)
 
     if err != nil {
         return "", err
     }
 
     return application.Name, err
+}
+
+func GetApplicationId(Name string) (int, error) {
+    var application applicationData
+    where := databases.Filter{"Name" : Name}
+    var columns []string
+
+    for k, _ := range schema {
+        columns = append(columns, k)
+    }
+
+    err := getDBSingleton().SelectRowSchema(columns, where, &application)
+
+    if err != nil {
+        return -1, err
+    }
+
+    return application.Id, err
 }

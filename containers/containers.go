@@ -15,9 +15,6 @@
 package containers
 
 import (
-    "fmt"
-    "errors"
-
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -47,30 +44,40 @@ func getDBSingleton() databases.TableInterface {
 
 func Init() {
     if containers == nil {
-        containers = databases.NewSchemaTable(postgres.Connection(), "containers", columns, types)
+        containers = databases.NewSchemaTable(postgres.Connection(), "containers", schema)
     }
 }
 
-func CreateContainer(AppId int, DockerInstance string, Name string) error {
-    var values map[string]interface{}
-    
+func CreateContainer(AppId int, DockerInstance string, Name string) (int, error) {
+    values := make(map[string]interface{}, len(schema))
+
     values["Id"] = "DEFAULT"
     values["AppId"] = AppId
     values["DockerInstance"] = DockerInstance
     values["Name"] = Name
 
-    return getDBSingleton().InsertSchema(values)
+    containerId, err := getDBSingleton().InsertSchema(values)
+    if err != nil {
+        return -1, err
+    }
+
+    return containerId, err
+}
+
+func DeleteContainer(Id int) (err error) {
+    where := databases.Filter{"Id" : Id}
+    return getDBSingleton().DeleteRowsSchema(where)
 }
 
 func GetContainerById(Id int, container *Container) (err error) {
     where := databases.Filter{"Id" : Id}
-    columns := make([]string, len(schema))
+    var columns []string
 
     for k, _ := range schema {
         columns = append(columns, k)
     }
 
-    err := getDBSingleton().SelectRowSchema(columns, where, container)
+    err = getDBSingleton().SelectRowSchema(columns, where, container)
 
     return
 }
