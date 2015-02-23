@@ -36,35 +36,52 @@ var (
 )
 
 var beacons databases.TableInterface
+var instances databases.TableInterface
 
-var schema = databases.Schema {
-    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
-    "BeaconAddress" : "text",
+var beaconSchema = databases.Schema {
+    "Address" : "text UNIQUE PRIMARY KEY",
     "Token" : "text",
     "Users" : "json",
 }
 
+var instanceSchema = databases.Schema {
+    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
+    "Name" : "text",
+    "CanAccessDocker" : "boolean",
+    "BeaconAddress" : "text",
+}
+
 type beaconData struct {
-    InstanceAddress string
-    BeaconAddress string
+    Address string
     Token string
     Users userMap
+}
+
+type instanceData struct {
+    InstanceAddress string
+    Name string
+    CanAccessDocker bool
+    BeaconAddress string
 }
 
 type userMap map[string]interface{}
 
 func Init() {
     if beacons == nil {
-        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", schema)
+        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", beaconSchema)
+    }
+
+    if instances == nil {
+        instances = databases.NewSchemaTable(postgres.Connection(), "instances", instanceSchema)
     }
 }
 
 func GetBeaconAddress(instance string) (string, error) {
-    var beacon beaconData
+    var beacon instanceData
     where := databases.Filter{"InstanceAddress" : instance}
     columns := []string{"BeaconAddress"}
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+    err := instances.SelectRowSchema(columns, where, &beacon)
 
     if err != nil {
         return "", err
@@ -73,32 +90,32 @@ func GetBeaconAddress(instance string) (string, error) {
     return beacon.BeaconAddress, nil
 }
 
-func GetBeaconToken(instance, user string) (string, error) {
-    var beacon beaconData
-    where := databases.Filter{"InstanceAddress" : instance}
+func GetBeaconToken(beacon, user string) (string, error) {
+    var data beaconData
+    where := databases.Filter{"Address" : beacon}
     columns := []string{"Token", "Users"}
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+    err := beacons.SelectRowSchema(columns, where, &data)
 
     if err != nil {
         return "", err
     }
 
     // Database gives nil on empty map
-    if beacon.Users == nil {
+    if data.Users == nil {
         return "", TokenPermissionError
     }
 
-    _, ok := beacon.Users[user]
+    _, ok := data.Users[user]
 
     if !ok {
         return "", TokenPermissionError
     }
    
-    return beacon.Token, nil
+    return data.Token, nil
 }
 
-func LoadBeacons() []beaconData {
+func LoadBeacons() []instanceData {
     var fileName string
     if _, err := os.Stat("/config/beacon_permissions.json"); os.IsNotExist(err) {
         fileName = "./config/beacon_permissions.json"
@@ -108,17 +125,17 @@ func LoadBeacons() []beaconData {
 
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var beacons []beaconData
-    json.Unmarshal(configFile, &beacons)
+    var instances []instanceData
+    json.Unmarshal(configFile, &instances)
 
-    return beacons
+    return instances
 }
 
 func Handle(r *mux.Router) {
-    beacons := LoadBeacons()
+    instances := LoadBeacons()
 
-    for _, beacon := range beacons {
-        addInstance(beacon)
+    for _, instance := range instances {
+        addInstance(instance)
     }
 
     r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
@@ -132,4 +149,6 @@ func Handle(r *mux.Router) {
     r.HandleFunc("/list", handleListBeacons).Methods("GET")
 
     r.HandleFunc("/list/{Beacon:.*}", handleListInstances).Methods("GET")
+
+    r.HandleFunc("/refresh/{Beacon:.*}", handleRefreshBeacon).Methods("PUT")
 }

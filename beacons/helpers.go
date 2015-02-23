@@ -12,62 +12,81 @@
 package beacons
 
 import (
+    "fmt"
+    "errors"
+    "encoding/json"
+    "io/ioutil"
+    "net/http"
+
+    "github.com/lighthouse/beacon/structs"
+
     "github.com/lighthouse/lighthouse/beacons/aliases"
 	"github.com/lighthouse/lighthouse/databases"
 )
 
-func getDBSingleton() databases.TableInterface {
-    if beacons == nil {
-        panic("Beacons database not initialized")
-    }
-    return beacons
-}
+func beaconExists(beacon string) bool {
+    var test beaconData
+    columns := []string{"Address"}
+    where := databases.Filter{"Address" : beacon}
 
-func instanceExists(instance string) bool {
-    var testInstance struct { InstanceAddress string }
-    columns := []string{"InstanceAddress"}
-    where := databases.Filter{"InstanceAddress" : instance}
-
-    err := getDBSingleton().SelectRowSchema(columns, where, &testInstance)
+    err := beacons.SelectRowSchema(columns, where, &test)
     return err != databases.NoRowsError
 }
 
-func addInstance(beacon beaconData) error {
+func instanceExists(instance string) bool {
+    var test instanceData
+    columns := []string{"InstanceAddress"}
+    where := databases.Filter{"InstanceAddress" : instance}
+
+    err := instances.SelectRowSchema(columns, where, &test)
+    return err != databases.NoRowsError
+}
+
+func addBeacon(beacon beaconData) error {
     entry := map[string]interface{}{
-        "InstanceAddress" : beacon.InstanceAddress,
-        "BeaconAddress" : beacon.BeaconAddress,
+        "Address" : beacon.Address,
         "Token" : beacon.Token,
         "Users" : beacon.Users,
     }
 
-    return getDBSingleton().InsertSchema(entry)
+    return beacons.InsertSchema(entry)
 }
 
-func updateBeaconField(field string, val interface{}, instance string) error {
+func addInstance(instance instanceData) error {
+    entry := map[string]interface{}{
+        "InstanceAddress" : instance.InstanceAddress,
+        "Name" : instance.Name,
+        "CanAccessDocker" : instance.CanAccessDocker,
+        "BeaconAddress" : instance.BeaconAddress,
+    }
+
+    return instances.InsertSchema(entry)
+}
+
+func updateBeaconField(field string, val interface{}, beacon string) error {
     to := databases.Filter{field : val}
-    where := databases.Filter{"InstanceAddress": instance}
+    where := databases.Filter{"Address": beacon}
 
-    return getDBSingleton().UpdateSchema(to, where)
+    return beacons.UpdateSchema(to, where)
 }
 
-func getBeaconData(instance string) (beaconData, error) {
-    var beacon beaconData
-    where := databases.Filter{"InstanceAddress" : instance}
+func getBeaconData(beacon string) (beaconData, error) {
+    var data beaconData
+    where := databases.Filter{"Address" : beacon}
 
-    err := getDBSingleton().SelectRowSchema(nil, where, &beacon)
+    err := beacons.SelectRowSchema(nil, where, &data)
 
     if err != nil {
         return beaconData{}, err
     }
    
-    return beacon, nil
+    return data, nil
 }
 
 func getBeaconsList(user string) ([]aliases.Alias, error) {
-    opts := databases.SelectOptions{Distinct : true}
-    cols := []string{"BeaconAddress", "Users"}
-
-    scanner, err := getDBSingleton().SelectSchema(cols, nil, opts)
+    opts := databases.SelectOptions{}
+    cols := []string{"Address", "Users"}
+    scanner, err := beacons.SelectSchema(cols, nil, opts)
 
     if err != nil {
         return nil, err
@@ -78,7 +97,7 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
 
     for scanner.Next() {
         var beacon struct {
-            BeaconAddress string
+            Address string
             Users userMap
         }
 
@@ -86,7 +105,7 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
 
         if _, ok := beacon.Users[user]; ok {
 
-            address := beacon.BeaconAddress
+            address := beacon.Address
             alias, _ := aliases.GetAliasOf(address)
 
             pair := aliases.Alias{Alias: alias, Address: address}
@@ -96,45 +115,93 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
                 seenBeacons[address] = true
             }
         }
-        
     }
    
     return beacons, nil
 }
 
-func getInstancesList(beacon, user string) ([]string, error) {
-    opts := databases.SelectOptions{Distinct : true}
-    cols := []string{"InstanceAddress", "Users"}
-    where := databases.Filter{"BeaconAddress": beacon}
-
-    scanner, err := getDBSingleton().SelectSchema(cols, where, opts)
-
+func getInstancesList(beacon, user string, refresh bool) ([]instanceData, error) {
+    data, err := getBeaconData(beacon)
     if err != nil {
         return nil, err
     }
 
-    instances := make([]string, 0)
+    if refresh {
+        refreshVMListOf(data)
+    }
+
+    opts := databases.SelectOptions{Distinct : true}
+    where := databases.Filter{"BeaconAddress": beacon}
+
+    scanner, err := instances.SelectSchema(nil, where, opts)
+    if err != nil {
+        return nil, err
+    }
+
+    instances := make([]instanceData, 0)
     InstanceAddress := make(map[string]bool)
 
     for scanner.Next() {
-        var instance struct {
-            InstanceAddress string
-            Users userMap
-        }
-
+        var instance instanceData
         scanner.Scan(&instance)
 
-        if _, ok := instance.Users[user]; ok {
+        if _, ok := data.Users[user]; ok {
 
             address := instance.InstanceAddress
 
             if _, found := InstanceAddress[address]; !found {
-                instances = append(instances, address)
+                instances = append(instances, instance)
                 InstanceAddress[address] = true
             }
         }
-        
     }
    
     return instances, nil
+}
+
+func refreshVMListOf(beacon beaconData) (error) {
+    vmsTarget := fmt.Sprintf("http://%s/vms", beacon.Address)
+
+    req, err := http.NewRequest("GET", vmsTarget, nil)
+    if err != nil {
+        return err
+    }
+
+    // Assuming user has permission to access token since they provided it
+    req.Header.Set(HEADER_TOKEN_KEY, beacon.Token)
+
+    resp, err := http.DefaultClient.Do(req)
+    if err != nil {
+        return err
+    }
+
+    defer resp.Body.Close()
+
+    vmsBody, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return err
+    }
+
+    if resp.StatusCode != http.StatusOK {
+        err = errors.New(string(vmsBody))
+        return err
+    }
+
+    var vms []structs.VM
+
+    err = json.Unmarshal(vmsBody, &vms)
+    if err != nil {
+        return err
+    }
+
+    for _, vm := range vms {
+        instanceAddr := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
+        instance := instanceData{instanceAddr, vm.Name, vm.CanAccessDocker, beacon.Address}
+        
+        if !instanceExists(instance.InstanceAddress) {
+            addInstance(instance)
+        }
+    }
+
+    return nil
 }

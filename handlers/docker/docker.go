@@ -40,7 +40,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     beaconAddress, err := beacons.GetBeaconAddress(info.Host)
 
     requestIsToBeacon := err == nil
-
+    
     var targetAddress, targetEndpoint string
 
     if requestIsToBeacon {
@@ -70,7 +70,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     }
 
     if requestIsToBeacon {
-        token, _ := beacons.GetBeaconToken(info.Host, email)
+        token, _ := beacons.GetBeaconToken(beaconAddress, email)
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 

@@ -50,10 +50,6 @@ func getDBSingleton() databases.TableInterface {
 func Init() {
     if aliases == nil {
         aliases = databases.NewSchemaTable(postgres.Connection(), "aliases", schema)
-
-        for alias, address := range LoadAliases() {
-            AddAlias(alias, address)
-        }
     }
 }
 
@@ -128,7 +124,6 @@ func Handle(r *mux.Router) {
     aliasConfig := LoadAliases()
 
     for alias, address := range aliasConfig {
-        fmt.Println(alias)
         AddAlias(alias, address)
     }
 

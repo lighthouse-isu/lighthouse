@@ -22,80 +22,72 @@ import (
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
-    "github.com/lighthouse/lighthouse/databases"
 )
 
-func setup() (databases.TableInterface, func()) {
+func setup() (func()) {
     SetupTestingTable()
     aliases.SetupTestingTable()
 
-    return beacons, func() {
+    return func() {
         TeardownTestingTable()
         aliases.TeardownTestingTable()
     }
 }
 
 func Test_AddBeaconData(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     users := userMap{"USER":true}
 
     testBeaconData := beaconData{
-        "INST_ADDR", "BEACON_ADDR", "TOKEN", users,
+        "BEACON_ADDR", "TOKEN", users,
     }
 
-    addInstance(testBeaconData)
+    addBeacon(testBeaconData)
 
     var values beaconData
-    table.SelectRowSchema(nil, nil, &values)
+    beacons.SelectRowSchema(nil, nil, &values)
 
     assert.Equal(t, testBeaconData, values)
 }
 
 func Test_UpdateBeaconData(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
-    testBeaconData := map[string]interface{}{
-        "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR_FAIL", 
+    testBeaconData := map[string]interface{}{ 
+        "Address" : "BEACON_ADDR_FAIL", 
         "Token" : "TOKEN_FAIL", 
         "Users" : userMap{"USER_FAIL":true},
     }
 
-    table.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData)
 
     userPass := userMap{"USER_PASS":true}
     keyData := beaconData {
-        "INST_ADDR_PASS", "BEACON_ADDR_PASS", "TOKEN_PASS", userPass,
+        "BEACON_ADDR_PASS", "TOKEN_PASS", userPass,
     }
 
     var values beaconData
+    updateBeaconField("Token", "TOKEN_PASS", "BEACON_ADDR_FAIL")
+    updateBeaconField("Users", userPass, "BEACON_ADDR_FAIL")
+    updateBeaconField("BeaconAddress", "BEACON_ADDR_PASS", "BEACON_ADDR_FAIL")
 
-    updateBeaconField("BeaconAddress", "BEACON_ADDR_PASS", "INST_ADDR")
-    updateBeaconField("Token", "TOKEN_PASS", "INST_ADDR")
-    updateBeaconField("Users", userPass, "INST_ADDR")
-    updateBeaconField("InstanceAddress", "INST_ADDR_PASS", "INST_ADDR")
-
-    table.SelectRowSchema(nil, nil, &values)
+    beacons.SelectRowSchema(nil, nil, &values)
     assert.Equal(t, keyData, values)
 }
 
 func Test_GetBeaconAddress_Found(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
-    users := userMap{"USER":true}
-
-    testBeaconData := map[string]interface{}{
+    testInstanceData := map[string]interface{}{
         "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR", 
-        "Token" : "TOKEN", 
-        "Users" : users,
+        "BeaconAddress" : "BEACON_ADDR",
     }
 
-    table.InsertSchema(testBeaconData)
+    instances.InsertSchema(testInstanceData)
 
     res, err := GetBeaconAddress("INST_ADDR")
 
@@ -107,7 +99,7 @@ func Test_GetBeaconAddress_Found(t *testing.T) {
 }
 
 func Test_GetBeaconAddress_NotFound(t *testing.T) {
-    _, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     res, err := GetBeaconAddress("BAD_ADDR")
@@ -120,31 +112,30 @@ func Test_GetBeaconAddress_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconData_Found(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     users := userMap{"USER":true}
 
     testBeaconData := map[string]interface{}{
-        "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR", 
+        "Address" : "BEACON_ADDR", 
         "Token" : "TOKEN", 
         "Users" : users,
     }
 
-    table.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData)
 
-    res, err := getBeaconData("INST_ADDR")
+    res, err := getBeaconData("BEACON_ADDR")
 
     assert.Nil(t, err, "getBeaconData should not return error beacon was found")
 
-    key := beaconData{"INST_ADDR", "BEACON_ADDR", "TOKEN", users}
+    key := beaconData{"BEACON_ADDR", "TOKEN", users}
     assert.Equal(t, key, res, 
         "getBeaconData should give correct beaconData")
 }
 
 func Test_GetBeaconData_NotFound(t *testing.T) {
-    _, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     res, err := getBeaconData("BAD_INST")
@@ -156,7 +147,7 @@ func Test_GetBeaconData_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconToken_NotFound(t *testing.T) {
-    _, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     res, err := GetBeaconToken("BAD_INST", "junk user")
@@ -168,19 +159,18 @@ func Test_GetBeaconToken_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconToken_NotPermitted(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     testBeaconData := map[string]interface{}{
-        "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR", 
+        "Address" : "BEACON_ADDR", 
         "Token" : "TOKEN", 
         "Users" : userMap{},
     }
 
-    table.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData)
 
-    res, err := GetBeaconToken("INST_ADDR", "BAD_USER")
+    res, err := GetBeaconToken("BEACON_ADDR", "BAD_USER")
 
     assert.NotNil(t, err, 
         "GetBeaconToken should return error on bad permissions")
@@ -190,19 +180,18 @@ func Test_GetBeaconToken_NotPermitted(t *testing.T) {
 }
 
 func Test_GetBeaconToken_Valid(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     testBeaconData := map[string]interface{}{
-        "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR", 
+        "Address" : "BEACON_ADDR", 
         "Token" : "TOKEN", 
         "Users" : userMap{"USER":true},
     }
 
-    table.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData)
 
-    res, err := GetBeaconToken("INST_ADDR", "USER")
+    res, err := GetBeaconToken("BEACON_ADDR", "USER")
 
     assert.Nil(t, err, 
         "GetBeaconToken should return nil error on success")
@@ -212,7 +201,7 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
 }
 
 func Test_ListBeacons_ValidUser(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     keyList := make([]aliases.Alias, 0)
@@ -226,16 +215,15 @@ func Test_ListBeacons_ValidUser(t *testing.T) {
             "getBeaconList output differed from key")
 
         newBeacon := map[string]interface{} {
-            "InstanceAddress" : "INST_ADDR", 
-            "BeaconAddress" : fmt.Sprintf("BEACON_ADDR %d", i), 
+            "Address" : fmt.Sprintf("BEACON_ADDR %d", i), 
             "Token" : "TOKEN", 
             "Users" : userMap{"USER":true},
         }
 
-        keyPair := aliases.Alias{"", newBeacon["BeaconAddress"].(string)}
+        keyPair := aliases.Alias{"", newBeacon["Address"].(string)}
 
         keyList = append(keyList, keyPair)
-        table.InsertSchema(newBeacon)
+        beacons.InsertSchema(newBeacon)
     }
 
     beaconList, err := getBeaconsList("USER")
@@ -245,27 +233,25 @@ func Test_ListBeacons_ValidUser(t *testing.T) {
 }
 
 func Test_ListBeacons_BadUser(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
     goodBeacon := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 1", 
-        "BeaconAddress" : "BEACON_ADDR 1", 
+        "Address" : "BEACON_ADDR 1", 
         "Token" : "TOKEN", 
         "Users" : userMap{"GOOD_USER":true},
     }
 
     badBeacon := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 2", 
-        "BeaconAddress" : "BEACON_ADDR 2", 
+        "Address" : "BEACON_ADDR 2", 
         "Token" : "TOKEN", 
         "Users" : userMap{"BAD_USER":true},
     }
 
     keyList := []aliases.Alias{aliases.Alias{"", "BEACON_ADDR 1"}}
 
-    table.InsertSchema(goodBeacon)
-    table.InsertSchema(badBeacon)
+    beacons.InsertSchema(goodBeacon)
+    beacons.InsertSchema(badBeacon)
 
     beaconList, err := getBeaconsList("GOOD_USER")
 
@@ -274,61 +260,73 @@ func Test_ListBeacons_BadUser(t *testing.T) {
 }
 
 func Test_ListInstances_ValidUser(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
-    keyList := make([]string, 0)
-
-    for i := 1; i <= 2; i++ {
-        instanceList, err := getInstancesList("BEACON_ADDR", "USER")
-
-        assert.Nil(t, err, "getBeaconList returned an error")
-
-        assert.Equal(t, keyList, instanceList, 
-            "getBeaconList output differed from key")
-
-        newInstance := map[string]interface{} {
-            "InstanceAddress" : fmt.Sprintf("INST_ADDR %d", i), 
-            "BeaconAddress" : "BEACON_ADDR", 
-            "Token" : "TOKEN", 
-            "Users" : userMap{"USER":true},
-        }
-
-        keyList = append(keyList, newInstance["InstanceAddress"].(string))
-        table.InsertSchema(newInstance)
+    beacon := map[string]interface{} {
+        "Address" : "BEACON_ADDR", 
+        "Token" : "TOKEN", 
+        "Users" : userMap{"USER":true},
     }
 
-    instanceList, err := getInstancesList("BEACON_ADDR", "USER")
+    beacons.InsertSchema(beacon)
 
-    assert.Nil(t, err, "getBeaconList returned an error")
+    keyList := make([]instanceData, 0)
+
+    for i := 1; i <= 2; i++ {
+        instanceList, err := getInstancesList("BEACON_ADDR", "USER", false)
+
+        assert.Nil(t, err, "getInstancesList returned an error")
+
+        assert.Equal(t, keyList, instanceList, 
+            "getInstancesList output differed from key")
+
+        newInstance := instanceData {
+            InstanceAddress : fmt.Sprintf("INST_ADDR %d", i), 
+            BeaconAddress : "BEACON_ADDR",
+            Name : fmt.Sprintf("VM %d", i),
+            CanAccessDocker : true,
+        }
+
+        keyList = append(keyList, newInstance)
+
+        instances.InsertSchema(map[string]interface{} {
+            "InstanceAddress" : newInstance.InstanceAddress, 
+            "BeaconAddress" : newInstance.BeaconAddress,
+            "Name" : newInstance.Name,
+            "CanAccessDocker" : newInstance.CanAccessDocker,
+        })
+    }
+
+    instanceList, err := getInstancesList("BEACON_ADDR", "USER", false)
+
+    assert.Nil(t, err, "getInstancesList returned an error")
     assert.Equal(t, keyList, instanceList)
 }
 
 func Test_ListInstances_BadUser(t *testing.T) {
-    table, teardown := setup()
+    teardown := setup()
     defer teardown()
 
-    goodInstance := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 1", 
-        "BeaconAddress" : "BEACON_ADDR", 
+    beacon := map[string]interface{} {
+        "Address" : "BEACON_ADDR", 
         "Token" : "TOKEN", 
         "Users" : userMap{"GOOD_USER":true},
     }
 
-    badInstance := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 2", 
+    beacons.InsertSchema(beacon)
+
+    instance := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR", 
+        "Name" : "NAME",
+        "CanAccessDocker" : true,
         "BeaconAddress" : "BEACON_ADDR", 
-        "Token" : "TOKEN", 
-        "Users" : userMap{"BAD_USER":true},
     }
 
-    keyList := []string{"INST_ADDR 1",}
+    instances.InsertSchema(instance)
 
-    table.InsertSchema(goodInstance)
-    table.InsertSchema(badInstance)
+    instanceList, err := getInstancesList("BEACON_ADDR", "BAD_USER", false)
 
-    instanceList, err := getInstancesList("BEACON_ADDR", "GOOD_USER")
-
-    assert.Nil(t, err, "getBeaconList returned an error")
-    assert.Equal(t, keyList, instanceList)
+    assert.Nil(t, err, "getInstancesList returned an error")
+    assert.Equal(t, 0, len(instanceList))
 }
