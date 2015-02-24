@@ -1,15 +1,14 @@
 #!/bin/bash
 
-list="$(find -mindepth 1 -path './[^.]*' -type d)"
+list="$(find -path '.*test.go')"
 
-rm -f coverage.html
 echo "mode: count\n" > test_coverage.out
 
 for d in $list; do
-    go test -coverprofile=cover.out -covermode=count $d
-    tail -n +2 cover.out >> test_coverage.out
+	path=$(echo $d | awk -F/ '{for (i=1; i<NF; i++) printf $i"/"}')
+
+	go test -v -coverprofile=cover.out -covermode=count $path
+	tail -n +2 cover.out >> test_coverage.out
 done
 
-go tool cover -html=test_coverage.out -o coverage.html
-
-rm test_coverage.out cover.out
+$HOME/gopath/bin/goveralls -coverprofile=test_coverage.out -service=travis-ci
