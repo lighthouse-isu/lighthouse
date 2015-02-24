@@ -11,7 +11,7 @@ for d in $list; do
     tail -n +2 cover.out >> profile.cov
 done
 
-cat profile.cov | awk -F/ '!match($NF, "_utils.go")' > no_utils.cov
+cat profile.cov | awk -F/ '!match($NF, "_testing_utils.go")' > no_utils.cov
 
 if [ $1 == "local" ]
 then
