@@ -1,8 +1,12 @@
 language: go
 
+go:
+  - tip
+
 before_install:
+  - go get github.com/axw/gocov/gocov
   - go get github.com/mattn/goveralls
+  - if ! go get code.google.com/p/go.tools/cmd/cover; then go get golang.org/x/tools/cmd/cover; fi
 
 script:
-  - go test ./beacons/ -v -covermode=count -coverprofile=coverage.out
-  - if [ -a coverage.out ]; then $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci; fi;
+  - $HOME/gopath/bin/goveralls -service=travis-ci
