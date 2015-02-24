@@ -37,10 +37,8 @@ func Test_GetValueOK_Found(t *testing.T) {
     assert.Equal(t, "right_value", value.(string))
 }
 
-func Test_GetValueOK_Found(t *testing.T) {
+func Test_GetValueOK_NotFound(t *testing.T) {
     r, _ := http.NewRequest("GET", "/", nil)
-
-    s := GetSession(r, sessionKey)
 
     _, ok := GetValueOK(r, sessionKey, "key")
 
