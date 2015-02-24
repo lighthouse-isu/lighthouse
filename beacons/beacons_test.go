@@ -68,12 +68,12 @@ func Test_UpdateBeaconData(t *testing.T) {
     keyData := beaconData {
         "BEACON_ADDR_PASS", "TOKEN_PASS", userPass,
     }
-
-    var values beaconData
+ 
     updateBeaconField("Token", "TOKEN_PASS", "BEACON_ADDR_FAIL")
     updateBeaconField("Users", userPass, "BEACON_ADDR_FAIL")
     updateBeaconField("Address", "BEACON_ADDR_PASS", "BEACON_ADDR_FAIL")
 
+    values := beaconData{"BEACON_ADDR_FAIL", "TOKEN_FAIL", userMap{}}
     beacons.SelectRowSchema(nil, nil, &values)
     assert.Equal(t, keyData, values)
 }
