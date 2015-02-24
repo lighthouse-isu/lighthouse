@@ -22,10 +22,6 @@ func SetupCustomTestingTable(table *databases.MockTable) {
     containers = table
 }
 
-func SetupTestingTable() {
-    containers = databases.CommonTestingTable(schema)
-}
-
 func TeardownTestingTable() {
     containers = nil
 }
