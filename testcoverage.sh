@@ -11,4 +11,10 @@ for d in $list; do
     tail -n +2 cover.out >> profile.cov
 done
 
-$HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
+if [ $1 == "local" ]
+then
+	go tool cover -html=profile.cov -o coverage.html
+	rm profile.cov cover.out
+else
+	$HOME/gopath/bin/goveralls -coverprofile=profile.cov -service=travis-ci
+fi

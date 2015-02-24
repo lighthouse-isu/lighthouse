@@ -25,6 +25,28 @@ const (
     sessionKey = "TEST_KEY"
 )
 
+func Test_GetValueOK_Found(t *testing.T) {
+    r, _ := http.NewRequest("GET", "/", nil)
+
+    s := GetSession(r, sessionKey)
+    s.Values["key"] = "right_value"
+
+    value, ok := GetValueOK(r, sessionKey, "key")
+
+    assert.True(t, ok)
+    assert.Equal(t, "right_value", value.(string))
+}
+
+func Test_GetValueOK_Found(t *testing.T) {
+    r, _ := http.NewRequest("GET", "/", nil)
+
+    s := GetSession(r, sessionKey)
+
+    _, ok := GetValueOK(r, sessionKey, "key")
+
+    assert.False(t, ok)
+}
+
 func Test_GetValue_Valid(t *testing.T) {
     r, _ := http.NewRequest("GET", "/", nil)
 
