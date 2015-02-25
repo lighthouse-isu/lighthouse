@@ -15,7 +15,13 @@
 package beacons
 
 import (
+	"net"
+    "net/http"
+    "net/http/httptest"
+
     "github.com/lighthouse/lighthouse/databases"
+
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
 func SetupTestingTable() {
@@ -27,4 +33,32 @@ func SetupTestingTable() {
 func TeardownTestingTable() {
     beacons = nil
     instances = nil
+}
+
+func setup() (func()) {
+    SetupTestingTable()
+    aliases.SetupTestingTable()
+
+    return func() {
+        TeardownTestingTable()
+        aliases.TeardownTestingTable()
+    }
+}
+
+func setupServer(f *func(http.ResponseWriter, *http.Request), url string) *httptest.Server {
+
+    // Handler function, defaults to an empty func
+    var useFunc func(http.ResponseWriter, *http.Request)
+
+    if f != nil {
+        useFunc = *f
+    } else {
+        useFunc = func(http.ResponseWriter, *http.Request) {}
+    }
+
+    s := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
+    s.Listener, _ = net.Listen("tcp", url + ":http")
+    s.Start()
+
+    return s
 }
