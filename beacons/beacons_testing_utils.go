@@ -15,7 +15,6 @@
 package beacons
 
 import (
-	"net"
     "net/http"
     "net/http/httptest"
 
@@ -45,7 +44,7 @@ func setup() (func()) {
     }
 }
 
-func setupServer(f *func(http.ResponseWriter, *http.Request), url string) *httptest.Server {
+func setupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
 
     // Handler function, defaults to an empty func
     var useFunc func(http.ResponseWriter, *http.Request)
@@ -57,7 +56,6 @@ func setupServer(f *func(http.ResponseWriter, *http.Request), url string) *httpt
     }
 
     s := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
-    s.Listener, _ = net.Listen("tcp", url + ":http")
     s.Start()
 
     return s

@@ -18,6 +18,7 @@ import (
     "testing"
 
     "fmt"
+    "strings"
     "encoding/json"
     "net/http"
 
@@ -350,15 +351,18 @@ func Test_RefreshVMListOf(t *testing.T) {
         fmt.Fprint(w, string(val))
     }
 
-    defer setupServer(&f, "127.0.0.1").Close()
+    s := setupServer(&f)
+    defer s.Close()
+
+    url := strings.Replace(s.URL, "http://", "", 1)
 
     beacons.InsertSchema(map[string]interface{} {
-        "Address" : "127.0.0.1", 
+        "Address" : url, 
         "Token" : "", 
         "Users" : userMap{},
     })
 
-    data := beaconData{Address: "127.0.0.1"}
+    data := beaconData{Address: url}
 
     refreshVMListOf(data)
 
