@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 list="$(find -path '.*test.go')"
 
 echo "mode: count\n" > profile.cov
