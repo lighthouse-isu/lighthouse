@@ -3,6 +3,7 @@ Lighthouse
 
 [![Build Status](https://img.shields.io/travis/lighthouse/lighthouse.svg?style=flat)](https://travis-ci.org/lighthouse/lighthouse)
 [![License](https://img.shields.io/badge/license-apache2-blue.svg?style=flat)](/LICENSE)
+[![Coveralls](https://img.shields.io/coveralls/lighthouse/lighthouse.svg)](https://coveralls.io/r/lighthouse/lighthouse)
 
 [Lighthouse](https://lighthouse.github.io) is a Docker controller. It aggregates information about Docker instances across mulitple cloud providers and allows for easy control over the containers deployed on that system.
 
