@@ -19,7 +19,7 @@ import (
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/containers/applications"
+    "github.com/lighthouse/lighthouse/handlers/containers/applications"
 )
 
 func ContainerCreateHandler(info handlers.HandlerInfo, rollback bool) *handlers.HandlerError {

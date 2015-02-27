@@ -26,7 +26,7 @@ import (
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/containers"
+    "github.com/lighthouse/lighthouse/handlers/containers"
 )
 
 /*
