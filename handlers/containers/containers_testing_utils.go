@@ -22,6 +22,10 @@ func SetupCustomTestingTable(table *databases.MockTable) {
     containers = table
 }
 
+func SetupTestingTable() {
+    containers = databases.CommonTestingTable(schema) // schema defined in containers.go
+}
+
 func TeardownTestingTable() {
     containers = nil
 }

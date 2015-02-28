@@ -17,8 +17,12 @@ package containers
 import (
     "testing"
     "fmt"
+    "net/http"
+
     "github.com/stretchr/testify/assert"
     "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/handlers/containers/applications"
 )
 
 func Test_CreateContainer(t *testing.T) {
@@ -86,4 +90,93 @@ func Test_GetContainerById(t *testing.T) {
 
     assert.Equal(t, "Test", container.Name,
         "Container name should match name in database.")
+}
+
+func Test_containerCreate_Passed(t *testing.T) {
+    SetupTestingTable()
+    applications.SetupTestingTable()
+    defer TeardownTestingTable()
+    defer applications.TeardownTestingTable()
+
+    var info handlers.HandlerInfo
+    info.Host = "HOST_PASSED"
+    r, _ := http.NewRequest("POST", "/containers/create?name=NAME_PASSED", nil)
+    info.Request = r
+    info.HandlerData = make(map[string]interface{})
+
+    ret := containerCreate(info)
+
+    assert.Nil(t, ret)
+    assert.Equal(t, 0, info.HandlerData["ContainerCreate"])
+
+    var container Container
+    err := GetContainerById(info.HandlerData["ContainerCreate"].(int), &container)
+    assert.Nil(t, err)
+    assert.Equal(t, 0, container.Id)
+    assert.Equal(t, 0, container.AppId)
+    assert.Equal(t, "HOST_PASSED", container.DockerInstance)
+    assert.Equal(t, "NAME_PASSED", container.Name)
+
+    name, err := applications.GetApplicationName(container.AppId)
+    assert.Nil(t, err)
+    assert.Equal(t, "NAME_PASSED", name)
+}
+
+func Test_containerCreate_NoName(t *testing.T) {
+    var info handlers.HandlerInfo
+    info.Host = "HOST_PASSED"
+    r, _ := http.NewRequest("POST", "/containers/create", nil)
+    info.Request = r
+    info.HandlerData = make(map[string]interface{})
+
+    ret := containerCreate(info)
+    assert.NotNil(t, ret)
+    assert.Equal(t, http.StatusBadRequest, ret.StatusCode)
+    assert.Equal(t, "Missing name query parameter.", ret.Cause)
+    assert.Equal(t, "Must create container with a name.", ret.Message)
+}
+
+func Test_containerDelete(t *testing.T) {
+    SetupTestingTable()
+    defer TeardownTestingTable()
+
+    var container Container
+    var info handlers.HandlerInfo
+    info.HandlerData = make(map[string]interface{})
+
+    containerId, err := CreateContainer(0, "HOST", "NAME")
+    assert.Nil(t, err)
+
+    info.HandlerData["ContainerCreate"] = containerId
+
+    containerDelete(info)
+
+    err = GetContainerById(containerId, &container)
+    assert.Equal(t, databases.NoRowsError, err)
+}
+
+func Test_containerHandler(t *testing.T) {
+    SetupTestingTable()
+    applications.SetupTestingTable()
+    defer TeardownTestingTable()
+    defer applications.TeardownTestingTable()
+
+    var info handlers.HandlerInfo
+    info.Host = "HOST_PASSED"
+    r, _ := http.NewRequest("POST", "/containers/create?name=NAME_PASSED", nil)
+    info.Request = r
+    info.HandlerData = make(map[string]interface{})
+
+    handlerErr := ContainerCreateHandler(info, false)
+    assert.Nil(t, handlerErr)
+
+    var container Container
+    err := GetContainerById(0, &container)
+    assert.Nil(t, err)
+
+    handlerErr = ContainerCreateHandler(info, true)
+    assert.Nil(t, handlerErr)
+
+    err = GetContainerById(0, &container)
+    assert.Equal(t, databases.NoRowsError, err)
 }

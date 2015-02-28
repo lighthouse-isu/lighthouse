@@ -114,7 +114,7 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     router.ServeHTTP(httptest.NewRecorder(), r)
 
-    expected := HandlerInfo{"Test/Endpoint", "TestHost", nil, r, nil}
+    expected := HandlerInfo{"Test/Endpoint", "TestHost", nil, r, make(map[string]interface{})}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")

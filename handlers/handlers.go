@@ -177,6 +177,7 @@ func GetHandlerInfo(r *http.Request) (HandlerInfo, bool) {
     info.DockerEndpoint = params["DockerEndpoint"]
     info.Body = GetRequestBody(r)
     info.Request = r
+    info.HandlerData = make(map[string]interface{})
 
     return info, true
 }
