@@ -31,8 +31,8 @@ import (
 var aliases databases.TableInterface
 
 var schema = databases.Schema{
-    "Alias" : "text UNIQUE PRIMARY KEY",
-    "Address" : "text",
+    "Alias" : "text",
+    "Address" : "text UNIQUE PRIMARY KEY",
 }
 
 type Alias struct {
@@ -63,10 +63,20 @@ func AddAlias(alias, address string) error {
 }
 
 func UpdateAlias(alias, address string) error {
-    to := databases.Filter{"Address" : address}
-    where := databases.Filter{"Alias": alias}
+    to := databases.Filter{"Alias": alias}
+    where := databases.Filter{"Address" : address}
 
     return getDBSingleton().UpdateSchema(to, where)
+}
+
+func SetAlias(alias, address string) error {
+    err := UpdateAlias(alias, address)
+
+    if err == databases.NoUpdateError {
+        err = AddAlias(alias, address)
+    }
+
+    return err
 }
 
 func GetAddressOf(alias string) (string, error) {
