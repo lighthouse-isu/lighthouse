@@ -138,12 +138,10 @@ func getInstancesList(beacon, user string, refresh bool) ([]map[string]interface
         return nil, err
     }
 
-    if _, ok := data.Users[user]; !ok {
-        return nil, TokenPermissionError
-    }
-
     if refresh {
-        refreshVMListOf(data)
+        if _, ok := data.Users[user]; !ok {
+            refreshVMListOf(data)
+        }
     }
 
     opts := databases.SelectOptions{Distinct : true}

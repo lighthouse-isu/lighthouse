@@ -137,7 +137,7 @@ func Handle(r *mux.Router) {
         AddAlias(alias, address)
     }
 
-    r.HandleFunc("/{Alias:.*}", handleUpdateAlias).Methods("PUT")
+    r.HandleFunc("/{Address:.*}", handleUpdateAlias).Methods("PUT")
 }
 
 func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
@@ -150,7 +150,7 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
         }
     }()
 
-    alias := mux.Vars(r)["Alias"]
+    address := mux.Vars(r)["Address"]
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -158,20 +158,20 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    var address string
+    var alias string
 
-    err = json.Unmarshal(reqBody, &address)
+    err = json.Unmarshal(reqBody, &alias)
     if err != nil {
         code = http.StatusInternalServerError
         return
     }
 
-    if address == "" {
+    if alias == "" {
         code = http.StatusBadRequest
         return
     }
 
-    _, res := GetAddressOf(alias)
+    _, res := GetAliasOf(address)
     if res == databases.NoRowsError {
         err = AddAlias(alias, address)
     } else {
