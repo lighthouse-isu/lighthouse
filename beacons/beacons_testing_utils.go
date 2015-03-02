@@ -15,17 +15,48 @@
 package beacons
 
 import (
+    "net/http"
+    "net/http/httptest"
+
     "github.com/lighthouse/lighthouse/databases"
+
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
-func SetupCustomTestingTable(table *databases.MockTable) {
-    beacons = table
-}
-
 func SetupTestingTable() {
-    beacons = databases.CommonTestingTable(schema) // schema defined in beacons.go
+	// schemas defined in beacons.go
+    beacons = databases.CommonTestingTable(beaconSchema) 
+    instances = databases.CommonTestingTable(instanceSchema)
 }
 
 func TeardownTestingTable() {
     beacons = nil
+    instances = nil
+}
+
+func setup() (func()) {
+    SetupTestingTable()
+    aliases.SetupTestingTable()
+
+    return func() {
+        TeardownTestingTable()
+        aliases.TeardownTestingTable()
+    }
+}
+
+func setupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
+
+    // Handler function, defaults to an empty func
+    var useFunc func(http.ResponseWriter, *http.Request)
+
+    if f != nil {
+        useFunc = *f
+    } else {
+        useFunc = func(http.ResponseWriter, *http.Request) {}
+    }
+
+    s := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
+    s.Start()
+
+    return s
 }
