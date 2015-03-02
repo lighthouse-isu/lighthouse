@@ -19,7 +19,6 @@ import (
     "net/http"
 
     "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/provider"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
@@ -58,7 +57,6 @@ func main() {
     versionRouter := baseRouter.PathPrefix(API_VERSION_0_2).Subrouter()
 
     docker.Handle(versionRouter.PathPrefix("/d").Subrouter())
-    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     aliases.Handle(versionRouter.PathPrefix("/aliases").Subrouter())
     auth.Handle(versionRouter)
