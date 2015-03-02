@@ -19,6 +19,7 @@ import (
     "net/http"
     "io/ioutil"
     "bytes"
+    "encoding/json"
 
     "github.com/gorilla/mux"
 
@@ -59,7 +60,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
 
     payload := []byte(nil)
     if info.Body != nil {
-        payload = []byte(info.Body.Payload)
+        payload, _ = json.Marshal(info.Body.Payload)
     }
 
     method := info.Request.Method
