@@ -35,18 +35,6 @@ func Test_SaltPassword(t *testing.T) {
     assert.Equal(t, expectedResult, SaltPassword("12345", "i'm the salt"))
 }
 
-func Test_WhoAmI_NotLoggedIn(t *testing.T) {
-	r, _ := http.NewRequest("GET", "/whoami", nil)
-
-    m := mux.NewRouter()
-    Handle(m)	
-    w := httptest.NewRecorder()
-
-    m.ServeHTTP(w, r)
-
-    assert.Equal(t, 404, w.Code)
-}
-
 func Test_WhoAmI_LoggedIn(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/whoami", nil)
     session.SetValue(r, "auth", "email", "TEST_EMAIL")
