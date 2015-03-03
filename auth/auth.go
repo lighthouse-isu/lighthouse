@@ -95,7 +95,7 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             return
         }
 
-        http.Redirect(w, r, "/login",  http.StatusFound)
+        w.WriteHeader(401)
     })
 }
 
@@ -146,5 +146,17 @@ func Handle(r *mux.Router) {
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
         session.SetValue(r, "auth", "logged_in", false)
         session.Save("auth", r, w)
+    }).Methods("GET")
+
+    r.HandleFunc("/whoami", func(w http.ResponseWriter, r *http.Request) {
+        email, loggedIn := session.GetValueOK(r, "auth", "email")
+
+        if loggedIn {
+            w.WriteHeader(200)
+            fmt.Fprintf(w, "%s", email)
+        } else {        
+            w.WriteHeader(404)    
+        }        
+
     }).Methods("GET")
 }

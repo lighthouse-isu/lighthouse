@@ -66,6 +66,7 @@ func main() {
         "/login",
         fmt.Sprintf("%s/login", API_VERSION_0_2),
         fmt.Sprintf("%s/logout", API_VERSION_0_2),
+        fmt.Sprintf("%s/whoami", API_VERSION_0_2),
     }
 
     app := auth.AuthMiddleware(baseRouter, ignoreURLs)
