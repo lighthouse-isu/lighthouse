@@ -93,7 +93,7 @@ type HandlerInfo struct {
     fields that appear in the body must be declared in this struct.
 */
 type RequestBody struct {
-    Payload string
+    Payload map[string]interface{}
 }
 
 /*
