@@ -44,18 +44,29 @@ func Connection() databases.DBInterface {
 func (this *postgresConnection) Exec(cmd string, params ...interface{}) (sql.Result, error) {
     res, err := this.DB.Exec(cmd, params...)
     
-    if err != nil {
-        pqErr, ok := err.(*pq.Error)
-
-        if ok {
-            switch pqErr.Code {
-            case "23505": 
-                err = databases.DuplicateKeyError
-            }
-        }
-    }
+    err = transformError(err)
 
     return res, err
+}
+
+func transformError(err error) error {
+    var pqErr *pq.Error = nil
+    var ok bool = false
+
+    if err != nil {
+        pqErr, ok = err.(*pq.Error)
+    } 
+
+    if !ok {
+        return nil
+    }
+
+    switch pqErr.Code {
+    case "23505": 
+        return databases.DuplicateKeyError
+    }
+
+    return nil
 }
 
 func setup() *postgresConnection {
