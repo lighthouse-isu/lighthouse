@@ -132,8 +132,8 @@ func Test_containerCreate_NoName(t *testing.T) {
     ret := containerCreate(info)
     assert.NotNil(t, ret)
     assert.Equal(t, http.StatusBadRequest, ret.StatusCode)
-    assert.Equal(t, "Missing name query parameter.", ret.Cause)
-    assert.Equal(t, "Must create container with a name.", ret.Message)
+    assert.Equal(t, "control", ret.Cause)
+    assert.Equal(t, "Containers must be created with a name", ret.Message)
 }
 
 func Test_containerDelete(t *testing.T) {
