@@ -44,7 +44,8 @@ func writeResponse(err error, w http.ResponseWriter) {
 
     switch err {
         case databases.KeyNotFoundError, databases.NoUpdateError, 
-                databases.EmptyKeyError, NotEnoughParametersError:
+                databases.EmptyKeyError, databases.DuplicateKeyError,
+                NotEnoughParametersError:
             code = http.StatusBadRequest
 
         case nil:
@@ -149,8 +150,6 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         return
     }
-
-    fmt.Println(beaconInfo.Address, beaconInfo.Alias)
 
     if beaconInfo.Address == "" || beaconInfo.Alias == "" {
         err = NotEnoughParametersError
