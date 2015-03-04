@@ -59,23 +59,54 @@ func Test_UpdateAlias(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS",
-		"Address" : "ADDRESS_FAIL",
+		"Alias" : "ALIAS_FAIL",
+		"Address" : "ADDRESS",
 	}
 
 	table.InsertSchema(alias)
 
-	keyAddress := "ADDRESS_PASS"
+	keyAlias := "ALIAS_PASS"
 
-	UpdateAlias("ALIAS", keyAddress)
+	UpdateAlias(keyAlias, "ADDRESS")
 
 	var real struct {
-		Address string
+		Alias string
 	}
 
-	table.SelectRowSchema([]string{"Address"}, nil, &real)
+	table.SelectRowSchema([]string{"Alias"}, nil, &real)
 
-	assert.Equal(t, keyAddress, real.Address)
+	assert.Equal(t, keyAlias, real.Alias)
+}
+
+func Test_SetAlias(t *testing.T) {
+	table, teardown := setup()
+	defer teardown()
+
+	alias := map[string]interface{}{
+		"Alias" : "ALIAS_OVERWRITE",
+		"Address" : "ADDRESS_OVERWRITE",
+	}
+
+	table.InsertSchema(alias)
+
+	overwriteAlias := "ALIAS_UPDATED"
+	SetAlias(overwriteAlias, "ADDRESS_OVERWRITE")
+
+	addedAlias := "ALIAS_ADDED"
+	SetAlias(addedAlias, "ADDRESS_ADDED")
+
+	var real Alias
+	where := make(databases.Filter)
+
+	where["Address"] = "ADDRESS_OVERWRITE"
+	table.SelectRowSchema([]string{"Alias"}, where, &real)
+
+	assert.Equal(t, overwriteAlias, real.Alias)
+
+	where["Address"] = "ADDRESS_ADDED"
+	table.SelectRowSchema([]string{"Alias"}, where, &real)
+
+	assert.Equal(t, addedAlias, real.Alias)
 }
 
 func Test_GetAddressOf(t *testing.T) {
@@ -131,54 +162,54 @@ func Test_HandleUpdateAlias_Existing(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS",
-		"Address" : "Address_FAIL",
+		"Alias" : "ALIAS_FAIL",
+		"Address" : "ADDRESS",
 	}
 
 	table.InsertSchema(alias)
 
-	keyAddress := "Address_PASS"
-	addressJSON, _ := json.Marshal(keyAddress)
+	keyAlias := "ALIAS_PASS"
+	aliasJSON, _ := json.Marshal(keyAlias)
 
 	w := httptest.NewRecorder()
-	r, _ := http.NewRequest("PUT", "/ALIAS", bytes.NewBuffer(addressJSON))
+	r, _ := http.NewRequest("PUT", "/ADDRESS", bytes.NewBuffer(aliasJSON))
 
 	m := mux.NewRouter()
-	m.HandleFunc("/{Alias:.*}", handleUpdateAlias)
+	m.HandleFunc("/{Address:.*}", handleUpdateAlias)
 	m.ServeHTTP(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var real struct {
-		Address string
+		Alias string
 	}
 
-	table.SelectRowSchema([]string{"Address"}, nil, &real)
-	assert.Equal(t, keyAddress, real.Address)
+	table.SelectRowSchema([]string{"Alias"}, nil, &real)
+	assert.Equal(t, keyAlias, real.Alias)
 }
 
 func Test_HandleUpdateAlias_New(t *testing.T) {
 	table, teardown := setup()
 	defer teardown()
 
-	keyAddress := "Address_PASS"
-	addressJSON, _ := json.Marshal(keyAddress)
+	keyAlias := "ALIAS_PASS"
+	aliasJSON, _ := json.Marshal(keyAlias)
 
 	w := httptest.NewRecorder()
-	r, _ := http.NewRequest("PUT", "/ALIAS", bytes.NewBuffer(addressJSON))
+	r, _ := http.NewRequest("PUT", "/ADDRESS", bytes.NewBuffer(aliasJSON))
 
 	m := mux.NewRouter()
-	m.HandleFunc("/{Alias:.*}", handleUpdateAlias)
+	m.HandleFunc("/{Address:.*}", handleUpdateAlias)
 	m.ServeHTTP(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var real struct {
-		Address string
+		Alias string
 	}
 
-	table.SelectRowSchema([]string{"Address"}, nil, &real)
-	assert.Equal(t, keyAddress, real.Address)
+	table.SelectRowSchema([]string{"Alias"}, nil, &real)
+	assert.Equal(t, keyAlias, real.Alias)
 }
 
 func Test_HandleUpdateAlias_Invalid(t *testing.T) {
@@ -188,10 +219,10 @@ func Test_HandleUpdateAlias_Invalid(t *testing.T) {
 	addressJSON, _ := json.Marshal("")
 
 	w := httptest.NewRecorder()
-	r, _ := http.NewRequest("PUT", "/ALIAS", bytes.NewBuffer(addressJSON))
+	r, _ := http.NewRequest("PUT", "/ADDRESS", bytes.NewBuffer(addressJSON))
 
 	m := mux.NewRouter()
-	m.HandleFunc("/{Alias:.*}", handleUpdateAlias)
+	m.HandleFunc("/{Address:.*}", handleUpdateAlias)
 	m.ServeHTTP(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)

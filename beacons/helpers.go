@@ -64,6 +64,18 @@ func addInstance(instance instanceData) error {
     return err
 }
 
+func updateInstance(instance instanceData) error {
+    to := map[string]interface{}{
+        "Name" : instance.Name,
+        "CanAccessDocker" : instance.CanAccessDocker,
+        "BeaconAddress" : instance.BeaconAddress,
+    }
+
+    where := map[string]interface{} {"InstanceAddress": instance.InstanceAddress}
+
+    return instances.UpdateSchema(to, where)
+}
+
 func updateBeaconField(field string, val interface{}, beacon string) error {
     to := databases.Filter{field : val}
     where := databases.Filter{"Address": beacon}
@@ -121,14 +133,16 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
     return beacons, nil
 }
 
-func getInstancesList(beacon, user string, refresh bool) ([]instanceData, error) {
+func getInstancesList(beacon, user string, refresh bool) ([]map[string]interface{}, error) {
     data, err := getBeaconData(beacon)
     if err != nil {
         return nil, err
     }
 
     if refresh {
-        refreshVMListOf(data)
+        if _, ok := data.Users[user]; !ok {
+            refreshVMListOf(data)
+        }
     }
 
     opts := databases.SelectOptions{Distinct : true}
@@ -141,7 +155,7 @@ func getInstancesList(beacon, user string, refresh bool) ([]instanceData, error)
 
     defer scanner.Close()
 
-    instances := make([]instanceData, 0)
+    instances := make([]map[string]interface{}, 0)
     InstanceAddress := make(map[string]bool)
 
     for scanner.Next() {
@@ -151,9 +165,18 @@ func getInstancesList(beacon, user string, refresh bool) ([]instanceData, error)
         if _, ok := data.Users[user]; ok {
 
             address := instance.InstanceAddress
+            alias, _ := aliases.GetAliasOf(address)
 
             if _, found := InstanceAddress[address]; !found {
-                instances = append(instances, instance)
+
+                instances = append(instances, map[string]interface{}{
+                    "Alias" : alias,
+                    "InstanceAddress" : instance.InstanceAddress,
+                    "Name" : instance.Name,
+                    "CanAccessDocker" : instance.CanAccessDocker,
+                    "BeaconAddress" : instance.BeaconAddress,
+                })
+
                 InstanceAddress[address] = true
             }
         }
@@ -197,13 +220,22 @@ func refreshVMListOf(beacon beaconData) (error) {
         return err
     }
 
+    beaconName, _ := aliases.GetAliasOf(beacon.Address)
+
     for _, vm := range vms {
         instanceAddr := fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version)
         instance := instanceData{instanceAddr, vm.Name, vm.CanAccessDocker, beacon.Address}
         
         if !instanceExists(instance.InstanceAddress) {
             addInstance(instance)
+        } else {
+            updateInstance(instance)
         }
+
+        aliases.SetAlias(
+            fmt.Sprintf("%s%s%s", beaconName, INSTANCE_ALIAS_DELIM, vm.Name), 
+            instance.InstanceAddress,
+        )
     }
 
     return nil

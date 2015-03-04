@@ -28,6 +28,7 @@ import (
 
 const (
     HEADER_TOKEN_KEY = "Token"
+    INSTANCE_ALIAS_DELIM = "."
 )
 
 var (

@@ -16,7 +16,9 @@ package beacons
 
 import (
 	"fmt"
+    "time"
     "strconv"
+    "net"
 	"net/http"
 	"encoding/json"
 	"io/ioutil"
@@ -139,11 +141,19 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     var beaconInfo struct {
         Address string
         Token string
+        Alias string
         Users []string
     }
 
     err = json.Unmarshal(reqBody, &beaconInfo)
     if err != nil {
+        return
+    }
+
+    fmt.Println(beaconInfo.Address, beaconInfo.Alias)
+
+    if beaconInfo.Address == "" || beaconInfo.Alias == "" {
+        err = NotEnoughParametersError
         return
     }
 
@@ -154,6 +164,17 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
 
     for _, user := range beaconInfo.Users {
         beacon.Users[user] = true
+    }
+
+    _, err = net.DialTimeout("ip", "http://" + beacon.Address, 
+        time.Duration(3) * time.Second)
+    if err != nil {
+        //return
+    }
+
+    err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
+    if err != nil {
+        return
     }
 
     err = addBeacon(beacon)

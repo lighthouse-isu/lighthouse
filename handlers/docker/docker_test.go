@@ -109,7 +109,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/?test=pass", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
+    info := handlers.HandlerInfo{"/?test=pass", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 

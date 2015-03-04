@@ -31,8 +31,8 @@ import (
 var aliases databases.TableInterface
 
 var schema = databases.Schema{
-    "Alias" : "text UNIQUE PRIMARY KEY",
-    "Address" : "text",
+    "Alias" : "text",
+    "Address" : "text UNIQUE PRIMARY KEY",
 }
 
 type Alias struct {
@@ -65,10 +65,20 @@ func AddAlias(alias, address string) error {
 }
 
 func UpdateAlias(alias, address string) error {
-    to := databases.Filter{"Address" : address}
-    where := databases.Filter{"Alias": alias}
+    to := databases.Filter{"Alias": alias}
+    where := databases.Filter{"Address" : address}
 
     return getDBSingleton().UpdateSchema(to, where)
+}
+
+func SetAlias(alias, address string) error {
+    err := UpdateAlias(alias, address)
+
+    if err == databases.NoUpdateError {
+        err = AddAlias(alias, address)
+    }
+
+    return err
 }
 
 func GetAddressOf(alias string) (string, error) {
@@ -129,7 +139,7 @@ func Handle(r *mux.Router) {
         AddAlias(alias, address)
     }
 
-    r.HandleFunc("/{Alias:.*}", handleUpdateAlias).Methods("PUT")
+    r.HandleFunc("/{Address:.*}", handleUpdateAlias).Methods("PUT")
 }
 
 func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +152,7 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
         }
     }()
 
-    alias := mux.Vars(r)["Alias"]
+    address := mux.Vars(r)["Address"]
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -150,20 +160,20 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    var address string
+    var alias string
 
-    err = json.Unmarshal(reqBody, &address)
+    err = json.Unmarshal(reqBody, &alias)
     if err != nil {
         code = http.StatusInternalServerError
         return
     }
 
-    if address == "" {
+    if alias == "" {
         code = http.StatusBadRequest
         return
     }
 
-    _, res := GetAddressOf(alias)
+    _, res := GetAliasOf(address)
     if res == databases.NoRowsError {
         err = AddAlias(alias, address)
     } else {
