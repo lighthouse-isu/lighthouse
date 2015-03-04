@@ -274,7 +274,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
 
     beacons.InsertSchema(beacon)
 
-    keyList := make([]instanceData, 0)
+    keyList := make([]map[string]interface{}, 0)
 
     for i := 1; i <= 2; i++ {
         instanceList, err := getInstancesList("BEACON_ADDR", "USER", false)
@@ -284,21 +284,17 @@ func Test_ListInstances_ValidUser(t *testing.T) {
         assert.Equal(t, keyList, instanceList, 
             "getInstancesList output differed from key")
 
-        newInstance := instanceData {
-            InstanceAddress : fmt.Sprintf("INST_ADDR %d", i), 
-            BeaconAddress : "BEACON_ADDR",
-            Name : fmt.Sprintf("VM %d", i),
-            CanAccessDocker : true,
+        newInstance := map[string]interface{} {
+            "InstanceAddress" : fmt.Sprintf("INST_ADDR %d", i), 
+            "BeaconAddress" : "BEACON_ADDR",
+            "Name" : fmt.Sprintf("VM %d", i),
+            "CanAccessDocker" : true,
         }
 
-        keyList = append(keyList, newInstance)
+        instances.InsertSchema(newInstance)
 
-        instances.InsertSchema(map[string]interface{} {
-            "InstanceAddress" : newInstance.InstanceAddress, 
-            "BeaconAddress" : newInstance.BeaconAddress,
-            "Name" : newInstance.Name,
-            "CanAccessDocker" : newInstance.CanAccessDocker,
-        })
+        newInstance["Alias"] = ""
+        keyList = append(keyList, newInstance)
     }
 
     instanceList, err := getInstancesList("BEACON_ADDR", "USER", false)
