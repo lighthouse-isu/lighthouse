@@ -39,8 +39,8 @@ func containerCreate(info handlers.HandlerInfo) *handlers.HandlerError {
     name := info.Request.FormValue("name")
     if name == "" {
         errInfo.StatusCode = http.StatusBadRequest
-        errInfo.Cause = "Missing name query parameter."
-        errInfo.Message = "Must create container with a name."
+        errInfo.Cause = "control"
+        errInfo.Message = "Containers must be created with a name"
         return &errInfo
     }
 
@@ -52,7 +52,7 @@ func containerCreate(info handlers.HandlerInfo) *handlers.HandlerError {
 
     if err != nil {
         errInfo.StatusCode = http.StatusInternalServerError
-        errInfo.Cause = "Database read error"
+        errInfo.Cause = "control"
         errInfo.Message = "Failed to read application from database"
         return &errInfo
     }
@@ -62,7 +62,7 @@ func containerCreate(info handlers.HandlerInfo) *handlers.HandlerError {
 
     if err != nil {
         errInfo.StatusCode = http.StatusInternalServerError
-        errInfo.Cause = "Database write error"
+        errInfo.Cause = "control"
         errInfo.Message = "Failed to insert new container into database."
         return &errInfo
     }
