@@ -54,10 +54,6 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
 
     url := fmt.Sprintf("http://%s/%s", targetAddress, targetEndpoint)
 
-    if info.Request.URL.RawQuery != "" {
-        url += "?" + info.Request.URL.RawQuery
-    }
-
     payload := []byte(nil)
     if info.Body != nil {
         payload, _ = json.Marshal(info.Body.Payload)
