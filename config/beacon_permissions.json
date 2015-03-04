@@ -1,3 +1,20 @@
-[
+{
+	"Beacons" :
+	[
+		{
+			"Address" : "127.0.0.1:5002",
+			"Token" : "TOKEN",
+			"Users" : {"admin@gmail.com":true}
+		}
+	],
 
-]
+	"Instances" :
+	[
+		{
+			"InstanceAddress" : "127.0.0.1:5001/v1.12",
+			"Name" : "boot2docker",
+			"CanAccessDocker" : true,
+			"BeaconAddress" : "127.0.0.1:5002"
+		}
+	]
+}

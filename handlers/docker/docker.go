@@ -19,7 +19,8 @@ import (
     "net/http"
     "io/ioutil"
     "bytes"
-    "regexp"
+    "encoding/json"
+	"regexp"
 
     "github.com/gorilla/mux"
 
@@ -61,7 +62,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
 
     payload := []byte(nil)
     if info.Body != nil {
-        payload = []byte(info.Body.Payload)
+        payload, _ = json.Marshal(info.Body.Payload)
     }
 
     method := info.Request.Method
@@ -72,7 +73,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     }
 
     if requestIsToBeacon {
-        token, _ := beacons.GetBeaconToken(info.Host, email)
+        token, _ := beacons.GetBeaconToken(beaconAddress, email)
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 

@@ -21,6 +21,7 @@ import (
     "net/http/httptest"
     "io/ioutil"
     "bytes"
+    "encoding/json"
 
     "github.com/stretchr/testify/assert"
 
@@ -131,12 +132,15 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
     beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
-    testBody := []byte("TestBody")
+    testBody := []byte(`{"Payload" : { "TestBody" : 1 } }`)
+    testPayload := map[string]interface{}{"TestBody" : 1}
+
+    jsonPayload, _ := json.Marshal(testPayload)
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         // Verify that the body is correctly transferred
         body, _ := ioutil.ReadAll(r.Body)
-        assert.Equal(t, testBody, body)
+        assert.Equal(t, string(jsonPayload), string(body))
 
         w.WriteHeader(200)
         w.Write([]byte("success"))
@@ -146,7 +150,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(testBody))
-    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{string(testBody)}, r, nil}
+    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{testPayload}, r, nil}
 
     err := DockerRequestHandler(w, info)
 
