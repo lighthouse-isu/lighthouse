@@ -71,6 +71,14 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 
+    // Ensure Content-Type
+    contentType := info.Request.Header.Get("Content-Type")
+    if contentType != "" {
+        req.Header.Set("Content-Type", contentType)
+    } else {
+        req.Header.Set("Content-Type", "application/json")
+    }
+    
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
         return &handlers.HandlerError{500, "control", method + " request failed"}
