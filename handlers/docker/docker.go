@@ -17,7 +17,6 @@ package docker
 import (
     "fmt"
     "net/http"
-    "io/ioutil"
     "bytes"
 
     "github.com/gorilla/mux"
@@ -86,13 +85,18 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         return &handlers.HandlerError{resp.StatusCode, "docker", resp.Status}
     }
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return &handlers.HandlerError{500, "control", "Failed reading response body"}
+    w.WriteHeader(resp.StatusCode)
+    var bodyBuffer = make([]byte, 16)
+
+    for {
+        n, err := resp.Body.Read(bodyBuffer)
+        w.Write(bodyBuffer[:n])
+
+        if err != nil {
+            break
+        }
     }
 
-    w.WriteHeader(resp.StatusCode)
-    w.Write(body)
     return nil
 }
 
