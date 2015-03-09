@@ -90,12 +90,12 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
             h.ServeHTTP(w, r)
             return
         }
 
-        http.Redirect(w, r, "/login",  http.StatusFound)
+        w.WriteHeader(404)
     })
 }
 
