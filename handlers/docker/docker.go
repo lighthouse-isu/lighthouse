@@ -126,7 +126,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     var customHandlers = handlers.CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,
-        regexp.MustCompile("/containers/create.*") : containers.ContainerCreateHandler,
+        regexp.MustCompile("containers/create.*") : containers.ContainerCreateHandler,
     }
 
     runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)
