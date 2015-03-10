@@ -403,6 +403,16 @@ func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Ro
 }
 
 func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
+    if columns == nil || len(columns) == 0 {
+        columns = make([]string, len(this.schema))
+
+        i := 0
+        for col, _ := range this.schema {
+            columns[i] = col
+            i += 1
+        }
+    }
+
     query, queryVals := buildQueryFrom(this.table, columns, where, opts)
     rows, err := this.db.Query(query, queryVals...)
 

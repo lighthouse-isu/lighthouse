@@ -27,7 +27,6 @@ import (
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
-    "github.com/lighthouse/lighthouse/databases"
 )
 
 // Helper for GetRequestBody tests
@@ -53,12 +52,14 @@ func Test_GetRequestBody_Null(t *testing.T) {
     Purpose: [most] POST and PUT requests
 */
 func Test_GetRequestBody_Normal(t *testing.T) {
-    outBody := makeRequestAndGetBody(`{"Payload":"TestPayload"}`)
+    outBody := makeRequestAndGetBody(`{"Payload":{"TestPayload":1}}`)
 
     assert.NotNil(t, outBody,
         "GetResponseBody should not return nil on non-nil body")
 
-    assert.Equal(t, &RequestBody{"TestPayload"}, outBody,
+    key := map[string]interface{}{"TestPayload":1}
+
+    assert.Equal(t, &RequestBody{key}, outBody,
         "GetResponseBody did not extract body correctly")
 }
 
@@ -68,12 +69,14 @@ func Test_GetRequestBody_Normal(t *testing.T) {
         down the RequestBody type.
 */
 func Test_GetRequestBody_ExtraPayload(t *testing.T) {
-    outBody := makeRequestAndGetBody(`{"Payload":"TestPayload","Extra":"ExtraField"}`)
+    outBody := makeRequestAndGetBody(`{"Payload":{"TestPayload":1},"Extra":"ExtraField"}`)
 
     assert.NotNil(t, outBody,
         "GetResponseBody should not return nil on non-nil body")
 
-    assert.Equal(t, &RequestBody{"TestPayload"}, outBody,
+    key := map[string]interface{}{"TestPayload":1}
+
+    assert.Equal(t, &RequestBody{key}, outBody,
         "GetResponseBody did not extract Payload correctly with an extra field")
 }
 
@@ -88,7 +91,7 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
     assert.NotNil(t, outBody,
         "GetResponseBody should not return nil on non-nil body")
 
-    assert.Equal(t, &RequestBody{""}, outBody,
+    assert.Equal(t, &RequestBody{nil}, outBody,
         "GetResponseBody did not extract Payload correctly with an extra field")
 }
 
@@ -97,7 +100,7 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
-    aliases.SetupTestingTable(databases.CommonTestingDatabase())
+    aliases.SetupTestingTable()
     defer aliases.TeardownTestingTable()
 
     aliases.AddAlias("TestHost", "TestHost")

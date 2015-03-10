@@ -19,7 +19,7 @@ type Permission map[string]interface{}
 const (
 	AccessAuthLevel = 0
 	ModifyAuthLevel = 1
-	OwnerAuthLevel = 2
+	OwnerAuthLevel  = 2
 )
 
 func NewPermission() Permission {

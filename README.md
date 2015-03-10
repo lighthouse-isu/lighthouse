@@ -1,6 +1,10 @@
 Lighthouse
 ==============
 
+[![Build Status](https://img.shields.io/travis/lighthouse/lighthouse.svg?style=flat)](https://travis-ci.org/lighthouse/lighthouse)
+[![License](https://img.shields.io/badge/license-apache2-blue.svg?style=flat)](/LICENSE)
+[![Coveralls](https://img.shields.io/coveralls/lighthouse/lighthouse.svg)](https://coveralls.io/r/lighthouse/lighthouse)
+
 [Lighthouse](https://lighthouse.github.io) is a Docker controller. It aggregates information about Docker instances across mulitple cloud providers and allows for easy control over the containers deployed on that system.
 
 It bridges the gap between providers hosting docker services. Are you running containers accross hundreds of vms across the world wide web? No problem, Lighthouse gives you the power to manage and maintain those vms with a few simple clicks. Everything was built with the goal of monotizing AWS, GCE, Azure, ect. into an easy to manage platform.
@@ -33,7 +37,7 @@ It bridges the gap between providers hosting docker services. Are you running co
 
 ### API
 
-Write your own client! See the API [documentation](https://github.com/lighthouse/lighthouse/wiki/API-Design)
+Write your own client! See the API [documentation](https://github.com/lighthouse/lighthouse/wiki/API-v0.2)
 
 ### Team
 

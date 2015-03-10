@@ -93,7 +93,7 @@ type HandlerInfo struct {
     fields that appear in the body must be declared in this struct.
 */
 type RequestBody struct {
-    Payload string
+    Payload map[string]interface{}
 }
 
 /*
@@ -166,7 +166,7 @@ func GetHandlerInfo(r *http.Request) (HandlerInfo, bool) {
 
     hostAlias := params["Host"]
 
-    value, err := aliases.GetAlias(hostAlias)
+    value, err := aliases.GetAddressOf(hostAlias)
     if err == nil {
         info.Host = value
     } else {

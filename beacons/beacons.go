@@ -29,6 +29,7 @@ import (
 
 const (
     HEADER_TOKEN_KEY = "Token"
+    INSTANCE_ALIAS_DELIM = "."
 )
 
 var (
@@ -38,31 +39,48 @@ var (
 )
 
 var beacons databases.TableInterface
+var instances databases.TableInterface
 
-var schema = databases.Schema {
-    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
-    "BeaconAddress" : "text",
+var beaconSchema = databases.Schema {
+    "Address" : "text UNIQUE PRIMARY KEY",
     "Token" : "text",
 }
 
+var instanceSchema = databases.Schema {
+    "InstanceAddress" : "text UNIQUE PRIMARY KEY",
+    "Name" : "text",
+    "CanAccessDocker" : "boolean",
+    "BeaconAddress" : "text",
+}
+
 type beaconData struct {
-    InstanceAddress string
-    BeaconAddress string
+    Address string
     Token string
+}
+
+type instanceData struct {
+    InstanceAddress string
+    Name string
+    CanAccessDocker bool
+    BeaconAddress string
 }
 
 func Init() {
     if beacons == nil {
-        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", schema)
+        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", beaconSchema)
+    }
+
+    if instances == nil {
+        instances = databases.NewSchemaTable(postgres.Connection(), "instances", instanceSchema)
     }
 }
 
 func GetBeaconAddress(instance string) (string, error) {
-    var beacon beaconData
+    var beacon instanceData
     where := databases.Filter{"InstanceAddress" : instance}
     columns := []string{"BeaconAddress"}
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+    err := instances.SelectRowSchema(columns, where, &beacon)
 
     if err != nil {
         return "", err
@@ -71,27 +89,30 @@ func GetBeaconAddress(instance string) (string, error) {
     return beacon.BeaconAddress, nil
 }
 
-func TryGetBeaconToken(instance string, user *auth.User) (string, error) {
-    var beacon beaconData
-    where := databases.Filter{"InstanceAddress" : instance}
-    columns := []string{"BeaconAddress", "Token"}
+func TryGetBeaconToken(beacon string, user *auth.User) (string, error) {
+    if !user.CanAccessBeacon(beacon) {
+        return "", TokenPermissionError
+    }
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &beacon)
+    var data beaconData
+    where := databases.Filter{"Address" : beacon}
+    columns := []string{"Token"}
+
+    err := beacons.SelectRowSchema(columns, where, &data)
 
     if err != nil {
         return "", err
     }
-
-    if !user.CanAccessBeacon(beacon.BeaconAddress) {
-        return "", TokenPermissionError
-    }
    
-    return beacon.Token, nil
+    return data.Token, nil
 }
 
-func LoadBeacons() []beaconData {
+func LoadBeacons() {
     var fileName string
-    if _, err := os.Stat("/config/beacon_permissions.json"); os.IsNotExist(err) {
+    var err error
+    if _, err = os.Stat("./config/beacon_permissions.json.dev"); err == nil {
+        fileName = "./config/beacon_permissions.json.dev"
+    } else if _, err = os.Stat("./config/beacon_permissions.json"); err == nil {
         fileName = "./config/beacon_permissions.json"
     } else {
         fileName = "/config/beacon_permissions.json"
@@ -99,24 +120,32 @@ func LoadBeacons() []beaconData {
 
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var beacons []beaconData
-    json.Unmarshal(configFile, &beacons)
+    var entries struct {
+        Beacons []beaconData
+        Instances []instanceData
+    }
 
-    return beacons
+    json.Unmarshal(configFile, &entries)
+
+    for _, beacon := range entries.Beacons {
+        addBeacon(beacon)
+    }
+
+    for _, inst := range entries.Instances {
+        addInstance(inst)
+    }
 }
 
 func Handle(r *mux.Router) {
-    beacons := LoadBeacons()
-
-    for _, beacon := range beacons {
-        addInstance(beacon)
-    }
+    LoadBeacons()
 
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", handleBeaconCreate).Methods("POST")
 
-    r.HandleFunc("/list", handleListBeacon).Methods("GET")
+    r.HandleFunc("/list", handleListBeacons).Methods("GET")
 
     r.HandleFunc("/list/{Beacon:.*}", handleListInstances).Methods("GET")
+
+    r.HandleFunc("/refresh/{Beacon:.*}", handleRefreshBeacon).Methods("PUT")
 }

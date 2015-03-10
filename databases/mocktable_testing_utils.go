@@ -120,7 +120,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         if !updated {
-            return errors.New("no update")
+            return NoUpdateError
         }
 
         return nil
@@ -154,7 +154,7 @@ func CommonTestingTable(schema Schema) *MockTable {
             }
         }
 
-        return errors.New("not found")
+        return NoRowsError
     }
 
     table.MockSelectSchema = func(cols []string, where Filter, opts SelectOptions)(ScannerInterface, error) {

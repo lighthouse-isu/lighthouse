@@ -16,15 +16,29 @@ package aliases
 
 import (
     "os"
+    "fmt"
     "io/ioutil"
+    "net/http"
 
     "encoding/json"
+
+    "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 var aliases databases.TableInterface
+
+var schema = databases.Schema{
+    "Alias" : "text",
+    "Address" : "text UNIQUE PRIMARY KEY",
+}
+
+type Alias struct {
+    Alias string
+    Address string
+}
 
 func getDBSingleton() databases.TableInterface {
     if aliases == nil {
@@ -35,25 +49,64 @@ func getDBSingleton() databases.TableInterface {
 
 func Init() {
     if aliases == nil {
-        aliases = databases.NewTable(postgres.Connection(), "aliases")
-
-        for alias, value := range LoadAliases() {
-            AddAlias(alias, value)
-        }
+        aliases = databases.NewSchemaTable(postgres.Connection(), "aliases", schema)
     }
 }
 
-func AddAlias(alias, value string) error {
-    return getDBSingleton().Insert(alias, value)
+func AddAlias(alias, address string) error {
+    entry := map[string]interface{}{
+        "Alias" : alias,
+        "Address" : address,
+    }
+
+    return getDBSingleton().InsertSchema(entry)
 }
 
-func UpdateAlias(alias, value string) error {
-    return getDBSingleton().Update(alias, value)
+func UpdateAlias(alias, address string) error {
+    to := databases.Filter{"Alias": alias}
+    where := databases.Filter{"Address" : address}
+
+    return getDBSingleton().UpdateSchema(to, where)
 }
 
-func GetAlias(alias string) (value string, err error) {
-    err = getDBSingleton().SelectRow(alias, &value)
-    return
+func SetAlias(alias, address string) error {
+    err := UpdateAlias(alias, address)
+
+    if err == databases.NoUpdateError {
+        err = AddAlias(alias, address)
+    }
+
+    return err
+}
+
+func GetAddressOf(alias string) (string, error) {
+    cols := []string{"Address"}
+    where := databases.Filter{"Alias": alias}
+    
+    var val Alias
+
+    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    
+    if err != nil {
+        return "", err
+    }
+
+    return val.Address, nil
+}
+
+func GetAliasOf(address string) (string, error) {
+    cols := []string{"Alias"}
+    where := databases.Filter{"Address": address}
+    
+    var val Alias
+
+    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    
+    if err != nil {
+        return "", err
+    }
+
+    return val.Alias, nil
 }
 
 func LoadAliases() map[string]string {
@@ -65,17 +118,70 @@ func LoadAliases() map[string]string {
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
-    var data []struct {
-        Alias   string
-        Value   string
-    }
+    var data []Alias
 
     json.Unmarshal(configFile, &data)
 
     configAliases := make(map[string]string)
     for _, item := range data {
-        configAliases[item.Alias] = item.Value
+        configAliases[item.Alias] = item.Address
     }
 
     return configAliases
+}
+
+func Handle(r *mux.Router) {
+    aliasConfig := LoadAliases()
+
+    for alias, address := range aliasConfig {
+        AddAlias(alias, address)
+    }
+
+    r.HandleFunc("/{Address:.*}", handleUpdateAlias).Methods("PUT")
+}
+
+func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
+    var code int = http.StatusOK
+    var err error = nil
+    defer func(){
+        w.WriteHeader(code)
+        if err != nil {
+            fmt.Fprint(w, err)
+        }
+    }()
+
+    address := mux.Vars(r)["Address"]
+
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    var alias string
+
+    err = json.Unmarshal(reqBody, &alias)
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    if alias == "" {
+        code = http.StatusBadRequest
+        return
+    }
+
+    _, res := GetAliasOf(address)
+    if res == databases.NoRowsError {
+        err = AddAlias(alias, address)
+    } else {
+        err = UpdateAlias(alias, address)
+    }
+
+    if err != nil {
+        code = http.StatusInternalServerError
+        return
+    }
+
+    return
 }

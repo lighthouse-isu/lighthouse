@@ -4,6 +4,8 @@
 *.exe
 *.pem
 
+/config/*.dev
+
 # Ignore front-end build artifacts
 /static
 

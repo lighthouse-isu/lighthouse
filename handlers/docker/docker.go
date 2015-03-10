@@ -19,6 +19,7 @@ import (
     "net/http"
     "io/ioutil"
     "bytes"
+    "encoding/json"
 
     "github.com/gorilla/mux"
 
@@ -39,7 +40,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     beaconAddress, err := beacons.GetBeaconAddress(info.Host)
 
     requestIsToBeacon := err == nil
-
+    
     var targetAddress, targetEndpoint string
 
     if requestIsToBeacon {
@@ -52,13 +53,9 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
 
     url := fmt.Sprintf("http://%s/%s", targetAddress, targetEndpoint)
 
-    if info.Request.URL.RawQuery != "" {
-        url += "?" + info.Request.URL.RawQuery
-    }
-
     payload := []byte(nil)
     if info.Body != nil {
-        payload = []byte(info.Body.Payload)
+        payload, _ = json.Marshal(info.Body.Payload)
     }
 
     method := info.Request.Method
@@ -74,6 +71,14 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 
+    // Ensure Content-Type
+    contentType := info.Request.Header.Get("Content-Type")
+    if contentType != "" {
+        req.Header.Set("Content-Type", contentType)
+    } else {
+        req.Header.Set("Content-Type", "application/json")
+    }
+    
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
         return &handlers.HandlerError{500, "control", method + " request failed"}
