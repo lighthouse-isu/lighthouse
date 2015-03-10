@@ -67,7 +67,7 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
 
     if requestIsToBeacon {
         user := auth.GetCurrentUser(info.Request)
-        token, _ := beacons.TryGetBeaconToken(info.Host, user)
+        token, _ := beacons.TryGetBeaconToken(beaconAddress, user)
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 
