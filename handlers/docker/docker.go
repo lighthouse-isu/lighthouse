@@ -16,6 +16,7 @@ package docker
 
 import (
     "fmt"
+    "io"
     "net/http"
     "bytes"
 
@@ -24,6 +25,8 @@ import (
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 /*
@@ -93,6 +96,9 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         w.Write(bodyBuffer[:n])
 
         if err != nil {
+            if err != io.EOF {
+                logging.Info("An unexpected error occured while reading the docker stream")
+            }
             break
         }
     }
