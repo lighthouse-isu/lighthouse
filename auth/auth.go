@@ -95,7 +95,7 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             return
         }
 
-        w.WriteHeader(404)
+        http.Redirect(w, r, "/", http.StatusFound)
     })
 }
 
