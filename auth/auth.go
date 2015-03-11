@@ -90,12 +90,16 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
             h.ServeHTTP(w, r)
             return
         }
 
-        http.Redirect(w, r, "/login",  http.StatusFound)
+        if strings.HasPrefix(r.URL.Path, "/api") {
+            w.WriteHeader(401)
+        } else {
+            http.Redirect(w, r, "/", http.StatusFound)
+        }
     })
 }
 
