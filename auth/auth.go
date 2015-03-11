@@ -96,7 +96,7 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
         }
 
         if strings.Contains("/api", r.URL.Path) {
-            http.WriteHeader(401)
+            w.WriteHeader(401)
         } else {
             http.Redirect(w, r, "/", http.StatusFound)
         }
