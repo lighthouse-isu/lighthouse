@@ -21,6 +21,7 @@ import (
     "html/template"
 
     "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
@@ -58,7 +59,7 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
     } 
 
     if err != nil {
-        w.WriteHeader(404)
+        handlers.WriteError(w, 404, "lighthouse", err.Error())
     }
 }
 
