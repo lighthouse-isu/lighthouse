@@ -29,8 +29,8 @@ var schema = databases.Schema {
 }
 
 type Container struct {
-    Id int
-    AppId int
+    Id int64
+    AppId int64
     DockerInstance string //TODO: normalize data (add IDs)
     Name string
 }
@@ -48,28 +48,27 @@ func Init() {
     }
 }
 
-func CreateContainer(AppId int, DockerInstance string, Name string) (int, error) {
-    values := make(map[string]interface{}, len(schema))
+func CreateContainer(AppId int64, DockerInstance string, Name string) (int64, error) {
+    values := make(map[string]interface{}, len(schema)-1)
 
-    values["Id"] = "DEFAULT"
     values["AppId"] = AppId
     values["DockerInstance"] = DockerInstance
     values["Name"] = Name
 
-    containerId, err := getDBSingleton().InsertSchema(values)
+    containerId, err := getDBSingleton().InsertSchema(values, "Id")
     if err != nil {
         return -1, err
     }
 
-    return containerId, err
+    return containerId.(int64), err
 }
 
-func DeleteContainer(Id int) (err error) {
+func DeleteContainer(Id int64) (err error) {
     where := databases.Filter{"Id" : Id}
     return getDBSingleton().DeleteRowsSchema(where)
 }
 
-func GetContainerById(Id int, container *Container) (err error) {
+func GetContainerById(Id int64, container *Container) (err error) {
     where := databases.Filter{"Id" : Id}
     var columns []string
 

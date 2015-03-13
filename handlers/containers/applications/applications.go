@@ -27,7 +27,7 @@ var schema = databases.Schema {
 }
 
 type applicationData struct {
-    Id int
+    Id int64
     Name string
 }
 
@@ -44,21 +44,21 @@ func Init() {
     }
 }
 
-func CreateApplication(Name string) (int, error) {
-    values := make(map[string]interface{}, len(schema))
+func CreateApplication(Name string) (int64, error) {
+    values := make(map[string]interface{}, len(schema)-1)
 
-    values["Id"] = "DEFAULT"
+//    values["Id"] = "DEFAULT"
     values["Name"] = Name
 
-    appId, err := getDBSingleton().InsertSchema(values)
+    appId, err := getDBSingleton().InsertSchema(values, "Id")
     if err != nil {
         return -1, err
     }
 
-    return appId, err
+    return appId.(int64), err
 }
 
-func GetApplicationName(Id int) (string, error) {
+func GetApplicationName(Id int64) (string, error) {
     var application applicationData
     where := databases.Filter{"Id" : Id}
     var columns []string
@@ -76,7 +76,7 @@ func GetApplicationName(Id int) (string, error) {
     return application.Name, err
 }
 
-func GetApplicationId(Name string) (int, error) {
+func GetApplicationId(Name string) (int64, error) {
     var application applicationData
     where := databases.Filter{"Name" : Name}
     var columns []string

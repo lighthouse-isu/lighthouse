@@ -34,7 +34,7 @@ func Test_GetBeaconAddress_Found(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR",
     }
 
-    instances.InsertSchema(testInstanceData)
+    instances.InsertSchema(testInstanceData, "")
 
     res, err := GetBeaconAddress("INST_ADDR")
 
@@ -80,7 +80,7 @@ func Test_GetBeaconToken_NotPermitted(t *testing.T) {
         "Users" : userMap{},
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     res, err := GetBeaconToken("BEACON_ADDR", "BAD_USER")
 
@@ -101,7 +101,7 @@ func Test_GetBeaconToken_Valid(t *testing.T) {
         "Users" : userMap{"USER":true},
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     res, err := GetBeaconToken("BEACON_ADDR", "USER")
 

@@ -27,12 +27,12 @@ import (
 type MockTable struct {
     Database [][]interface{}
     Schema map[string]int
-    lastUpdateRow int
+    lastUpdateRow int64
 
     MockInsert           func(string, interface{})(error)
     MockUpdate           func(string, interface{})(error)
     MockSelectRow        func(string, interface{})(error)
-    MockInsertSchema     func(map[string]interface{})(int, error)
+    MockInsertSchema     func(map[string]interface{}, string)(interface{}, error)
     MockDeleteRowsSchema func(Filter)(error)
     MockUpdateSchema     func(map[string]interface{}, map[string]interface{})(error)
     MockSelectRowSchema  func([]string, Filter, interface{})(error)
@@ -54,8 +54,8 @@ func (t *MockTable) SelectRow(s string, i interface{})(e error) {
     return
 }
 
-func (t *MockTable) InsertSchema(v map[string]interface{})(i int, e error) {
-    if t.MockInsertSchema != nil { return t.MockInsertSchema(v) }
+func (t *MockTable) InsertSchema(v map[string]interface{}, returnCol string)(i interface{}, e error) {
+    if t.MockInsertSchema != nil { return t.MockInsertSchema(v, returnCol) }
     return
 }
 
@@ -88,19 +88,18 @@ func CommonTestingTable(schema Schema) *MockTable {
         i += 1
     }
 
-    table.MockInsertSchema = func(values map[string]interface{})(int, error) {
+    table.MockInsertSchema = func(values map[string]interface{}, returnCol string)(interface{}, error) {
         addition := make([]interface{}, len(table.Schema))
 
         for k, orig := range values {
-            var v interface{}
+            addition[table.Schema[k]] = orig
+        }
 
-            if orig == "DEFAULT" {
-                v = table.lastUpdateRow
-            } else {
-                v = orig
+        //because "DEFAULT" doesn't work with pq, need to add left-out columns
+        for k, v := range table.Schema {
+            if _, ok := values[k]; !ok {
+                addition[v] = table.lastUpdateRow
             }
-
-            addition[table.Schema[k]] = v
         }
 
         for _, row := range table.Database {
@@ -108,11 +107,16 @@ func CommonTestingTable(schema Schema) *MockTable {
                 return -1, errors.New("duplicate row")
             }
         }
-        retRow := table.lastUpdateRow
+
         table.lastUpdateRow++
         table.Database = append(table.Database, addition)
 
-        return retRow, nil
+        if returnCol != "" {
+            ret := addition[table.Schema[returnCol]]
+            return ret, nil
+        }
+
+        return nil, nil
     }
 
     table.MockDeleteRowsSchema = func(where Filter)(error) {

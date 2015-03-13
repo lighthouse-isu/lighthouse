@@ -39,7 +39,7 @@ func Test_BeaconExists_True(t *testing.T) {
         "Users" : userMap{},
     }
 
-    beacons.InsertSchema(testData)
+    beacons.InsertSchema(testData, "")
 
     assert.True(t, beaconExists("BEACON_ADDR"))
 }
@@ -62,7 +62,7 @@ func Test_InstanceExists_True(t *testing.T) {
         "CanAccessDocker" : true,
     }
 
-    instances.InsertSchema(testData)
+    instances.InsertSchema(testData, "")
 
     assert.True(t, instanceExists("INST_ADDR"))
 }
@@ -152,7 +152,7 @@ func Test_UpdateBeaconData(t *testing.T) {
         "Users" : userMap{"USER_FAIL":true},
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     userPass := userMap{"USER_PASS":true}
     keyData := beaconData {
@@ -180,7 +180,7 @@ func Test_GetBeaconData_Found(t *testing.T) {
         "Users" : users,
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     res, err := getBeaconData("BEACON_ADDR")
 
@@ -226,7 +226,7 @@ func Test_ListBeacons_ValidUser(t *testing.T) {
         keyPair := aliases.Alias{"", newBeacon["Address"].(string)}
 
         keyList = append(keyList, keyPair)
-        beacons.InsertSchema(newBeacon)
+        beacons.InsertSchema(newBeacon, "")
     }
 
     beaconList, err := getBeaconsList("USER")
@@ -253,8 +253,8 @@ func Test_ListBeacons_BadUser(t *testing.T) {
 
     keyList := []aliases.Alias{aliases.Alias{"", "BEACON_ADDR 1"}}
 
-    beacons.InsertSchema(goodBeacon)
-    beacons.InsertSchema(badBeacon)
+    beacons.InsertSchema(goodBeacon, "")
+    beacons.InsertSchema(badBeacon, "")
 
     beaconList, err := getBeaconsList("GOOD_USER")
 
@@ -272,7 +272,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
         "Users" : userMap{"USER":true},
     }
 
-    beacons.InsertSchema(beacon)
+    beacons.InsertSchema(beacon, "")
 
     keyList := make([]map[string]interface{}, 0)
 
@@ -291,7 +291,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
             "CanAccessDocker" : true,
         }
 
-        instances.InsertSchema(newInstance)
+        instances.InsertSchema(newInstance, "")
 
         newInstance["Alias"] = ""
         keyList = append(keyList, newInstance)
@@ -313,7 +313,7 @@ func Test_ListInstances_BadUser(t *testing.T) {
         "Users" : userMap{"GOOD_USER":true},
     }
 
-    beacons.InsertSchema(beacon)
+    beacons.InsertSchema(beacon, "")
 
     instance := map[string]interface{} {
         "InstanceAddress" : "INST_ADDR", 
@@ -322,7 +322,7 @@ func Test_ListInstances_BadUser(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR", 
     }
 
-    instances.InsertSchema(instance)
+    instances.InsertSchema(instance, "")
 
     instanceList, err := getInstancesList("BEACON_ADDR", "BAD_USER", false)
 
@@ -356,7 +356,7 @@ func Test_RefreshVMListOf(t *testing.T) {
         "Address" : url, 
         "Token" : "", 
         "Users" : userMap{},
-    })
+    }, "")
 
     data := beaconData{Address: url}
 

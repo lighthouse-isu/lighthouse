@@ -154,7 +154,47 @@ func (this *Table) Insert(key string, value interface{}) error {
     return err
 }
 
-func (this *Table) InsertSchema(values map[string]interface{}) (int, error) {
+func (this *Table) InsertSchema(values map[string]interface{}, returning string) (interface{}, error) {
+    if returning == "" {
+        err := this.insertSchema_noReturn(values)
+        return nil, err
+    } else {
+        return this.insertSchema_return(values, returning)
+    }
+}
+
+func (this *Table) insertSchema_return(values map[string]interface{}, returnCol string) (interface{}, error) {
+    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
+    var res interface{}
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING %s`,
+        this.table, colBuf.String(), valBuf.String(), returnCol)
+    err := this.db.QueryRow(query, queryVals...).Scan(&res)
+
+    if err != nil {
+        return nil, err
+    }
+
+    return res, nil
+}
+
+func (this *Table) insertSchema_noReturn(values map[string]interface{}) (error) {
+    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
+        this.table, colBuf.String(), valBuf.String())
+    res, err := this.db.Exec(query, queryVals...)
+
+    if err == nil {
+        cnt, err := res.RowsAffected()
+
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
+
+    return err
+}
+
+func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes.Buffer, bytes.Buffer, []interface{}){
     var colBuf, valBuf bytes.Buffer
     queryVals := make([]interface{}, len(values))
     i := 0
@@ -174,24 +214,7 @@ func (this *Table) InsertSchema(values map[string]interface{}) (int, error) {
         i += 1
     }
 
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
-        this.table, colBuf.String(), valBuf.String())
-    res, err := this.db.Exec(query, queryVals...)
-
-    if err == nil {
-        cnt, err := res.RowsAffected()
-
-        if err == nil && cnt < 1 {
-            return -1, NoUpdateError
-        }
-    }
-
-    if err != nil {
-        fmt.Println(err.Error())
-        return -1, err
-    }
-    lastInsert, err := res.LastInsertId()
-    return int(lastInsert), err
+    return colBuf, valBuf, queryVals
 }
 
 func (this *Table) DeleteRowsSchema(where Filter) (error) {

@@ -110,7 +110,7 @@ func Test_containerCreate_Passed(t *testing.T) {
     assert.Equal(t, 0, info.HandlerData["ContainerCreate"])
 
     var container Container
-    err := GetContainerById(info.HandlerData["ContainerCreate"].(int), &container)
+    err := GetContainerById(info.HandlerData["ContainerCreate"].(int64), &container)
     assert.Nil(t, err)
     assert.Equal(t, 0, container.Id)
     assert.Equal(t, 0, container.AppId)
