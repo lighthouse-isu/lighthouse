@@ -21,10 +21,14 @@ import (
     "net/http/httptest"
     "io/ioutil"
     "bytes"
+    "encoding/json"
+
+    "github.com/gorilla/mux"
 
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/handlers"
 )
 
@@ -108,7 +112,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/?test=pass", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"/?test=pass", "localhost:8080", nil, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -131,12 +135,15 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
     beacons.SetupTestingTable()
     defer beacons.TeardownTestingTable()
 
-    testBody := []byte("TestBody")
+    testBody := []byte(`{"Payload" : { "TestBody" : 1 } }`)
+    testPayload := map[string]interface{}{"TestBody" : 1}
+
+    jsonPayload, _ := json.Marshal(testPayload)
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         // Verify that the body is correctly transferred
         body, _ := ioutil.ReadAll(r.Body)
-        assert.Equal(t, testBody, body)
+        assert.Equal(t, string(jsonPayload), string(body))
 
         w.WriteHeader(200)
         w.Write([]byte("success"))
@@ -146,7 +153,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(testBody))
-    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{string(testBody)}, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{testPayload}, r}
 
     err := DockerRequestHandler(w, info)
 
@@ -239,4 +246,33 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     assert.Equal(t, 200, w.Code,
         "DockerRequestHandler should output the forwarded request's response code.")
+}
+
+/*
+    Tests data extraction for requests into a HandlerInfo.
+    Purpose: To add ensure Handler get valid data.
+*/
+func Test_GetHandlerInfo(t *testing.T) {
+    aliases.SetupTestingTable()
+    defer aliases.TeardownTestingTable()
+
+    aliases.AddAlias("TestHost", "AliasHost")
+
+    router := mux.NewRouter()
+    var info handlers.HandlerInfo
+
+    router.HandleFunc("/{Endpoint:.*}",
+        func(w http.ResponseWriter, r *http.Request) {
+            info, _ = GetHandlerInfo(r)
+    })
+
+    r, _ := http.NewRequest("GET", "/TestHost/Test%2FEndpoint", nil)
+    r.RequestURI = "/TestHost/Test%2FEndpoint"
+
+    router.ServeHTTP(httptest.NewRecorder(), r)
+
+    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r}
+
+    assert.Equal(t, expected, info,
+        "GetHandlerInfo did not extract data correctly")
 }

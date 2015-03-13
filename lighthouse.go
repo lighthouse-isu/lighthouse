@@ -15,15 +15,18 @@
 package main
 
 import (
+    "os"
     "fmt"
     "net/http"
+    "html/template"
 
     "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/provider"
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/users"
     "github.com/lighthouse/lighthouse/handlers/docker"
+    "github.com/lighthouse/lighthouse/session"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -35,7 +38,29 @@ const (
 )
 
 func ServeIndex(w http.ResponseWriter, r *http.Request) {
-    http.ServeFile(w, r, "static/index.html")
+    authData := struct {
+        LoggedIn bool
+        Email string
+    }{
+        session.GetValueOrDefault(r, "auth", "logged_in", false).(bool),
+        session.GetValueOrDefault(r, "auth", "email", "").(string),
+    }
+
+    var indexPath string
+    if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
+        indexPath = "static/index.html"
+    } else {
+        indexPath = "/static/index.html"
+    }
+
+    indexTemplate, err := template.New("index.html").ParseFiles(indexPath)
+    if err == nil {
+        err = indexTemplate.Execute(w, authData)
+    } 
+
+    if err != nil {
+        handlers.WriteError(w, 404, "lighthouse", err.Error())
+    }
 }
 
 func main() {
@@ -58,7 +83,6 @@ func main() {
     versionRouter := baseRouter.PathPrefix(API_VERSION_0_2).Subrouter()
 
     docker.Handle(versionRouter.PathPrefix("/d").Subrouter())
-    provider.Handle(versionRouter.PathPrefix("/provider").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     aliases.Handle(versionRouter.PathPrefix("/aliases").Subrouter())
     auth.Handle(versionRouter)

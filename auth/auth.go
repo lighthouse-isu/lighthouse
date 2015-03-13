@@ -30,7 +30,7 @@ import (
     "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/users"
-
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/session"
 )
 
@@ -90,12 +90,16 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
             h.ServeHTTP(w, r)
             return
         }
 
-        http.Redirect(w, r, "/login",  http.StatusFound)
+        if strings.HasPrefix(r.URL.Path, "/api") {
+            handlers.WriteError(w, 401, "auth", "not logged in")
+        } else {
+            http.Redirect(w, r, "/", http.StatusFound)
+        }
     })
 }
 
@@ -137,10 +141,8 @@ func Handle(r *mux.Router) {
         if userOK && passwordOK {
             w.WriteHeader(200)
         } else {
-            w.WriteHeader(401)
+            handlers.WriteError(w, 401, "auth", "email or password incorrect")
         }
-
-        fmt.Fprintf(w, "%t", userOK && passwordOK)
     }).Methods("POST")
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {

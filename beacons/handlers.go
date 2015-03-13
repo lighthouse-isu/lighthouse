@@ -38,25 +38,17 @@ func getInstanceAlias(instance string) string {
 }
 
 func writeResponse(err error, w http.ResponseWriter) {
-    var code int
-
     switch err {
+        case nil:
+            w.WriteHeader(http.StatusOK)
+
         case databases.KeyNotFoundError, databases.NoUpdateError, 
                 databases.EmptyKeyError, NotEnoughParametersError:
-            code = http.StatusBadRequest
-
-        case nil:
-            code = http.StatusOK
+            handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
         default:
-            code = http.StatusInternalServerError
-    }
-
-    w.WriteHeader(code)
-
-    if err != nil {
-        fmt.Fprint(w, err)
-    }
+            handlers.WriteError(w, http.StatusInternalServerError, "beacons", err.Error())
+    }    
 }
 
 func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
@@ -84,9 +76,12 @@ func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
+
     params, ok := handlers.GetEndpointParams(r, []string{"Beacon", "UserId"})
     if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
+        err = NotEnoughParametersError
         return
     }
 
@@ -99,13 +94,16 @@ func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
         err = updateBeaconField("Users", data.Users, beacon)
     }
 
-    writeResponse(err, w)
+    return
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
+
     params, ok := handlers.GetEndpointParams(r, []string{"Beacon"})
     if ok == false || len(params) < 1 {
-        writeResponse(NotEnoughParametersError, w)
+        err = NotEnoughParametersError
         return
     }
 
@@ -113,7 +111,6 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        writeResponse(err, w)
         return
     }
 
@@ -124,7 +121,7 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
         err = updateBeaconField("Token", token, beacon)
     }
 
-    writeResponse(err, w)
+    return
 }
 
 func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
@@ -139,11 +136,17 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     var beaconInfo struct {
         Address string
         Token string
+        Alias string
         Users []string
     }
 
     err = json.Unmarshal(reqBody, &beaconInfo)
     if err != nil {
+        return
+    }
+
+    if beaconInfo.Address == "" || beaconInfo.Alias == "" {
+        err = NotEnoughParametersError
         return
     }
 
@@ -154,6 +157,17 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
 
     for _, user := range beaconInfo.Users {
         beacon.Users[user] = true
+    }
+
+    // _, err = net.DialTimeout("ip", "http://" + beacon.Address, 
+    //     time.Duration(3) * time.Second)
+    // if err != nil {
+    //     return
+    // }
+
+    err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
+    if err != nil {
+        return
     }
 
     err = addBeacon(beacon)
