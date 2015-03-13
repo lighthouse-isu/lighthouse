@@ -242,7 +242,7 @@ func Test_ParseUserUpdateRequest_AuthLevel_Invalid(t *testing.T) {
 
 	update = []byte(`{"AuthLevel" : 2}`)
 	vals, code = parseUserUpdateRequest(curUser, modUser, update)
-	assert.Equal(t, http.StatusUnauthorized, code)
+	assert.Equal(t, http.StatusForbidden, code)
 	assert.Nil(t, vals)
 }
 
@@ -307,7 +307,7 @@ func Test_ParseUserUpdateRequest_Beacons_CantModify(t *testing.T) {
 	updateStr := fmt.Sprintf(`{"Beacons" : {"Beacon" : %d}}`, AccessAuthLevel)
 
 	vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
-	assert.Equal(t, http.StatusUnauthorized, code)
+	assert.Equal(t, http.StatusForbidden, code)
 	assert.Nil(t, vals)
 }
 
@@ -325,7 +325,7 @@ func Test_ParseUserUpdateRequest_Beacons_TooHigh(t *testing.T) {
     updateStr := fmt.Sprintf(`{"Beacons" : {"Beacon" : %d}}`, OwnerAuthLevel)
 
 	vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
-	assert.Equal(t, http.StatusUnauthorized, code)
+	assert.Equal(t, http.StatusForbidden, code)
 	assert.Nil(t, vals)
 }
 
@@ -476,7 +476,7 @@ func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
     var user User
     table.SelectRowSchema(nil, nil, &user)
 
-    assert.Equal(t, http.StatusUnauthorized, w.Code)
+    assert.Equal(t, http.StatusForbidden, w.Code)
     assert.Equal(t, keyUser, user)
 }
 

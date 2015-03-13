@@ -187,7 +187,7 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
     }
 
     if !currentUser.CanModifyUser(reqUser) {
-        code = http.StatusUnauthorized
+        code = http.StatusForbidden
         return
     }
 
@@ -225,7 +225,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
     currentUser := GetCurrentUser(r)
 
     if currentUser.AuthLevel < CreateUserAuthLevel {
-        code = http.StatusUnauthorized
+        code = http.StatusForbidden
         return
     }
 
@@ -308,7 +308,7 @@ func parseUserUpdateRequest(curUser, modUser *User, updateJSON []byte) (map[stri
         }
 
         if updates.AuthLevel > curUser.AuthLevel {
-            return nil, http.StatusUnauthorized
+            return nil, http.StatusForbidden
         }
 
         updateValues["AuthLevel"] = updates.AuthLevel
@@ -329,7 +329,7 @@ func parseUserUpdateRequest(curUser, modUser *User, updateJSON []byte) (map[stri
             if permitted {
                 modUser.SetAuthLevel("Beacons", beacon, level)
             } else {
-                return nil, http.StatusUnauthorized
+                return nil, http.StatusForbidden
             }
         }
     }    
