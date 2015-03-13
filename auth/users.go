@@ -16,12 +16,14 @@ package auth
 
 import (
     "fmt"
+    "errors"
     "net/http"
     "io/ioutil"
     "encoding/json"
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
@@ -30,6 +32,10 @@ import (
 const (
     DefaultAuthLevel = 0
     CreateUserAuthLevel = 1
+)
+
+var (
+    UserAccessError = errors.New("User does not exist or current permission too low")
 )
 
 type User struct {
@@ -108,6 +114,14 @@ func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
     return getDBSingleton().UpdateSchema(to, where)
 }
 
+func writeResponse(w http.ResponseWriter, code int, err error) {
+    if err == nil {
+        w.WriteHeader(code)
+    } else {
+        handlers.WriteError(w, code, "users", err.Error())
+    }
+}
+
 func handleListUsers(w http.ResponseWriter, r *http.Request) {
     currentUser := GetCurrentUser(r)
     userList, err := getAllUsers(currentUser)
@@ -117,13 +131,13 @@ func handleListUsers(w http.ResponseWriter, r *http.Request) {
         userJson, err = json.Marshal(userList)
     }
 
-    if err == nil {
-        w.WriteHeader(http.StatusOK)
-        fmt.Fprintf(w, string(userJson))
-    } else {
-        w.WriteHeader(http.StatusInternalServerError)
-        fmt.Fprint(w, err)
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, err) 
+        return
     }
+
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprintf(w, string(userJson))
 }
 
 func handleGetUser(w http.ResponseWriter, r *http.Request) {
@@ -131,14 +145,14 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
     reqUser, err := GetUser(reqEmail)
 
     if err != nil {
-        w.WriteHeader(http.StatusNotFound)
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
         return
     }
 
     currentUser := GetCurrentUser(r)
 
     if !currentUser.CanViewUser(reqUser) {
-        w.WriteHeader(http.StatusNotFound)
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
         return
     }
 
@@ -150,55 +164,45 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
     }
 
     userJson, err := json.Marshal(userInfo)
-
-    if err == nil {
-        w.WriteHeader(http.StatusOK)
-        fmt.Fprint(w, string(userJson))
-    } else {
-        w.WriteHeader(http.StatusInternalServerError)
-        fmt.Fprint(w, err)
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, UserAccessError) 
+        return
     }
+
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprint(w, string(userJson))
 }
 
 func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
-    var err error = nil
-    var code int = http.StatusOK
-
-    defer func() { 
-        w.WriteHeader(code)
-        if err != nil {
-            fmt.Fprint(w, err) 
-        }
-    }()
-
     reqEmail := mux.Vars(r)["Email"]
     reqUser, err := GetUser(reqEmail)
 
     if err != nil {
-        code = http.StatusNotFound
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
         return
     }
 
     currentUser := GetCurrentUser(r)
 
     if !currentUser.CanViewUser(reqUser) {
-        code = http.StatusNotFound
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
         return
     }
 
     if !currentUser.CanModifyUser(reqUser) {
-        code = http.StatusForbidden
+        writeResponse(w, http.StatusForbidden, UserAccessError)
         return
     }
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        code = http.StatusInternalServerError
+        writeResponse(w, http.StatusInternalServerError, err)
         return
     }
 
     values, code := parseUserUpdateRequest(currentUser, reqUser, reqBody)
     if code != http.StatusOK {
+        writeResponse(w, code, errors.New("could not update user"))
         return
     }
 
@@ -206,32 +210,24 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
     err = getDBSingleton().UpdateSchema(values, where)
 
     if err != nil {
-        code = http.StatusInternalServerError
+        writeResponse(w, http.StatusInternalServerError, err)
         return
     }
+
+    w.WriteHeader(http.StatusOK)
 }
 
 func handleCreateUser(w http.ResponseWriter, r *http.Request) {
-    var err error = nil
-    var code int = http.StatusOK
-
-    defer func() { 
-        w.WriteHeader(code)
-        if err != nil {
-            fmt.Fprint(w, err) 
-        }
-    }()
-
     currentUser := GetCurrentUser(r)
 
     if currentUser.AuthLevel < CreateUserAuthLevel {
-        code = http.StatusForbidden
+        writeResponse(w, http.StatusForbidden, UserAccessError)
         return
     }
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        code = http.StatusInternalServerError
+        writeResponse(w, http.StatusInternalServerError, UserAccessError)
         return
     }
 
@@ -242,7 +238,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &userInfo)
     if err != nil {
-        code = http.StatusInternalServerError
+        writeResponse(w, http.StatusInternalServerError, err)
         return
     }
 
@@ -251,9 +247,11 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
     err = CreateUser(userInfo.Email, salt, saltedPassword)
     if err != nil {
-        code = http.StatusBadRequest
+        writeResponse(w, http.StatusBadRequest, err)
         return
     }
+
+    w.WriteHeader(http.StatusOK)
 }
 
 func getAllUsers(currentUser *User) ([]string, error) {

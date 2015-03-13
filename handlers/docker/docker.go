@@ -26,6 +26,7 @@ import (
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
 /*
@@ -112,13 +113,11 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     // Ready all HTTP form data for the handlers
     r.ParseForm()
 
-    info, ok := handlers.GetHandlerInfo(r)
+    info, ok := GetHandlerInfo(r)
 
     if !ok {
-        handlers.WriteError(w, handlers.HandlerError {
-            http.StatusBadRequest, 
-            "control", "could not get required data for handler",
-        })
+        handlers.WriteError(w, http.StatusBadRequest, 
+            "handlers", "could not get required data for handler")
         return
     }
 
@@ -137,6 +136,37 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         handlers.Rollback(w, *err, info, runCustomHandlers)
     }
+}
+
+/*
+    Extracts data from the request to create a HandlerInfo
+    which is used by the handlers.
+
+    RETURN: A HandlerInfo extracted from the request
+*/
+func GetHandlerInfo(r *http.Request) (handlers.HandlerInfo, bool) {
+    var info handlers.HandlerInfo
+
+    params, ok := handlers.GetEndpointParams(r, []string{"Host", "DockerEndpoint"})
+
+    if ok == false || len(params) < 2 {
+        return handlers.HandlerInfo{}, false
+    }
+
+    hostAlias := params["Host"]
+
+    value, err := aliases.GetAddressOf(hostAlias)
+    if err == nil {
+        info.Host = value
+    } else {
+        info.Host = hostAlias // Unknown alias, just use what was given
+    }
+
+    info.DockerEndpoint = params["DockerEndpoint"]
+    info.Body = handlers.GetRequestBody(r)
+    info.Request = r
+
+    return info, true
 }
 
 func Handle(r *mux.Router) {

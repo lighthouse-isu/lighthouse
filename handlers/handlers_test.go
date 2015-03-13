@@ -25,8 +25,6 @@ import (
 
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
-
-    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
 // Helper for GetRequestBody tests
@@ -96,35 +94,6 @@ func Test_GetRequestBody_NoPayload(t *testing.T) {
 }
 
 /*
-    Tests data extraction for requests into a HandlerInfo.
-    Purpose: To add ensure Handler get valid data.
-*/
-func Test_GetHandlerInfo(t *testing.T) {
-    aliases.SetupTestingTable()
-    defer aliases.TeardownTestingTable()
-
-    aliases.AddAlias("TestHost", "TestHost")
-
-    router := mux.NewRouter()
-    var info HandlerInfo
-
-    router.HandleFunc("/{Endpoint:.*}",
-        func(w http.ResponseWriter, r *http.Request) {
-            info, _ = GetHandlerInfo(r)
-    })
-
-    r, _ := http.NewRequest("GET", "/TestHost/Test%2FEndpoint", nil)
-    r.RequestURI = "/TestHost/Test%2FEndpoint"
-
-    router.ServeHTTP(httptest.NewRecorder(), r)
-
-    expected := HandlerInfo{"Test/Endpoint", "TestHost", nil, r}
-
-    assert.Equal(t, expected, info,
-        "GetHandlerInfo did not extract data correctly")
-}
-
-/*
     Validates that error messages are correctly generated for the user.
     Purpose: Ensuring handler errors reach the user correctly.
 */
@@ -133,7 +102,7 @@ func Test_WriteError(t *testing.T) {
 
     router.HandleFunc("/",
         func(w http.ResponseWriter, r *http.Request) {
-            WriteError(w, HandlerError{500, "TestCause", "TestMessage"})
+            WriteError(w, 500, "TestCause", "TestMessage")
     })
 
     w := httptest.NewRecorder()
