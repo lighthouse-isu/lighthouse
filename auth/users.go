@@ -74,15 +74,19 @@ func CreateUser(email, salt, password string) error {
 }   
 
 func createUserWithAuthLevel(email, salt, password string, level int) error {
-    user := map[string]interface{}{
-        "Email" : email,
-        "Salt" : salt,
-        "Password" : password,
-        "AuthLevel" : level,
-        "Permissions" : NewPermission(),
+    return addUser(User{email, salt, password, level, NewPermission()})
+}
+
+func addUser(user User) error {
+    entry := map[string]interface{}{
+        "Email" : user.Email,
+        "Salt" : user.Salt,
+        "Password" : user.Password,
+        "AuthLevel" : user.AuthLevel,
+        "Permissions" : user.Permissions,
     }
 
-    return getDBSingleton().InsertSchema(user)
+    return getDBSingleton().InsertSchema(entry)
 }
 
 func GetUser(email string) (*User, error) {
@@ -162,7 +166,7 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
     }{
         reqUser.AuthLevel, reqUser.Permissions,
     }
-
+    
     userJson, err := json.Marshal(userInfo)
     if err != nil {
         writeResponse(w, http.StatusInternalServerError, UserAccessError) 

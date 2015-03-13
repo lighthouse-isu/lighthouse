@@ -63,10 +63,12 @@ type AuthConfig struct {
 
 func LoadAuthConfig() *AuthConfig{
     var fileName string
-    if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
-        fileName = "./config/auth.json"
-    } else {
+    if _, err := os.Stat("./config/auth.json.dev"); !os.IsNotExist(err) {
+        fileName = "./config/auth.json.dev"
+    } else if _, err := os.Stat("/config/auth.json"); !os.IsNotExist(err) {
         fileName = "/config/auth.json"
+    } else {
+        fileName = "./config/auth.json"
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
@@ -108,10 +110,12 @@ func Handle(r *mux.Router) {
     SECRET_HASH_KEY = config.SecretKey
 
     for _, admin := range config.Admins {
-        salt := GenerateSalt()
-        saltedPassword := SaltPassword(admin.Password, salt)
+        admin.convertPermissionsFromDB()
 
-        createUserWithAuthLevel(admin.Email, salt, saltedPassword, admin.AuthLevel)
+        admin.Salt = GenerateSalt()
+        admin.Password = SaltPassword(admin.Password, admin.Salt)
+
+        addUser(admin)
     }
 
     r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
