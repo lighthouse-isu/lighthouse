@@ -143,8 +143,6 @@ func Handle(r *mux.Router) {
         } else {
             handlers.WriteError(w, 401, "auth", "email or password incorrect")
         }
-
-        fmt.Fprintf(w, "%t", userOK && passwordOK)
     }).Methods("POST")
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
