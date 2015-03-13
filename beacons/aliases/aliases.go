@@ -16,7 +16,6 @@ package aliases
 
 import (
     "os"
-    "fmt"
     "io/ioutil"
     "net/http"
 
@@ -24,6 +23,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -144,9 +144,10 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
     var code int = http.StatusOK
     var err error = nil
     defer func(){
-        w.WriteHeader(code)
-        if err != nil {
-            fmt.Fprint(w, err)
+        if err == nil {
+            w.WriteHeader(code)
+        } else {
+            handlers.WriteError(w, code, "aliases", err.Error())
         }
     }()
 
