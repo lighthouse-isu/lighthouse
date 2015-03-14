@@ -23,7 +23,7 @@ import (
 
     "github.com/gorilla/mux"
 
-    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons/aliases"
@@ -38,7 +38,6 @@ import (
     RETURN: nil on succes.  A non-nil *handlers.HandlerError on failure
 */
 func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *handlers.HandlerError {
-    email := session.GetValueOrDefault(info.Request, "auth", "email", "").(string)
     beaconAddress, err := beacons.GetBeaconAddress(info.Host)
 
     requestIsToBeacon := err == nil
@@ -68,7 +67,8 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
     }
 
     if requestIsToBeacon {
-        token, _ := beacons.GetBeaconToken(beaconAddress, email)
+        user := auth.GetCurrentUser(info.Request)
+        token, _ := beacons.TryGetBeaconToken(beaconAddress, user)
         req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
     }
 

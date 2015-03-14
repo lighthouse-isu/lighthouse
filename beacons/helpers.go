@@ -21,6 +21,7 @@ import (
     "github.com/lighthouse/beacon/structs"
 
     "github.com/lighthouse/lighthouse/beacons/aliases"
+    "github.com/lighthouse/lighthouse/auth"
 	"github.com/lighthouse/lighthouse/databases"
 )
 
@@ -46,7 +47,6 @@ func addBeacon(beacon beaconData) error {
     entry := map[string]interface{}{
         "Address" : beacon.Address,
         "Token" : beacon.Token,
-        "Users" : beacon.Users,
     }
 
     return beacons.InsertSchema(entry)
@@ -95,9 +95,9 @@ func getBeaconData(beacon string) (beaconData, error) {
     return data, nil
 }
 
-func getBeaconsList(user string) ([]aliases.Alias, error) {
+func getBeaconsList(user *auth.User) ([]aliases.Alias, error) {
     opts := databases.SelectOptions{}
-    cols := []string{"Address", "Users"}
+    cols := []string{"Address"}
     scanner, err := beacons.SelectSchema(cols, nil, opts)
 
     if err != nil {
@@ -106,24 +106,19 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
 
     beacons := make([]aliases.Alias, 0)
     seenBeacons := make(map[string]bool)
+    var beacon beaconData
 
     for scanner.Next() {
-        var beacon struct {
-            Address string
-            Users userMap
-        }
-
         scanner.Scan(&beacon)
 
-        if _, ok := beacon.Users[user]; ok {
-
+        if user.CanAccessBeacon(beacon.Address) {
             address := beacon.Address
             alias, _ := aliases.GetAliasOf(address)
 
-            pair := aliases.Alias{Alias: alias, Address: address}
+            data := aliases.Alias{Alias: alias, Address: address}
 
             if _, found := seenBeacons[address]; !found {
-                beacons = append(beacons, pair)
+                beacons = append(beacons, data)
                 seenBeacons[address] = true
             }
         }
@@ -132,16 +127,18 @@ func getBeaconsList(user string) ([]aliases.Alias, error) {
     return beacons, nil
 }
 
-func getInstancesList(beacon, user string, refresh bool) ([]map[string]interface{}, error) {
+func getInstancesList(beacon string, user *auth.User, refresh bool) ([]map[string]interface{}, error) {
+    if !user.CanAccessBeacon(beacon) {
+        return make([]map[string]interface{}, 0), nil
+    }
+
     data, err := getBeaconData(beacon)
     if err != nil {
         return nil, err
     }
 
     if refresh {
-        if _, ok := data.Users[user]; !ok {
-            refreshVMListOf(data)
-        }
+        refreshVMListOf(data)
     }
 
     opts := databases.SelectOptions{Distinct : true}
@@ -161,23 +158,20 @@ func getInstancesList(beacon, user string, refresh bool) ([]map[string]interface
         var instance instanceData
         scanner.Scan(&instance)
 
-        if _, ok := data.Users[user]; ok {
+        address := instance.InstanceAddress
+        alias, _ := aliases.GetAliasOf(address)
 
-            address := instance.InstanceAddress
-            alias, _ := aliases.GetAliasOf(address)
+        if _, found := InstanceAddress[address]; !found {
 
-            if _, found := InstanceAddress[address]; !found {
+            instances = append(instances, map[string]interface{}{
+                "Alias" : alias,
+                "InstanceAddress" : instance.InstanceAddress,
+                "Name" : instance.Name,
+                "CanAccessDocker" : instance.CanAccessDocker,
+                "BeaconAddress" : instance.BeaconAddress,
+            })
 
-                instances = append(instances, map[string]interface{}{
-                    "Alias" : alias,
-                    "InstanceAddress" : instance.InstanceAddress,
-                    "Name" : instance.Name,
-                    "CanAccessDocker" : instance.CanAccessDocker,
-                    "BeaconAddress" : instance.BeaconAddress,
-                })
-
-                InstanceAddress[address] = true
-            }
+            InstanceAddress[address] = true
         }
     }
    

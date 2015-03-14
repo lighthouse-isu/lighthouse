@@ -3,8 +3,7 @@
 	[
 		{
 			"Address" : "127.0.0.1:5002",
-			"Token" : "TOKEN",
-			"Users" : {"admin@gmail.com":true}
+			"Token" : "TOKEN"
 		}
 	],
 
