@@ -23,15 +23,18 @@ import (
 
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
+    "github.com/lighthouse/lighthouse/auth"
 )
 
 func Test_GetBeaconAddress_Found(t *testing.T) {
-    teardown := setup()
+    setup()
     defer teardown()
 
     testInstanceData := map[string]interface{}{
-        "InstanceAddress" : "INST_ADDR", 
-        "BeaconAddress" : "BEACON_ADDR",
+        "InstanceAddress" : "INST_ADDR",
+        "Name" : "NAME",
+        "CanAccessDocker" : true,
+        "BeaconAddress" : "BEACON_ADDR", 
     }
 
     instances.InsertSchema(testInstanceData)
@@ -46,7 +49,7 @@ func Test_GetBeaconAddress_Found(t *testing.T) {
 }
 
 func Test_GetBeaconAddress_NotFound(t *testing.T) {
-    teardown := setup()
+    setup()
     defer teardown()
 
     res, err := GetBeaconAddress("BAD_ADDR")
@@ -59,57 +62,66 @@ func Test_GetBeaconAddress_NotFound(t *testing.T) {
 }
 
 func Test_GetBeaconToken_NotFound(t *testing.T) {
-    teardown := setup()
+    setup()
     defer teardown()
 
-    res, err := GetBeaconToken("BAD_INST", "junk user")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BAD_ADDR", auth.OwnerAuthLevel)
 
-    assert.NotNil(t, err, "GetBeaconToken should forward errors")
+    res, err := TryGetBeaconToken("BAD_ADDR", user)
+
+    assert.NotNil(t, err,
+        "TryGetBeaconToken should forward errors")
 
     assert.Equal(t, "", res, 
-        "GetBeaconToken should give empty token on error")
+        "TryGetBeaconToken should give empty token on error")
 }
 
 func Test_GetBeaconToken_NotPermitted(t *testing.T) {
-    teardown := setup()
+    setup()
     defer teardown()
 
     testBeaconData := map[string]interface{}{
-        "Address" : "BEACON_ADDR", 
-        "Token" : "TOKEN", 
-        "Users" : userMap{},
+        "BeaconAddress" : "BEACON_ADDR", 
+        "Token" : "TOKEN",
     }
 
     beacons.InsertSchema(testBeaconData)
 
-    res, err := GetBeaconToken("BEACON_ADDR", "BAD_USER")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    res, err := TryGetBeaconToken("BEACON_ADDR", user)
 
     assert.NotNil(t, err, 
-        "GetBeaconToken should return error on bad permissions")
+        "TryGetBeaconToken should return error on bad permissions")
 
     assert.Equal(t, "", res, 
-        "GetBeaconToken should give empty token on bad permissions")
+        "TryGetBeaconToken should give empty token on bad permissions")
 }
 
 func Test_GetBeaconToken_Valid(t *testing.T) {
-    teardown := setup()
+    setup()
     defer teardown()
 
     testBeaconData := map[string]interface{}{
         "Address" : "BEACON_ADDR", 
         "Token" : "TOKEN", 
-        "Users" : userMap{"USER":true},
     }
 
     beacons.InsertSchema(testBeaconData)
 
-    res, err := GetBeaconToken("BEACON_ADDR", "USER")
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR", auth.OwnerAuthLevel)
+
+    res, err := TryGetBeaconToken("BEACON_ADDR", user)
 
     assert.Nil(t, err, 
-        "GetBeaconToken should return nil error on success")
+        "TryGetBeaconToken should return nil error on success")
 
     assert.Equal(t, "TOKEN", res, 
-        "GetBeaconToken should give corrent token")
+        "TryGetBeaconToken should give corrent token")
 }
 
 func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {
@@ -119,7 +131,10 @@ func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {
     m.ServeHTTP(w, r)
 
     // This won't run during a panic(), but we can't panic during a 404
-    assert.NotEqual(t, http.StatusNotFound, w.Code)
+    if http.StatusNotFound == w.Code {
+        t.Log(r.URL.Path)
+        t.Fail()
+    }
 }
 
 func Test_Handle(t *testing.T) {
@@ -130,8 +145,6 @@ func Test_Handle(t *testing.T) {
         Method string
         Endpoint string
     } {
-        {"PUT",    "/user/TEST"},
-        {"DELETE", "/user/TEST"},
         {"PUT",    "/token/TEST"},
         {"POST",   "/create"},
         {"GET",    "/list"},

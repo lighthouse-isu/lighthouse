@@ -16,19 +16,17 @@ package beacons
 
 import (
 	"fmt"
-    "time"
     "strconv"
-    "net"
 	"net/http"
 	"encoding/json"
 	"io/ioutil"
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/handlers"
-    "github.com/lighthouse/lighthouse/session"
 )
 
 func getInstanceAlias(instance string) string {
@@ -40,75 +38,27 @@ func getInstanceAlias(instance string) string {
 }
 
 func writeResponse(err error, w http.ResponseWriter) {
-    var code int
-
     switch err {
+        case nil:
+            w.WriteHeader(http.StatusOK)
+
         case databases.KeyNotFoundError, databases.NoUpdateError, 
                 databases.EmptyKeyError, databases.DuplicateKeyError,
-                NotEnoughParametersError:
-            code = http.StatusBadRequest
-
-        case nil:
-            code = http.StatusOK
+                databases.EmptyKeyError, NotEnoughParametersError:
+            handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
         default:
-            code = http.StatusInternalServerError
-    }
-
-    w.WriteHeader(code)
-
-    if err != nil {
-        fmt.Fprint(w, err)
-    }
-}
-
-func handleAddUserToBeacon(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Beacon", "UserId"})
-    if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    beacon := getInstanceAlias(params["Beacon"])
-    userId := params["UserId"]
-
-    data, err := getBeaconData(beacon)
-
-    if err == nil {
-        if data.Users == nil {
-            data.Users = userMap{}
-        }
-
-        data.Users[userId] = true
-        err = updateBeaconField("Users", data.Users, beacon)
-    }
-
-    writeResponse(err, w)
-}
-
-func handleRemoveUserFromBeacon(w http.ResponseWriter, r *http.Request) {
-    params, ok := handlers.GetEndpointParams(r, []string{"Beacon", "UserId"})
-    if ok == false || len(params) < 2 {
-        writeResponse(NotEnoughParametersError, w)
-        return
-    }
-
-    beacon := getInstanceAlias(params["Beacon"])
-    userId := params["UserId"]
-
-    data, err := getBeaconData(beacon)
-    if err == nil {
-        delete(data.Users, userId)
-        err = updateBeaconField("Users", data.Users, beacon)
-    }
-
-    writeResponse(err, w)
+            handlers.WriteError(w, http.StatusInternalServerError, "beacons", err.Error())
+    }    
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
+
     params, ok := handlers.GetEndpointParams(r, []string{"Beacon"})
     if ok == false || len(params) < 1 {
-        writeResponse(NotEnoughParametersError, w)
+        err = NotEnoughParametersError
         return
     }
 
@@ -116,18 +66,21 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
-        writeResponse(err, w)
         return
     }
 
     var token string
 
     err = json.Unmarshal(reqBody, &token)
-    if err == nil {
-        err = updateBeaconField("Token", token, beacon)
+    if err != nil {
+        return
     }
 
-    writeResponse(err, w)
+    to := map[string]interface{}{"Token" : token}
+    where := map[string]interface{}{"Address" : beacon}
+    err = beacons.UpdateSchema(to, where)
+
+    return
 }
 
 func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
@@ -143,7 +96,6 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
         Address string
         Token string
         Alias string
-        Users []string
     }
 
     err = json.Unmarshal(reqBody, &beaconInfo)
@@ -156,20 +108,18 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    beacon := beaconData{beaconInfo.Address, beaconInfo.Token, userMap{}}
+    beacon := beaconData{beaconInfo.Address, beaconInfo.Token}
 
-    currentUser := session.GetValueOrDefault(r, "auth", "email", "").(string)
-    beacon.Users[currentUser] = true
+    currentUser := auth.GetCurrentUser(r)
+    auth.SetUserBeaconAuthLevel(currentUser, beacon.Address, auth.OwnerAuthLevel)
 
-    for _, user := range beaconInfo.Users {
-        beacon.Users[user] = true
-    }
+    // _, err = net.DialTimeout("ip", "http://" + beacon.Address, 
+    //     time.Duration(3) * time.Second)
+    // if err != nil {
+    //     return
+    // }
 
-    _, err = net.DialTimeout("ip", "http://" + beacon.Address, 
-        time.Duration(3) * time.Second)
-    if err != nil {
-        //return
-    }
+    // TODO - rollback on error
 
     err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
     if err != nil {
@@ -182,16 +132,15 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     }
 
     err = refreshVMListOf(beacon)
-
-    return 
+    fmt.Println(err)
+    return
 }
 
 func handleListBeacons(w http.ResponseWriter, r *http.Request) {
-    user := session.GetValueOrDefault(r, "auth", "email", "").(string)
-
+    user := auth.GetCurrentUser(r)
     beacons, err := getBeaconsList(user)
-    var output []byte
 
+    var output []byte
     if err == nil {
         output, err = json.Marshal(beacons)
     } 
@@ -205,7 +154,7 @@ func handleListBeacons(w http.ResponseWriter, r *http.Request) {
 
 func handleListInstances(w http.ResponseWriter, r *http.Request) {
     beacon := mux.Vars(r)["Beacon"]
-    user := session.GetValueOrDefault(r, "auth", "email", "").(string)
+    user := auth.GetCurrentUser(r)
 
     refreshParam := r.URL.Query().Get("refresh")
     refresh, ok := strconv.ParseBool(refreshParam)

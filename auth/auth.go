@@ -28,9 +28,8 @@ import (
     "encoding/json"
 
     "github.com/gorilla/mux"
-
-    "github.com/lighthouse/lighthouse/users"
-
+    
+    "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/session"
 )
 
@@ -58,16 +57,18 @@ type LoginForm struct {
 }
 
 type AuthConfig struct {
-    Admins []users.User
+    Admins []User
     SecretKey string
 }
 
 func LoadAuthConfig() *AuthConfig{
     var fileName string
-    if _, err := os.Stat("/config/auth.json"); os.IsNotExist(err) {
-        fileName = "./config/auth.json"
-    } else {
+    if _, err := os.Stat("./config/auth.json.dev"); !os.IsNotExist(err) {
+        fileName = "./config/auth.json.dev"
+    } else if _, err := os.Stat("/config/auth.json"); !os.IsNotExist(err) {
         fileName = "/config/auth.json"
+    } else {
+        fileName = "./config/auth.json"
     }
     configFile, _ := ioutil.ReadFile(fileName)
 
@@ -90,12 +91,16 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
             }
         }
 
-        if loggedIn := session.GetValueOrDefault(r, "auth", "logged_in", false).(bool); loggedIn {
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
             h.ServeHTTP(w, r)
             return
         }
 
-        http.Redirect(w, r, "/login",  http.StatusFound)
+        if strings.HasPrefix(r.URL.Path, "/api") {
+            handlers.WriteError(w, 401, "auth", "not logged in")
+        } else {
+            http.Redirect(w, r, "/", http.StatusFound)
+        }
     })
 }
 
@@ -105,10 +110,12 @@ func Handle(r *mux.Router) {
     SECRET_HASH_KEY = config.SecretKey
 
     for _, admin := range config.Admins {
-        salt := GenerateSalt()
-        saltedPassword := SaltPassword(admin.Password, salt)
+        admin.convertPermissionsFromDB()
 
-        users.CreateUser(admin.Email, salt, saltedPassword)
+        admin.Salt = GenerateSalt()
+        admin.Password = SaltPassword(admin.Password, admin.Salt)
+
+        addUser(admin)
     }
 
     r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
@@ -118,7 +125,7 @@ func Handle(r *mux.Router) {
 
         var userOK, passwordOK bool
 
-        user, err := users.GetUser(loginForm.Email)
+        user, err := GetUser(loginForm.Email)
         userOK = err == nil
 
         if userOK {
@@ -137,14 +144,22 @@ func Handle(r *mux.Router) {
         if userOK && passwordOK {
             w.WriteHeader(200)
         } else {
-            w.WriteHeader(401)
+            handlers.WriteError(w, 401, "auth", "email or password incorrect")
         }
-
-        fmt.Fprintf(w, "%t", userOK && passwordOK)
     }).Methods("POST")
 
     r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
         session.SetValue(r, "auth", "logged_in", false)
         session.Save("auth", r, w)
     }).Methods("GET")
+
+    userRoute := r.PathPrefix("/users").Subrouter()
+
+    userRoute.HandleFunc("/list", handleListUsers).Methods("GET")
+
+    userRoute.HandleFunc("/{Email}", handleGetUser).Methods("GET")
+
+    userRoute.HandleFunc("/{Email}", handleUpdateUser).Methods("PUT")
+
+    userRoute.HandleFunc("/create", handleCreateUser).Methods("POST")
 }

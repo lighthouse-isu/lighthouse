@@ -140,6 +140,10 @@ func (this *Table) convertOutput(orig interface{}, col string) interface{} {
 
         return read
     }
+
+    if strings.Contains(colType, "int") {
+        return int(orig.(int64))
+    }
     
     return orig
 }
