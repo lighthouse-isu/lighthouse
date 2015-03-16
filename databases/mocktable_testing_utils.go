@@ -27,14 +27,16 @@ import (
 type MockTable struct {
     Database [][]interface{}
     Schema map[string]int
+    lastUpdateRow int64
 
-    MockInsert          func(string, interface{})(error)
-    MockUpdate          func(string, interface{})(error)
-    MockSelectRow       func(string, interface{})(error)
-    MockInsertSchema    func(map[string]interface{})(error)
-    MockUpdateSchema    func(map[string]interface{}, map[string]interface{})(error)
-    MockSelectRowSchema func([]string, Filter, interface{})(error)
-    MockSelectSchema    func([]string, Filter, SelectOptions)(ScannerInterface, error)
+    MockInsert           func(string, interface{})(error)
+    MockUpdate           func(string, interface{})(error)
+    MockSelectRow        func(string, interface{})(error)
+    MockInsertSchema     func(map[string]interface{}, string)(interface{}, error)
+    MockDeleteRowsSchema func(Filter)(error)
+    MockUpdateSchema     func(map[string]interface{}, map[string]interface{})(error)
+    MockSelectRowSchema  func([]string, Filter, interface{})(error)
+    MockSelectSchema     func([]string, Filter, SelectOptions)(ScannerInterface, error)
 }
 
 func (t *MockTable) Insert(s string, i interface{})(e error) {
@@ -52,8 +54,13 @@ func (t *MockTable) SelectRow(s string, i interface{})(e error) {
     return
 }
 
-func (t *MockTable) InsertSchema(v map[string]interface{})(e error) {
-    if t.MockInsertSchema != nil { return t.MockInsertSchema(v) }
+func (t *MockTable) InsertSchema(v map[string]interface{}, returnCol string)(i interface{}, e error) {
+    if t.MockInsertSchema != nil { return t.MockInsertSchema(v, returnCol) }
+    return
+}
+
+func (t *MockTable) DeleteRowsSchema(w Filter)(e error) {
+    if t.MockDeleteRowsSchema != nil { return t.MockDeleteRowsSchema(w) }
     return
 }
 
@@ -73,7 +80,7 @@ func (t *MockTable) SelectSchema(c []string, w Filter, opts SelectOptions)(s Sca
 }
 
 func CommonTestingTable(schema Schema) *MockTable {
-    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int)}
+    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
 
     i := 0
     for k, _ := range schema {
@@ -81,20 +88,71 @@ func CommonTestingTable(schema Schema) *MockTable {
         i += 1
     }
 
-    table.MockInsertSchema = func(values map[string]interface{})(error) {
+    table.MockInsertSchema = func(values map[string]interface{}, returnCol string)(interface{}, error) {
         addition := make([]interface{}, len(table.Schema))
 
-        for k, v := range values {
-            addition[table.Schema[k]] = v
+        for k, orig := range values {
+            addition[table.Schema[k]] = orig
+        }
+
+        //because "DEFAULT" doesn't work with pq, need to add left-out columns
+        for k, v := range table.Schema {
+            if _, ok := values[k]; !ok {
+                addition[v] = table.lastUpdateRow
+            }
         }
 
         for _, row := range table.Database {
             if reflect.DeepEqual(row, addition) {
-                return errors.New("duplicate row")
+                return -1, errors.New("duplicate row")
             }
         }
 
+        table.lastUpdateRow++
         table.Database = append(table.Database, addition)
+
+        if returnCol != "" {
+            ret := addition[table.Schema[returnCol]]
+            return ret, nil
+        }
+
+        return nil, nil
+    }
+
+    table.MockDeleteRowsSchema = func(where Filter)(error) {
+        updated := false
+        var toDelete []int
+
+        i := 0
+        for _, row := range table.Database {
+            applies := true
+            for col, val := range where {
+                if row[table.Schema[col]] != val {
+                    applies = false
+                    break
+                }
+            }
+
+            if applies {
+                toDelete = append(toDelete, i)
+                updated = true
+            }
+
+            i = i + 1
+        }
+
+        //cut the appropriate rows from the database
+        for _, rowId := range toDelete {
+            copy(table.Database[rowId:], table.Database[rowId+1:])
+            for j, end := len(table.Database) - 1, len(table.Database); j < end; j++ {
+                table.Database[j] = nil
+            }
+            table.Database = table.Database[:len(table.Database) - 1]
+        }
+
+        if !updated {
+            return errors.New("no update")
+        }
 
         return nil
     }

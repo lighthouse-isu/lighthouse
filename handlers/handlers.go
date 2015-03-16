@@ -80,6 +80,7 @@ type HandlerInfo struct {
     Host            string
     Body            *RequestBody
     Request         *http.Request
+    HandlerData     map[string]interface{}
 }
 
 /*

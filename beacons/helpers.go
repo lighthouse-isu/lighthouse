@@ -49,7 +49,8 @@ func addBeacon(beacon beaconData) error {
         "Token" : beacon.Token,
     }
 
-    return beacons.InsertSchema(entry)
+    _, err := beacons.InsertSchema(entry, "")
+    return err
 }
 
 func addInstance(instance instanceData) error {
@@ -59,8 +60,8 @@ func addInstance(instance instanceData) error {
         "CanAccessDocker" : instance.CanAccessDocker,
         "BeaconAddress" : instance.BeaconAddress,
     }
-
-    return instances.InsertSchema(entry)
+    _, err := instances.InsertSchema(entry, "")
+    return err
 }
 
 func updateInstance(instance instanceData) error {

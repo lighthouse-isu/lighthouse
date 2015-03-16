@@ -39,7 +39,7 @@ func Test_BeaconExists_True(t *testing.T) {
         "Token" : "TOKEN", 
     }
 
-    beacons.InsertSchema(testData)
+    beacons.InsertSchema(testData, "")
 
     assert.True(t, beaconExists("BEACON_ADDR"))
 }
@@ -62,7 +62,7 @@ func Test_InstanceExists_True(t *testing.T) {
         "CanAccessDocker" : true,
     }
 
-    instances.InsertSchema(testData)
+    instances.InsertSchema(testData, "")
 
     assert.True(t, instanceExists("INST_ADDR"))
 }
@@ -147,7 +147,7 @@ func Test_UpdateBeaconData(t *testing.T) {
         "Token" : "TOKEN_FAIL", 
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     var result beaconData
     
@@ -169,7 +169,7 @@ func Test_GetBeaconData_Found(t *testing.T) {
         "Token" : "TOKEN", 
     }
 
-    beacons.InsertSchema(testBeaconData)
+    beacons.InsertSchema(testBeaconData, "")
 
     res, err := getBeaconData("BEACON_ADDR")
 
@@ -218,7 +218,7 @@ func Test_ListBeacons_ValidUser(t *testing.T) {
         auth.SetUserBeaconAuthLevel(user, addr, auth.OwnerAuthLevel)
 
         keyList = append(keyList, aliases.Alias{"", newBeacon["Address"].(string)})
-        beacons.InsertSchema(newBeacon)
+        beacons.InsertSchema(newBeacon, "")
     }
 
     beaconList, err := getBeaconsList(user)
@@ -245,8 +245,8 @@ func Test_ListBeacons_BadUser(t *testing.T) {
     user, _ := auth.GetUser("EMAIL")
     auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR 1", auth.OwnerAuthLevel)
 
-    beacons.InsertSchema(goodBeacon)
-    beacons.InsertSchema(badBeacon)
+    beacons.InsertSchema(goodBeacon, "")
+    beacons.InsertSchema(badBeacon, "")
 
     beaconList, err := getBeaconsList(user)
 
@@ -265,7 +265,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
 
     beacons.InsertSchema(map[string]interface{}{
         "Address" : "BEACON_ADDR", "Token" : "TOKEN",
-    })
+    }, "")
 
     keyList := make([]map[string]interface{}, 0)
 
@@ -283,7 +283,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
             "BeaconAddress" : "BEACON_ADDR", 
         }
 
-        instances.InsertSchema(newInstance)
+        instances.InsertSchema(newInstance, "")
 
         newInstance["Alias"] = ""
         keyList = append(keyList, newInstance)
@@ -301,11 +301,11 @@ func Test_ListInstances_BadUser(t *testing.T) {
 
     beacons.InsertSchema(map[string]interface{}{
         "Address" : "BEACON_ADDR 1", "Token" : "TOKEN",
-    })
+    }, "")
 
     beacons.InsertSchema(map[string]interface{}{
         "Address" : "BEACON_ADDR 2", "Token" : "TOKEN",
-    })
+    }, "")
 
     auth.CreateUser("EMAIL", "", "")
     user, _ := auth.GetUser("EMAIL")
@@ -325,8 +325,8 @@ func Test_ListInstances_BadUser(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR 2", 
     }
 
-    instances.InsertSchema(goodInstance)
-    instances.InsertSchema(badInstance)
+    instances.InsertSchema(goodInstance, "")
+    instances.InsertSchema(badInstance, "")
 
     key := goodInstance
     key["Alias"] = ""
@@ -363,7 +363,7 @@ func Test_RefreshVMListOf(t *testing.T) {
     beacons.InsertSchema(map[string]interface{} {
         "Address" : url, 
         "Token" : "", 
-    })
+    }, "")
 
     data := beaconData{Address: url}
 
