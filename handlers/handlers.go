@@ -68,7 +68,7 @@ type CustomHandlerMap map[*regexp.Regexp]CustomHandlerFunc
     Container of failure data created by the handlers
 */
 type HandlerError struct {
-    StatusCode  int
+    StatusCode  int     `json:"-"`
     Cause       string
     Message     string
 }
@@ -130,7 +130,7 @@ func Rollback(
     info HandlerInfo,
     runHandlers []CustomHandlerFunc,
 ) {
-    WriteError(w, err)
+    WriteError(w, err.StatusCode, err.Cause, err.Message)
     for _, handler := range runHandlers {
         handler(info, true)
     }
@@ -139,47 +139,13 @@ func Rollback(
 /*
     Writes error data and code to the HTTP response.
 */
-func WriteError(w http.ResponseWriter, err HandlerError) {
-    json, _ := json.Marshal(struct {
-        Error   string
-        Message string
-    }{err.Cause, err.Message})
-
+func WriteError(w http.ResponseWriter, code int, cause, message string) {
     w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(err.StatusCode)
+    w.WriteHeader(code)
+
+    err := HandlerError{Cause: cause, Message: message}
+    json, _ := json.Marshal(err)
     w.Write(json)
-}
-
-/*
-    Extracts data from the request to create a HandlerInfo
-    which is used by the handlers.
-
-    RETURN: A HandlerInfo extracted from the request
-*/
-func GetHandlerInfo(r *http.Request) (HandlerInfo, bool) {
-    var info HandlerInfo
-
-    params, ok := GetEndpointParams(r, []string{"Host", "DockerEndpoint"})
-
-    if ok == false || len(params) < 2 {
-        return HandlerInfo{}, false
-    }
-
-    hostAlias := params["Host"]
-
-    value, err := aliases.GetAddressOf(hostAlias)
-    if err == nil {
-        info.Host = value
-    } else {
-        info.Host = hostAlias // Unknown alias, just use what was given
-    }
-
-    info.DockerEndpoint = params["DockerEndpoint"]
-    info.Body = GetRequestBody(r)
-    info.Request = r
-    info.HandlerData = make(map[string]interface{})
-
-    return info, true
 }
 
 /*

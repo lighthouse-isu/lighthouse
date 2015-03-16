@@ -23,9 +23,12 @@ import (
     "bytes"
     "encoding/json"
 
+    "github.com/gorilla/mux"
+
     "github.com/stretchr/testify/assert"
 
     "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/handlers"
 )
 
@@ -243,4 +246,33 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     assert.Equal(t, 200, w.Code,
         "DockerRequestHandler should output the forwarded request's response code.")
+}
+
+/*
+    Tests data extraction for requests into a HandlerInfo.
+    Purpose: To add ensure Handler get valid data.
+*/
+func Test_GetHandlerInfo(t *testing.T) {
+    aliases.SetupTestingTable()
+    defer aliases.TeardownTestingTable()
+
+    aliases.AddAlias("TestHost", "AliasHost")
+
+    router := mux.NewRouter()
+    var info handlers.HandlerInfo
+
+    router.HandleFunc("/{Endpoint:.*}",
+        func(w http.ResponseWriter, r *http.Request) {
+            info, _ = GetHandlerInfo(r)
+    })
+
+    r, _ := http.NewRequest("GET", "/TestHost/Test%2FEndpoint", nil)
+    r.RequestURI = "/TestHost/Test%2FEndpoint"
+
+    router.ServeHTTP(httptest.NewRecorder(), r)
+
+    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r}
+
+    assert.Equal(t, expected, info,
+        "GetHandlerInfo did not extract data correctly")
 }

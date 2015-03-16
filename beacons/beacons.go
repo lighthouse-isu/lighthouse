@@ -22,6 +22,7 @@ import (
 
     "github.com/gorilla/mux"
 
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
 )
@@ -34,6 +35,7 @@ const (
 var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
     NotEnoughParametersError = errors.New("beacons: not enough parameters given")
+    DuplicateInstanceError = errors.New("beacons: tried to add an instance which already exists")
 )
 
 var beacons databases.TableInterface
@@ -42,7 +44,6 @@ var instances databases.TableInterface
 var beaconSchema = databases.Schema {
     "Address" : "text UNIQUE PRIMARY KEY",
     "Token" : "text",
-    "Users" : "json",
 }
 
 var instanceSchema = databases.Schema {
@@ -55,7 +56,6 @@ var instanceSchema = databases.Schema {
 type beaconData struct {
     Address string
     Token string
-    Users userMap
 }
 
 type instanceData struct {
@@ -64,8 +64,6 @@ type instanceData struct {
     CanAccessDocker bool
     BeaconAddress string
 }
-
-type userMap map[string]interface{}
 
 func Init() {
     if beacons == nil {
@@ -91,26 +89,19 @@ func GetBeaconAddress(instance string) (string, error) {
     return beacon.BeaconAddress, nil
 }
 
-func GetBeaconToken(beacon, user string) (string, error) {
+func TryGetBeaconToken(beacon string, user *auth.User) (string, error) {
+    if !user.CanAccessBeacon(beacon) {
+        return "", TokenPermissionError
+    }
+
     var data beaconData
     where := databases.Filter{"Address" : beacon}
-    columns := []string{"Token", "Users"}
+    columns := []string{"Token"}
 
     err := beacons.SelectRowSchema(columns, where, &data)
 
     if err != nil {
         return "", err
-    }
-
-    // Database gives nil on empty map
-    if data.Users == nil {
-        return "", TokenPermissionError
-    }
-
-    _, ok := data.Users[user]
-
-    if !ok {
-        return "", TokenPermissionError
     }
    
     return data.Token, nil
@@ -147,10 +138,6 @@ func LoadBeacons() {
 
 func Handle(r *mux.Router) {
     LoadBeacons()
-
-    r.HandleFunc("/user/{Endpoint:.*}", handleAddUserToBeacon).Methods("PUT")
-
-    r.HandleFunc("/user/{Endpoint:.*}", handleRemoveUserFromBeacon).Methods("DELETE")
 
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
