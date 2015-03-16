@@ -85,7 +85,7 @@ func Test_HandleUpdateBeaconToken(t *testing.T) {
 
 	beacons.InsertSchema(map[string]interface{}{
 		"Address" : "ADDR", "Token" : "TOKEN",
-	})
+	}, "")
 
 	setupBeaconPermissions("ADDR", 2)
 	w := runHandlerTest("PUT", "/ADDR", "TOKEN_PASS", "/{Endpoint}", handleUpdateBeaconToken)
@@ -176,7 +176,7 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 
 	// Duplicate beacon - with the postgres error fix this will become a 400
 	body = map[string]interface{} {"Address" : "localhost:8080", "Alias" : "ALIAS", "Token" : ""}
-	beacons.InsertSchema(body)
+	beacons.InsertSchema(body, "")
 
     defer setupServer(nil).Close()
 

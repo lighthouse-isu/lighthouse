@@ -46,12 +46,12 @@ func addUsers(table *databases.MockTable, users ...User) {
 	for _, user := range users {
 
 		table.InsertSchema(map[string]interface{}{
-	    	"Email" : user.Email,
-	    	"Salt" : user.Salt,
-	    	"Password" : user.Password,
-	    	"AuthLevel" : user.AuthLevel,
-	    	"Permissions" : user.Permissions,
-	    })
+	        "Email" : user.Email,
+	        "Salt" : user.Salt,
+	        "Password" : user.Password,
+            "AuthLevel" : user.AuthLevel,
+	        "Permissions" : user.Permissions,
+	    }, "")
 	}
 }
 
@@ -74,14 +74,14 @@ func Test_CreateUser(t *testing.T) {
     CreateUser(email, salt, password)
 
     keyUser := User {
-    	email, salt, password, DefaultAuthLevel, NewPermission(),
+        email, salt, password, DefaultAuthLevel, NewPermission(),
     }
 
     var actual User
     table.SelectRowSchema(nil, nil, &actual)
 
 	assert.Equal(t, keyUser, actual)
-}   
+}
 
 func Test_CreateUserWithAuthLevel(t *testing.T) {
 	table, teardown := setupTests()
@@ -95,7 +95,7 @@ func Test_CreateUserWithAuthLevel(t *testing.T) {
     createUserWithAuthLevel(email, salt, password, authLevel)
 
     keyUser := User {
-    	email, salt, password, authLevel, NewPermission(),
+        email, salt, password, authLevel, NewPermission(),
     }
 
     var actual User
@@ -170,7 +170,7 @@ func Test_SetUserBeaconAuthLevel(t *testing.T) {
     perms["Beacons"] = map[string]interface{}{"OVERWRITE" : 0}
 
     keyPerms := map[string]interface{}{
-    	"OVERWRITE" : 1, "NEW": 2,
+        "OVERWRITE" : 1, "NEW": 2,
     }
 
     user := &User{Email: "EMAIL", Permissions: perms,}
@@ -195,7 +195,7 @@ func Test_GetAllUsers(t *testing.T) {
 	addUsers(table, 
 		*current,
 		User{Email : "lower",   AuthLevel : 0},
-    	User{Email : "equal",   AuthLevel : 1},
+        User{Email : "equal",   AuthLevel : 1},
 		User{Email : "higher",  AuthLevel : 2},
     )
 
@@ -203,14 +203,14 @@ func Test_GetAllUsers(t *testing.T) {
 
     assert.Equal(t, 2, len(users))
     if len(users) != 2 {
-    	return
+        return
     }
 
     assert.True(t, users[0] == "current" || users[1] == "current",
-    	"getAllUsers should list current user")
+        "getAllUsers should list current user")
 
     assert.True(t, users[0] == "lower" || users[1] == "lower",
-    	"getAllUsers should list less privileged users")
+        "getAllUsers should list less privileged users")
 }
 
 func Test_ParseUserUpdateRequest_AuthLevel_Valid(t *testing.T) {

@@ -107,23 +107,63 @@ func Test_Insert(t *testing.T) {
         "Insertion call should encode given value as JSON")
 }
 
-func Test_InsertSchema(t *testing.T) {
+//TODO
+//Will not run because we can't mock sql.Row
+//We need to write a database driver...
+//Or use someone else's
+/*
+func Test_InsertSchema_WithReturn(t *testing.T) {
+    db, call, schema := makeTestingDatabase(t)
+    table := NewSchemaTable(db, "test_table", schema)
+
+    newData := map[string]interface{}{
+        "Name" : "John Doe",
+        "Age" : 42,
+    }
+
+    retval, _ := table.InsertSchema(newData, "Id")
+
+    q := call["query_row"].query
+    args := call["query_row"].args[0].([]interface{})
+
+    assert.True(t, strings.Contains(q, "INSERT"),
+        "Insert query should contain INSERT")
+    assert.True(t, strings.Contains(q, "test_table"),
+        "Insertion Exec call should contain table name")
+
+    var firstCol, lastCol string
+
+    assert.True(t, strings.Index(q, "Id") < 0, "Query should not contain 'Id' column")
+    assert.True(t, strings.Index(q, "Name") >= 0, "Query should contain 'Name' column")
+    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Age' column")
+
+    firstCol = firstSubstr(q, "Age", "Name")
+    lastCol = lastSubstr(q, "Age", "Name")
+
+    assert.Equal(t, newData[firstCol], args[0],
+        fmt.Sprintf("Query param for %s is incorrect", firstCol))
+    assert.Equal(t, newData[lastCol], args[1],
+        fmt.Sprintf("Query param for %s is incorrect", lastCol))
+}
+*/
+
+func Test_InsertSchema_Plain(t *testing.T) {
     db, call, schema := makeTestingDatabase(t)
     table := NewSchemaTable(db, "test_table", schema)
     
     newData := map[string]interface{}{
-        "Id" : "DEFAULT",
+        "Id" : "0",
         "Name" : "John Doe",
         "Age" : 42,
     }
     
     revData := map[interface{}]string {
-        "DEFAULT" : "Id",
+        "0" : "Id",
         "John Doe" : "Name",
         42 : "Age",
     }
 
-    table.InsertSchema(newData)
+    table.InsertSchema(newData, "")
 
     q := call["exec"].query
     args := call["exec"].args[0].([]interface{})
@@ -135,9 +175,9 @@ func Test_InsertSchema(t *testing.T) {
     
     var firstCol, lastCol string
     
-    assert.True(t, strings.Index(q, "Id") >= 0, "Query should contain 'Age' column")
+    assert.True(t, strings.Index(q, "Id") >= 0, "Query should contain 'Id' column")
     assert.True(t, strings.Index(q, "Name") >= 0, "Query should contain 'Name' column")
-    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Id' column")
+    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Age' column")
     
     firstCol = firstSubstr(q, firstSubstr(q, "Id", "Name"), "Age")
     lastCol = lastSubstr(q, lastSubstr(q, "Id", "Name"), "Age")

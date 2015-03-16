@@ -63,7 +63,7 @@ func Test_UpdateAlias(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.InsertSchema(alias)
+	table.InsertSchema(alias, "")
 
 	keyAlias := "ALIAS_PASS"
 
@@ -87,7 +87,7 @@ func Test_SetAlias(t *testing.T) {
 		"Address" : "ADDRESS_OVERWRITE",
 	}
 
-	table.InsertSchema(alias)
+	table.InsertSchema(alias, "")
 
 	overwriteAlias := "ALIAS_UPDATED"
 	SetAlias(overwriteAlias, "ADDRESS_OVERWRITE")
@@ -118,7 +118,7 @@ func Test_GetAddressOf(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.InsertSchema(alias)
+	table.InsertSchema(alias, "")
 
 	keyAddress := "ADDRESS"
 	var realAddress string
@@ -142,7 +142,7 @@ func Test_GetAliasOf(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.InsertSchema(alias)
+	table.InsertSchema(alias, "")
 
 	keyAlias := "ALIAS"
 	var realAddress string
@@ -166,7 +166,7 @@ func Test_HandleUpdateAlias_Existing(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.InsertSchema(alias)
+	table.InsertSchema(alias, "")
 
 	keyAlias := "ALIAS_PASS"
 	aliasJSON, _ := json.Marshal(keyAlias)

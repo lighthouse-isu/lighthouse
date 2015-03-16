@@ -135,7 +135,7 @@ func Test_RunCustomHandlers_Normal(t *testing.T) {
     handlers := make(CustomHandlerMap)
 
     hitCount := 0
-    testInfo := HandlerInfo{"testendpoint", "", nil, nil}
+    testInfo := HandlerInfo{"testendpoint", "", nil, nil, nil}
 
     doCall := func(info HandlerInfo, rollback bool) (*HandlerError) {
         assert.False(t, rollback, "RunCustomHandlers instructed to rollback")

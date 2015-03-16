@@ -86,7 +86,8 @@ func addUser(user User) error {
         "Permissions" : user.Permissions,
     }
 
-    return getDBSingleton().InsertSchema(entry)
+    _, err := getDBSingleton().InsertSchema(entry, "")
+    return err
 }
 
 func GetUser(email string) (*User, error) {

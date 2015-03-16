@@ -59,7 +59,9 @@ func AddAlias(alias, address string) error {
         "Address" : address,
     }
 
-    return getDBSingleton().InsertSchema(entry)
+    _, err := getDBSingleton().InsertSchema(entry, "")
+
+    return err
 }
 
 func UpdateAlias(alias, address string) error {
