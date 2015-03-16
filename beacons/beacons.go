@@ -34,7 +34,7 @@ const (
 
 var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
-    NotEnoughParametersError = errors.New("beacons: not enough parameters given")
+    NotEnoughParametersError = errors.New("beacons: not enough or invalid parameters given")
     DuplicateInstanceError = errors.New("beacons: tried to add an instance which already exists")
 )
 

@@ -29,12 +29,12 @@ import (
     "github.com/lighthouse/lighthouse/handlers"
 )
 
-func getInstanceAlias(instance string) string {
-    alias, err := aliases.GetAddressOf(instance)
+func getAddressOf(alias string) string {
+    address, err := aliases.GetAddressOf(alias)
     if err != nil {
-        return instance
+        return alias
     }
-    return alias
+    return address
 }
 
 func writeResponse(err error, w http.ResponseWriter) {
@@ -42,8 +42,14 @@ func writeResponse(err error, w http.ResponseWriter) {
         case nil:
             w.WriteHeader(http.StatusOK)
 
-        case databases.KeyNotFoundError, databases.NoUpdateError, 
-                databases.EmptyKeyError, NotEnoughParametersError:
+        // Errors outside of package
+        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+            handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
+
+        case TokenPermissionError:
+            handlers.WriteError(w, http.StatusForbidden, "beacons", err.Error())
+
+        case NotEnoughParametersError:
             handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
         default:
@@ -56,12 +62,20 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
     defer func() { writeResponse(err, w) }()
 
     params, ok := handlers.GetEndpointParams(r, []string{"Beacon"})
-    if ok == false || len(params) < 1 {
+
+    if ok == false || len(params) < 1 || params["Beacon"] == "" {
         err = NotEnoughParametersError
         return
     }
 
-    beacon := getInstanceAlias(params["Beacon"])
+    beacon := getAddressOf(params["Beacon"])
+
+    user := auth.GetCurrentUser(r)
+
+    if !user.CanModifyBeacon(beacon) {
+        err = TokenPermissionError
+        return
+    }
 
     reqBody, err := ioutil.ReadAll(r.Body)
     if err != nil {
@@ -72,6 +86,7 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &token)
     if err != nil {
+        err = NotEnoughParametersError
         return
     }
 
@@ -99,6 +114,7 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &beaconInfo)
     if err != nil {
+        err = NotEnoughParametersError
         return
     }
 
@@ -131,7 +147,6 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     }
 
     err = refreshVMListOf(beacon)
-    fmt.Println(err)
     return
 }
 

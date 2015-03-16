@@ -178,7 +178,7 @@ func getInstancesList(beacon string, user *auth.User, refresh bool) ([]map[strin
     return instances, nil
 }
 
-func refreshVMListOf(beacon beaconData) (error) {
+func refreshVMListOf(beacon beaconData) error {
     vmsTarget := fmt.Sprintf("http://%s/vms", beacon.Address)
 
     req, err := http.NewRequest("GET", vmsTarget, nil)
