@@ -23,8 +23,6 @@ import (
     "io/ioutil"
 
     "github.com/gorilla/mux"
-
-    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
 /*
