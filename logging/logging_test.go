@@ -60,3 +60,23 @@ func Test_LoggingMiddleware(t *testing.T) {
     assert.Equal(t, method, "GET",
         "Logging Middleware didn't correctly log the method.")
 }
+
+func Test_Info(t *testing.T) {
+    mw := &MockWriter{}
+    key, res := "TEST_INFO", ""
+
+    oldLogger := logger
+    defer func() {
+        // restore patched logger after done testing
+        logger = oldLogger
+    }()
+
+    // patch logger with a mock logger
+    logger = log.New(mw, "", 0)
+
+    Info(key)
+    
+    fmt.Sscanf(mw.LogInput, "%s\n", &res)
+
+    assert.Equal(t, key, res)
+}
