@@ -23,6 +23,8 @@ import (
     "encoding/json"
 
     "database/sql"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 var (
@@ -153,7 +155,7 @@ func (this *Table) Insert(key string, value interface{}) error {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -258,7 +260,7 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -271,7 +273,7 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -330,7 +332,7 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
