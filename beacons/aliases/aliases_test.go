@@ -227,3 +227,52 @@ func Test_HandleUpdateAlias_Invalid(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
+
+func Test_HandleUpdateAlias_BadJSON(t *testing.T) {
+	_, teardown := setup()
+	defer teardown()
+
+	addressJSON, _ := json.Marshal([]int{1})
+
+	w := httptest.NewRecorder()
+	r, _ := http.NewRequest("PUT", "/ADDRESS", bytes.NewBuffer(addressJSON))
+
+	m := mux.NewRouter()
+	m.HandleFunc("/{Address:.*}", handleUpdateAlias)
+	m.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {
+    defer func() { recover() }()
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+
+    // This won't run during a panic(), but we can't panic during a 404
+    if http.StatusNotFound == w.Code {
+        t.Log(r.URL.Path)
+        t.Fail()
+    }
+}
+
+func Test_Handle(t *testing.T) {
+    r := mux.NewRouter()
+    Handle(r)
+
+    routes := []struct {
+        Method string
+        Endpoint string
+    } {
+        {"PUT", "/ADDR"},
+    }
+
+    for _, route := range routes {
+        m := route.Method
+        e := route.Endpoint
+
+        req, _ := http.NewRequest(m, e, bytes.NewBuffer([]byte("")))
+        tryHandleTest(t, req, r)
+    }
+}
