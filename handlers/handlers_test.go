@@ -209,3 +209,112 @@ func Test_Rollback(t *testing.T) {
 
     assert.Equal(t, 3, hitCount, "Rollback did not call all handlers")
 }
+
+/*
+    Validates parameter extraction of wildcarded endpoints
+    Purpose: Ensuring handlers get proper endpoint parameters
+*/
+func Test_GetEndpointParams_Normal(t *testing.T) {
+    params := []string{"P1", "P2", "P3"}
+
+    keys := map[string]string {
+        "P1" : "K1", 
+        "P2" : "K2", 
+        "P3" : "K3",
+    }
+
+    h := func (w http.ResponseWriter, r *http.Request) {
+        res, ok := GetEndpointParams(r, params)
+
+        assert.True(t, ok)
+        assert.Equal(t, keys, res)
+    }
+
+    m := mux.NewRouter()
+    m.HandleFunc("/{Endpoint:.*}", h)
+
+    r, _ := http.NewRequest("GET", "/K1/K2/K3", nil)
+    r.RequestURI = "/K1/K2/K3"
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+}
+
+/*
+    Validates error handling when mux doesn't have an "Endpoint" route variable
+*/
+func Test_GetEndpointParams_Invalid(t *testing.T) {
+    params := []string{"P1"}
+
+    h := func (w http.ResponseWriter, r *http.Request) {
+        res, ok := GetEndpointParams(r, params)
+
+        assert.False(t, ok)
+        assert.Nil(t, res)
+    }
+
+    m := mux.NewRouter()
+    m.HandleFunc("/BAD_ROUTE", h)
+
+    r, _ := http.NewRequest("GET", "/K1", nil)
+    r.RequestURI = "/K1"
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+}
+
+/*
+    Validates parameter extraction when not enough parameters exist
+*/
+func Test_GetEndpointParams_TooFew(t *testing.T) {
+    params := []string{"P1", "P2", "P3"}
+
+    keys := map[string]string {
+        "P1" : "K1", 
+        "P2" : "K2",
+    }
+
+    h := func (w http.ResponseWriter, r *http.Request) {
+        res, ok := GetEndpointParams(r, params)
+        
+        assert.True(t, ok)
+        assert.Equal(t, keys, res)
+    }
+
+    m := mux.NewRouter()
+    m.HandleFunc("/{Endpoint:.*}", h)
+
+    r, _ := http.NewRequest("GET", "/K1/K2", nil)
+    r.RequestURI = "/K1/K2"
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+}
+
+/*
+    Validates parameter extraction when extra parameters exist
+*/
+func Test_GetEndpointParams_TooMany(t *testing.T) {
+    params := []string{"P1", "P2"}
+
+    keys := map[string]string {
+        "P1" : "K1", 
+        "P2" : "K2/K3",
+    }
+
+    h := func (w http.ResponseWriter, r *http.Request) {
+        res, ok := GetEndpointParams(r, params)
+        
+        assert.True(t, ok)
+        assert.Equal(t, keys, res)
+    }
+
+    m := mux.NewRouter()
+    m.HandleFunc("/{Endpoint:.*}", h)
+
+    r, _ := http.NewRequest("GET", "/K1/K2/K3", nil)
+    r.RequestURI = "/K1/K2/K3"
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+}
