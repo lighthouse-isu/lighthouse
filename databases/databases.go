@@ -172,8 +172,9 @@ func (this *Table) InsertSchema(values map[string]interface{}, returning string)
 func (this *Table) insertSchema_return(values map[string]interface{}, returnCol string) (interface{}, error) {
     colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
     var res interface{}
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING %s`,
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING %s;`,
         this.table, colBuf.String(), valBuf.String(), returnCol)
+
     err := this.db.QueryRow(query, queryVals...).Scan(&res)
 
     if err != nil {
@@ -185,7 +186,7 @@ func (this *Table) insertSchema_return(values map[string]interface{}, returnCol 
 
 func (this *Table) insertSchema_noReturn(values map[string]interface{}) (error) {
     colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`,
         this.table, colBuf.String(), valBuf.String())
     res, err := this.db.Exec(query, queryVals...)
 
@@ -207,8 +208,8 @@ func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes
 
     for col, val := range values {
         if i != 0 {
-            colBuf.WriteString(",")
-            valBuf.WriteString(",")
+            colBuf.WriteString(", ")
+            valBuf.WriteString(", ")
         }
         colBuf.WriteString(col)
 
@@ -225,24 +226,27 @@ func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes
 
 func (this *Table) DeleteRowsSchema(where Filter) (error) {
     var buffer bytes.Buffer
+    vals := make([]interface{}, len(where))
 
     buffer.WriteString("DELETE FROM ")
     buffer.WriteString(this.table)
-    buffer.WriteString(" WHERE ")
-    vals := make([]interface{}, len(where))
-    
-    i := 1
-    for col, val := range where {
-        if i != 1 {
-            buffer.WriteString(" && ")
+
+    if len(where) > 0 {
+        buffer.WriteString(" WHERE ")
+        
+        i := 1
+        for col, val := range where {
+            if i != 1 {
+                buffer.WriteString(" && ")
+            }
+
+            buffer.WriteString(col)
+            buffer.WriteString(" = ")
+            buffer.WriteString(fmt.Sprintf("($%d)", i))
+
+            vals[i - 1] = val
+            i += 1
         }
-
-        buffer.WriteString(col)
-        buffer.WriteString(" = ")
-        buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-        vals[i - 1] = val
-        i += 1
     }
 
     buffer.WriteString(";")
@@ -408,6 +412,7 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
 }
 
 func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
+    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
 
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
@@ -419,7 +424,6 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
         }
     }
 
-    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
     row := this.db.QueryRow(query, queryVals...)
 
     if row == nil {
@@ -455,6 +459,8 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
 }
 
 func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
+    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
+
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 
@@ -465,7 +471,6 @@ func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptio
         }
     }
 
-    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
     rows, err := this.db.Query(query, queryVals...)
 
     if err != nil {
