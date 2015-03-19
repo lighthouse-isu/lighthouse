@@ -16,7 +16,6 @@ package containers
 
 import (
     "testing"
-    "fmt"
     "net/http"
 
     "github.com/stretchr/testify/assert"
