@@ -24,7 +24,7 @@ import (
     "github.com/DATA-DOG/go-sqlmock"
 )
 
-var testSchema map[string]string = map[string]string {
+var testSchema Schema = Schema{
     "Name" : "text UNIQUE PRIMARY KEY",
     "Age" : "integer",
     "Phone" : "text",
