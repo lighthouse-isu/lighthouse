@@ -55,7 +55,7 @@ func Test_DeleteContainer(t *testing.T) {
     containerId, _ := CreateContainer(1, "localhost", "Test")
     CreateContainer(1, "not localhost", "Test")
 
-    err := DeleteContainer(containerId)
+    DeleteContainer(containerId)
 
     assert.Equal(t, 1, len(table.Database),
         "Database should have one element after delete")

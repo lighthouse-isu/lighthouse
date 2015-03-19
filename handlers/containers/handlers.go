@@ -15,7 +15,6 @@
 package containers
 
 import (
-    "fmt"
     "net/http"
 
     "github.com/lighthouse/lighthouse/databases"
