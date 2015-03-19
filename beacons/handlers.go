@@ -43,6 +43,7 @@ func writeResponse(err error, w http.ResponseWriter) {
             w.WriteHeader(http.StatusOK)
 
         case databases.KeyNotFoundError, databases.NoUpdateError, 
+                databases.EmptyKeyError, databases.DuplicateKeyError,
                 databases.EmptyKeyError, NotEnoughParametersError:
             handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 

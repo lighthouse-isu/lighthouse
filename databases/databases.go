@@ -23,6 +23,8 @@ import (
     "encoding/json"
 
     "database/sql"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 var (
@@ -31,6 +33,7 @@ var (
     UnknownError = errors.New("databases: unknown error")
     KeyNotFoundError = errors.New("databases: given key not found")
     NoRowsError = errors.New("databases: result was empty")
+    DuplicateKeyError = errors.New("databases: key already exists")
 )
 
 type Table struct {
@@ -153,7 +156,7 @@ func (this *Table) Insert(key string, value interface{}) error {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -258,7 +261,7 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -271,7 +274,7 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -330,7 +333,7 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
