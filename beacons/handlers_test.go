@@ -174,14 +174,15 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 500, w.Code)
 
-	// Duplicate beacon - with the postgres error fix this will become a 400
-	body = map[string]interface{} {"Address" : "localhost:8080", "Alias" : "ALIAS", "Token" : ""}
+	// Duplicate beacon
+	body = map[string]interface{} {"Address" : "localhost:8080", "Token" : ""}
 	beacons.InsertSchema(body, "")
+	body["Alias"] = "ALIAS"
 
     defer setupServer(nil).Close()
 
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
-	assert.Equal(t, 500, w.Code)
+	assert.Equal(t, 400, w.Code)
 }
 
 func Test_HandleListBeacons(t *testing.T) {

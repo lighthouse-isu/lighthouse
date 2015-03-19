@@ -21,21 +21,55 @@ import (
 
     "database/sql"
 
-    _ "github.com/lib/pq"
+    "github.com/lib/pq"
 
     "github.com/lighthouse/lighthouse/logging"
+
+    "github.com/lighthouse/lighthouse/databases"
 )
 
-var connection *sql.DB
+type postgresConnection struct {
+    sql.DB
+}
 
-func Connection() *sql.DB {
+var connection *postgresConnection
+
+func Connection() databases.DBInterface {
     if connection == nil {
         connection = setup()
     }
     return connection
 }
 
-func setup() *sql.DB {
+func (this *postgresConnection) Exec(cmd string, params ...interface{}) (sql.Result, error) {
+    res, err := this.DB.Exec(cmd, params...)
+    
+    err = transformError(err)
+
+    return res, err
+}
+
+func transformError(err error) error {
+    var pqErr *pq.Error = nil
+    var ok bool = false
+
+    if err != nil {
+        pqErr, ok = err.(*pq.Error)
+    } 
+
+    if !ok {
+        return nil
+    }
+
+    switch pqErr.Code {
+    case "23505": 
+        return databases.DuplicateKeyError
+    }
+
+    return nil
+}
+
+func setup() *postgresConnection {
     postgresHost := os.Getenv("POSTGRES_PORT_5432_TCP_ADDR")
     dockerHost := os.Getenv("DOCKER_HOST")
 
@@ -70,5 +104,5 @@ func setup() *sql.DB {
         panic(err.Error())
     }
 
-    return postgres
+    return &postgresConnection{*postgres}
 }

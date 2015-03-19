@@ -43,13 +43,14 @@ func writeResponse(err error, w http.ResponseWriter) {
             w.WriteHeader(http.StatusOK)
 
         // Errors outside of package
-        case databases.KeyNotFoundError, databases.NoUpdateError, databases.EmptyKeyError:
+        case databases.KeyNotFoundError, databases.DuplicateKeyError,
+                databases.NoUpdateError, databases.EmptyKeyError:
             handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
         case TokenPermissionError:
             handlers.WriteError(w, http.StatusForbidden, "beacons", err.Error())
 
-        case NotEnoughParametersError:
+        case NotEnoughParametersError, DuplicateBeaconError:
             handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
         default:
@@ -142,6 +143,10 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     }
 
     err = addBeacon(beacon)
+    if err == databases.DuplicateKeyError {
+        err = DuplicateBeaconError
+    }
+
     if err != nil {
         return
     }

@@ -33,6 +33,7 @@ var (
     UnknownError = errors.New("databases: unknown error")
     KeyNotFoundError = errors.New("databases: given key not found")
     NoRowsError = errors.New("databases: result was empty")
+    DuplicateKeyError = errors.New("databases: key already exists")
 )
 
 type Table struct {
