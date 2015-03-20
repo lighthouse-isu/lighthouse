@@ -50,7 +50,7 @@ func Test_NewTable(t *testing.T) {
     assert.Equal(t, db, table.db)
 
     if err := db.Close(); err != nil {
-    	t.Errorf(err.Error())
+        t.Errorf(err.Error())
     }
 }
 
@@ -87,10 +87,15 @@ func Test_Insert(t *testing.T) {
     db, _ := sqlmock.New()
     table := &Table{db, "test_table", nil}
 
+    value, _ := json.Marshal("VALUE")
     sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs("KEY", string(value)).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    table.Insert("KEY", "VALUE")
+    err := table.Insert("KEY", "VALUE")
+    if err != nil {
+        t.Errorf(err.Error())
+    }
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -107,6 +112,7 @@ func Test_InsertSchema_WithReturn(t *testing.T) {
     }
 
     sqlmock.ExpectQuery(`INSERT INTO test_table (.+) VALUES (.+) RETURNING Age;`).
+        WithArgs(42, "John Doe").
         WillReturnRows(sqlmock.NewRows([]string{"Age"}).AddRow(1))
 
     retval, err := table.InsertSchema(newData, "Age")
@@ -129,6 +135,7 @@ func Test_InsertSchema_NoReturn(t *testing.T) {
     }
 
     sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs(42, "John Doe").
         WillReturnResult(sqlmock.NewResult(0, 1))
 
     retval, err := table.InsertSchema(newData, "")
@@ -151,6 +158,7 @@ func Test_InsertSchema_NoInsert(t *testing.T) {
     }
 
     sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs(42, "John Doe").
         WillReturnResult(sqlmock.NewResult(0, 0))
 
     _, err := table.InsertSchema(newData, "")
@@ -166,10 +174,13 @@ func Test_Update(t *testing.T) {
     db, _ := sqlmock.New()
     table := &Table{db, "test_table", nil}
 
+    value, _ := json.Marshal("VALUE")
     sqlmock.ExpectExec(`UPDATE test_table SET (.+) WHERE keyColumn = (.+);`).
+        WithArgs("KEY", string(value)).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    table.Update("KEY", "VALUE")
+    err := table.Update("KEY", "VALUE")
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -179,7 +190,7 @@ func Test_Update(t *testing.T) {
 func Test_UpdateSchema(t *testing.T) {
     db, _ := sqlmock.New()
     table := &Table{db, "test_table", testSchema}
-    
+
     to := map[string]interface{} {
         "Name": "Jane Doe",
         "Age" : 42,
@@ -191,9 +202,11 @@ func Test_UpdateSchema(t *testing.T) {
     }
 
     sqlmock.ExpectExec(`UPDATE test_table SET (.+) WHERE (.+);`).
+        WithArgs(42, "Jane Doe", 41, "123-456-7890").
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    table.UpdateSchema(to, where)
+    err := table.UpdateSchema(to, where)
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -210,11 +223,13 @@ func Test_SelectRow(t *testing.T) {
     jsonBuff, _ := json.Marshal(key)
 
     sqlmock.ExpectQuery(`SELECT valueColumn FROM test_table WHERE keyColumn = .+;`).
+        WithArgs("KEY").
         WillReturnRows(sqlmock.NewRows([]string{"valueColumn"}).AddRow(jsonBuff))
 
-    table.SelectRow("KEY", &res)
+    err := table.SelectRow("KEY", &res)
 
     assert.Equal(t, key, res)
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -231,14 +246,16 @@ func Test_SelectRowSchema(t *testing.T) {
     }
 
     sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
+        WithArgs(1).
         WillReturnRows(sqlmock.NewRows(columns).AddRow([]byte("123-456-7890"), []byte("Sam")))
 
     key := testObject{"Sam", 0, "123-456-7890"}
 
     var res testObject
-    table.SelectRowSchema(columns, filter, &res)
+    err := table.SelectRowSchema(columns, filter, &res)
 
     assert.Equal(t, key, res)
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -261,13 +278,16 @@ func Test_SelectSchema(t *testing.T) {
     }
 
     sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
+        WithArgs(1).
         WillReturnRows(sqlmock.NewRows(columns).
             AddRow([]byte(key[0].Phone), []byte(key[0].Name)).
             AddRow([]byte(key[1].Phone), []byte(key[1].Name)).
             AddRow([]byte(key[2].Phone), []byte(key[2].Name)))
 
     var res testObject
-    scan, _ := table.SelectSchema(columns, filter, SelectOptions{})
+    scan, err := table.SelectSchema(columns, filter, SelectOptions{})
+
+    assert.Nil(t, err)
 
     for i := 0; i < 3 && scan.Next(); i += 1 {
         scan.Scan(&res)
@@ -288,7 +308,9 @@ func Test_SelectSchema_Options(t *testing.T) {
     sqlmock.ExpectQuery(`SELECT DISTINCT .+;`).
         WillReturnRows(sqlmock.NewRows(columns))
 
-    table.SelectSchema(columns, nil, SelectOptions{Distinct: true})
+    _, err := table.SelectSchema(columns, nil, SelectOptions{Distinct: true})
+
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -304,10 +326,13 @@ func Test_SelectSchema_Star(t *testing.T) {
         "Age" : 1,
     }
 
-    sqlmock.ExpectQuery(`SELECT * .+;`).
+    sqlmock.ExpectQuery(`SELECT \* .+;`).
+        WithArgs(1).
         WillReturnRows(sqlmock.NewRows(columns))
 
-    table.SelectSchema(nil, filter, SelectOptions{})
+    _, err := table.SelectSchema(nil, filter, SelectOptions{})
+
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -318,15 +343,20 @@ func Test_SelectRowSchema_Star(t *testing.T) {
     db, _ := sqlmock.New()
     table := &Table{db, "test_table", testSchema}
 
-    columns := []string {"Phone", "Name"}
+    columns := []string {"Age", "Name", "Phone"}
     filter := Filter {
         "Age" : 1,
     }
 
-    sqlmock.ExpectQuery(`SELECT * .+;`).
-        WillReturnRows(sqlmock.NewRows(columns))
+    var data testObject
 
-    table.SelectRowSchema(nil, filter, nil)
+    sqlmock.ExpectQuery(`SELECT \* .+;`).
+        WithArgs(1).
+        WillReturnRows(sqlmock.NewRows(columns).AddRow(int64(1), []byte("Sam"), []byte("123-456-7890")))
+
+    err := table.SelectRowSchema(nil, filter, &data)
+
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -336,16 +366,18 @@ func Test_SelectRowSchema_Star(t *testing.T) {
 func Test_DeleteRowsSchema(t *testing.T) {
     db, _ := sqlmock.New()
     table := &Table{db, "test_table", testSchema}
-    
+
     where := map[string]interface{} {
         "Age" : 41,
         "Phone" : "123-456-7890",
     }
 
     sqlmock.ExpectExec(`DELETE FROM test_table WHERE (.+);`).
+        WithArgs(41, "123-456-7890").
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    table.DeleteRowsSchema(where)
+    err := table.DeleteRowsSchema(where)
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -359,7 +391,8 @@ func Test_DeleteRowsNil(t *testing.T) {
     sqlmock.ExpectExec(`DELETE FROM test_table;`).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    table.DeleteRowsSchema(nil)
+    err := table.DeleteRowsSchema(nil)
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
