@@ -17,330 +17,475 @@ package databases
 import (
     "testing"
     "strings"
-    "fmt"
-    "errors"
-    "database/sql"
+    "encoding/json"
 
     "github.com/stretchr/testify/assert"
+
+    "github.com/DATA-DOG/go-sqlmock"
 )
 
-type testParameterPair struct {
-    query string
-    args []interface{}
+var testSchema Schema = Schema{
+    "Name" : "text UNIQUE PRIMARY KEY",
+    "Age" : "integer",
+    "Phone" : "text",
 }
 
-type testCallData map[string]testParameterPair
-
-func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData, Schema) {
-    db := &MockDatabase{}
-    call := make(testCallData)
-    schema := Schema {
-        "Id" : "serial primary key",
-        "Name" : "text",
-        "Age" : "integer",
-    }
-
-    db.MockExec = func(s string, i ...interface{}) (sql.Result, error) {
-        call["exec"] = testParameterPair{s, i}
-        return nil, errors.New("junk")
-    }
-    db.MockQueryRow = func(s string, i ...interface{}) (*sql.Row) {
-        call["query_row"] = testParameterPair{s, i}
-        return nil
-    }
-    db.MockQuery = func(s string, i ...interface{}) (*sql.Rows, error) {
-        call["query"] = testParameterPair{s, i}
-        return nil, errors.New("junk")
-    }
-
-    return db, call, schema
+type testObject struct {
+    Name string
+    Age int
+    Phone string
 }
 
 func Test_NewTable(t *testing.T) {
-    db, call, _ := makeTestingDatabase(t)
-    NewTable(db, "test_table")
+    db, _ := sqlmock.New()
 
-    q := call["exec"].query
+    sqlmock.ExpectExec(`CREATE TABLE test_table (keyColumn text UNIQUE PRIMARY KEY, valueColumn json);`)
 
-    assert.True(t, strings.Contains(q, "CREATE"),
-        "Database setup should CREATE table")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Table creation Exec call should contain table name")
+    var inter interface{}
+    inter = NewTable(db, "test_table")
+    table := inter.(*Table)
+
+    assert.Nil(t, table.schema)
+    assert.Equal(t, "test_table", table.table)
+    assert.Equal(t, db, table.db)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
 func Test_NewSchemaTable(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    NewSchemaTable(db, "test_table", schema)
+    db, _ := sqlmock.New()
 
-    q := call["exec"].query
+    keyCols := `Name text UNIQUE PRIMARY KEY, Age integer, About json`
 
-    assert.True(t, strings.Contains(q, "CREATE"), 
-        "Database setup should CREATE table")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Table creation Exec call should contain table name")
+    sqlmock.ExpectExec(`CREATE TABLE test_table (` + keyCols + `);`)
 
-    for col, dataType := range schema {
-        assert.True(t, strings.Contains(q, col),
-            fmt.Sprintf("Table should be created with schema column %s", col))
-        assert.True(t, strings.Contains(q, dataType),
-            fmt.Sprintf("Table should create %s with type %s", col, dataType))
+    var inter interface{}
+    inter = NewSchemaTable(db, "test_table", testSchema)
+    table := inter.(*Table)
+
+    assert.Equal(t, testSchema, table.schema)
+    assert.Equal(t, "test_table", table.table)
+    assert.Equal(t, db, table.db)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
     }
+}
+
+func Test_NewSchemaTable_Panic(t *testing.T) {
+    defer func() { recover() }()
+
+    db, _ := sqlmock.New()
+    NewSchemaTable(db, "test_table", nil)
+
+    t.Errorf("Nil schema in NewSchemaTable should panic")
 }
 
 func Test_Insert(t *testing.T) {
-    db, call, _ := makeTestingDatabase(t)
-    table := NewTable(db, "test_table")
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", nil}
 
-    table.Insert("TEST_KEY", "TEST_VAL")
+    value, _ := json.Marshal("VALUE")
+    sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs("KEY", string(value)).
+        WillReturnResult(sqlmock.NewResult(0, 1))
 
-    q := call["exec"].query
-    args := call["exec"].args[0].([]interface{})
+    err := table.Insert("KEY", "VALUE")
+    if err != nil {
+        t.Errorf(err.Error())
+    }
 
-    assert.True(t, strings.Contains(q, "INSERT"),
-        "Insert query should contain INSERT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Insertion Exec call should contain table name")
-
-    assert.Equal(t, "TEST_KEY", args[0].(string),
-        "Insertion call should add given key")
-    assert.Equal(t, "\"TEST_VAL\"", args[1].(string),
-        "Insertion call should encode given value as JSON")
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
-//TODO
-//Will not run because we can't mock sql.Row
-//We need to write a database driver...
-//Or use someone else's
-/*
 func Test_InsertSchema_WithReturn(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
 
     newData := map[string]interface{}{
         "Name" : "John Doe",
         "Age" : 42,
     }
 
-    retval, _ := table.InsertSchema(newData, "Id")
+    sqlmock.ExpectQuery(`INSERT INTO test_table (.+) VALUES (.+) RETURNING Age;`).
+        WithArgs(42, "John Doe").
+        WillReturnRows(sqlmock.NewRows([]string{"Age"}).AddRow(1))
 
-    q := call["query_row"].query
-    args := call["query_row"].args[0].([]interface{})
+    retval, err := table.InsertSchema(newData, "Age")
 
-    assert.True(t, strings.Contains(q, "INSERT"),
-        "Insert query should contain INSERT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Insertion Exec call should contain table name")
+    assert.Nil(t, err)
+    assert.Equal(t, 1, retval)
 
-    var firstCol, lastCol string
-
-    assert.True(t, strings.Index(q, "Id") < 0, "Query should not contain 'Id' column")
-    assert.True(t, strings.Index(q, "Name") >= 0, "Query should contain 'Name' column")
-    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Age' column")
-
-    firstCol = firstSubstr(q, "Age", "Name")
-    lastCol = lastSubstr(q, "Age", "Name")
-
-    assert.Equal(t, newData[firstCol], args[0],
-        fmt.Sprintf("Query param for %s is incorrect", firstCol))
-    assert.Equal(t, newData[lastCol], args[1],
-        fmt.Sprintf("Query param for %s is incorrect", lastCol))
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
-*/
 
-func Test_InsertSchema_Plain(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
-    
+func Test_InsertSchema_NoReturn(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
     newData := map[string]interface{}{
-        "Id" : "0",
         "Name" : "John Doe",
         "Age" : 42,
     }
-    
-    revData := map[interface{}]string {
-        "0" : "Id",
-        "John Doe" : "Name",
-        42 : "Age",
+
+    sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs(42, "John Doe").
+        WillReturnResult(sqlmock.NewResult(0, 1))
+
+    retval, err := table.InsertSchema(newData, "")
+
+    assert.Nil(t, err)
+    assert.Nil(t, retval)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
     }
-
-    table.InsertSchema(newData, "")
-
-    q := call["exec"].query
-    args := call["exec"].args[0].([]interface{})
-
-    assert.True(t, strings.Contains(q, "INSERT"),
-        "Insert query should contain INSERT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Insertion Exec call should contain table name")
-    
-    var firstCol, lastCol string
-    
-    assert.True(t, strings.Index(q, "Id") >= 0, "Query should contain 'Id' column")
-    assert.True(t, strings.Index(q, "Name") >= 0, "Query should contain 'Name' column")
-    assert.True(t, strings.Index(q, "Age") >= 0, "Query should contain 'Age' column")
-    
-    firstCol = firstSubstr(q, firstSubstr(q, "Id", "Name"), "Age")
-    lastCol = lastSubstr(q, lastSubstr(q, "Id", "Name"), "Age")
-
-    assert.Equal(t, newData[firstCol], args[0],
-        fmt.Sprintf("Query param for %s is incorrect", firstCol))
-    assert.Equal(t, newData[lastCol], args[2],
-        fmt.Sprintf("Query param for %s is incorrect", lastCol))
-
-    midCol := revData[args[1]] != firstCol &&
-              revData[args[1]] != lastCol &&
-              revData[args[1]] != ""
-
-    assert.True(t, midCol,
-        fmt.Sprintf("Middle query param %v is incorrect", args[1]))
 }
 
-func firstSubstr(src, a, b string) string {
-    if strings.Index(src, a) <= strings.Index(src, b) {
-        return a
-    }
-    return b
-}
+func Test_InsertSchema_NoInsert(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
 
-func lastSubstr(src, a, b string) string {
-    if strings.Index(src, a) >= strings.Index(src, b) {
-        return a
+    newData := map[string]interface{}{
+        "Name" : "John Doe",
+        "Age" : 42,
     }
-    return b
+
+    sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
+        WithArgs(42, "John Doe").
+        WillReturnResult(sqlmock.NewResult(0, 0))
+
+    _, err := table.InsertSchema(newData, "")
+
+    assert.Equal(t, NoUpdateError, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
 func Test_Update(t *testing.T) {
-    db, call, _ := makeTestingDatabase(t)
-    table := NewTable(db, "test_table")
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", nil}
 
-    table.Update("TEST_KEY", "TEST_VAL")
+    value, _ := json.Marshal("VALUE")
+    sqlmock.ExpectExec(`UPDATE test_table SET (.+) WHERE keyColumn = (.+);`).
+        WithArgs("KEY", string(value)).
+        WillReturnResult(sqlmock.NewResult(0, 1))
 
-    q := call["exec"].query
-    args := call["exec"].args[0].([]interface{})
+    err := table.Update("KEY", "VALUE")
+    assert.Nil(t, err)
 
-    assert.True(t, strings.Contains(q, "UPDATE"),
-        "Update query should contain UPDATE")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Update Exec call should contain table name")
-
-    assert.Equal(t, "TEST_KEY", args[0].(string),
-        "Insertion call should add given key")
-    assert.Equal(t, "\"TEST_VAL\"", args[1].(string),
-        "Insertion call should encode given value as JSON")
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
 func Test_UpdateSchema(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
-    
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
     to := map[string]interface{} {
         "Name": "Jane Doe",
+        "Age" : 42,
     }
 
     where := map[string]interface{} {
-        "Id" : 1,
+        "Age" : 41,
+        "Phone" : "123-456-7890",
     }
 
-    table.UpdateSchema(to, where)
-    q := call["exec"].query
-    args := call["exec"].args[0].([]interface{})
+    sqlmock.ExpectExec(`UPDATE test_table SET (.+) WHERE (.+);`).
+        WithArgs(42, "Jane Doe", 41, "123-456-7890").
+        WillReturnResult(sqlmock.NewResult(0, 1))
 
-    assert.True(t, strings.Contains(q, "UPDATE"),
-        "Update query should contain UPDATE")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Update Exec call should contain table name")
-    assert.True(t, strings.Contains(q, "Name"),
-        "Update query should to contain column name")
-    assert.True(t, strings.Contains(q, "Id"),
-        "Update query should contain where column name")
-    assert.True(t, strings.Index(q, "Name") < strings.Index(q, "Id"),
-        "Update query should contain to column before where column")
+    err := table.UpdateSchema(to, where)
+    assert.Nil(t, err)
 
-    assert.Equal(t, "Jane Doe", args[0].(string),
-        "Update query should update name")
-    assert.Equal(t, 1, args[1].(int),
-        "Update query should look for Id")
-
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
 func Test_SelectRow(t *testing.T) {
-    db, call, _ := makeTestingDatabase(t)
-    table := NewTable(db, "test_table")
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", nil}
 
-    table.SelectRow("TEST_KEY", nil)
+    key := []string{"PASS"}
+    res := []string{}
 
-    q := call["query_row"].query
-    args := call["query_row"].args[0].([]interface{})
+    jsonBuff, _ := json.Marshal(key)
 
-    assert.True(t, strings.Contains(q, "SELECT"),
-        "Row query should contain SELECT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Query should contain table name")
+    sqlmock.ExpectQuery(`SELECT valueColumn FROM test_table WHERE keyColumn = .+;`).
+        WithArgs("KEY").
+        WillReturnRows(sqlmock.NewRows([]string{"valueColumn"}).AddRow(jsonBuff))
 
-    assert.Equal(t, "TEST_KEY", args[0].(string),
-        "Query should be given correct key")
+    err := table.SelectRow("KEY", &res)
+
+    assert.Equal(t, key, res)
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
 }
 
 func Test_SelectRowSchema(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
 
-    columns := []string {"Id", "Name", "Age"}
+    columns := []string {"Phone", "Name"}
     filter := Filter {
-        "Id" : 1,
+        "Age" : 1,
     }
 
-    table.SelectRowSchema(columns, filter, nil)
+    sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
+        WithArgs(1).
+        WillReturnRows(sqlmock.NewRows(columns).AddRow([]byte("123-456-7890"), []byte("Sam")))
 
-    q := call["query_row"].query
-    args := call["query_row"].args[0].([]interface{})
+    key := testObject{"Sam", 0, "123-456-7890"}
 
-    assert.True(t, strings.Contains(q, "SELECT"),
-        "Row query should contain SELECT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Query should contain table name")
+    var res testObject
+    err := table.SelectRowSchema(columns, filter, &res)
 
-    for _, col := range columns {
-        assert.True(t, strings.Contains(q, col),
-            "Row query should contain column name")
+    assert.Equal(t, key, res)
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
     }
-
-    assert.True(t, strings.Contains(q, "WHERE"),
-        "Row query should contain WHERE")
-    assert.True(t, strings.Contains(q, "Id"),
-        "Row query should contain filter column")
-    assert.Equal(t, 1, args[0].(int),
-        "Row query parameters should contain filter values")
 }
 
 func Test_SelectSchema(t *testing.T) {
-    db, call, schema := makeTestingDatabase(t)
-    table := NewSchemaTable(db, "test_table", schema)
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
 
-    columns := []string {"Id", "Name", "Age"}
+    columns := []string {"Phone", "Name"}
     filter := Filter {
-        "Id" : 1,
+        "Age" : 1,
     }
 
-    table.SelectSchema(columns, filter, SelectOptions{})
-
-    q := call["query"].query
-    args := call["query"].args[0].([]interface{})
-
-    assert.True(t, strings.Contains(q, "SELECT"),
-        "Row query should contain SELECT")
-    assert.True(t, strings.Contains(q, "test_table"),
-        "Query should contain table name")
-
-    for _, col := range columns {
-        assert.True(t, strings.Contains(q, col),
-            "Row query should contain column name")
+    key := []testObject{
+        testObject{"Sam", 0, "123-456-7890"},
+        testObject{"Sue", 0, "314-151-9285"},
+        testObject{"Bob", 0, "319-256-7380"},
     }
 
-    assert.True(t, strings.Contains(q, "WHERE"),
-        "Row query should contain WHERE")
-    assert.True(t, strings.Contains(q, "Id"),
-        "Row query should contain filter column")
-    assert.Equal(t, 1, args[0].(int),
-        "Row query parameters should contain filter values")
+    sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
+        WithArgs(1).
+        WillReturnRows(sqlmock.NewRows(columns).
+            AddRow([]byte(key[0].Phone), []byte(key[0].Name)).
+            AddRow([]byte(key[1].Phone), []byte(key[1].Name)).
+            AddRow([]byte(key[2].Phone), []byte(key[2].Name)))
+
+    var res testObject
+    scan, err := table.SelectSchema(columns, filter, SelectOptions{})
+
+    assert.Nil(t, err)
+
+    for i := 0; i < 3 && scan.Next(); i += 1 {
+        scan.Scan(&res)
+        assert.Equal(t, key[i], res)
+    }
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_SelectSchema_Options(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    columns := []string {"Phone", "Name"}
+
+    sqlmock.ExpectQuery(`SELECT DISTINCT .+;`).
+        WillReturnRows(sqlmock.NewRows(columns))
+
+    _, err := table.SelectSchema(columns, nil, SelectOptions{Distinct: true})
+
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_SelectSchema_Star(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    columns := []string {"Phone", "Name"}
+    filter := Filter {
+        "Age" : 1,
+    }
+
+    sqlmock.ExpectQuery(`SELECT \* .+;`).
+        WithArgs(1).
+        WillReturnRows(sqlmock.NewRows(columns))
+
+    _, err := table.SelectSchema(nil, filter, SelectOptions{})
+
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_SelectRowSchema_Star(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    columns := []string {"Age", "Name", "Phone"}
+    filter := Filter {
+        "Age" : 1,
+    }
+
+    var data testObject
+
+    sqlmock.ExpectQuery(`SELECT \* .+;`).
+        WithArgs(1).
+        WillReturnRows(sqlmock.NewRows(columns).AddRow(int64(1), []byte("Sam"), []byte("123-456-7890")))
+
+    err := table.SelectRowSchema(nil, filter, &data)
+
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_DeleteRowsSchema(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    where := map[string]interface{} {
+        "Age" : 41,
+        "Phone" : "123-456-7890",
+    }
+
+    sqlmock.ExpectExec(`DELETE FROM test_table WHERE (.+);`).
+        WithArgs(41, "123-456-7890").
+        WillReturnResult(sqlmock.NewResult(0, 1))
+
+    err := table.DeleteRowsSchema(where)
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_DeleteRowsNil(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    sqlmock.ExpectExec(`DELETE FROM test_table;`).
+        WillReturnResult(sqlmock.NewResult(0, 1))
+
+    err := table.DeleteRowsSchema(nil)
+    assert.Nil(t, err)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_DeleteRowsNoUpdate(t *testing.T) {
+    db, _ := sqlmock.New()
+    table := &Table{db, "test_table", testSchema}
+
+    sqlmock.ExpectExec(`.*`).
+        WillReturnResult(sqlmock.NewResult(0, 0))
+
+    err := table.DeleteRowsSchema(nil)
+
+    assert.Equal(t, NoUpdateError, err)
+}
+
+func Test_BuildQueryFrom_Normal(t *testing.T) {
+    columns := []string {"Phone", "Name"}
+    filter := Filter {"Age" : 1, "Name" : "Sam"}
+
+    res, vars := buildQueryFrom("TABLE", columns, filter, SelectOptions{})
+
+    key := "SELECT Phone, Name FROM TABLE WHERE "
+
+    assert.True(t, strings.HasPrefix(res, key))
+    res = res[len(key):]
+
+    assert.True(t, strings.Contains(res, "Age") && strings.Contains(res, "Name"))
+
+    if strings.HasPrefix(res, "Age") {
+        assert.Equal(t, 1, vars[0])
+        assert.Equal(t, "Sam", vars[1])
+    } else {
+        assert.Equal(t, "Sam", vars[0])
+        assert.Equal(t, 1, vars[1])
+    } 
+}
+
+func Test_BuildQueryFrom_NilsAndOptions(t *testing.T) {
+    res, vars := buildQueryFrom("TABLE", nil, nil, SelectOptions{Distinct: true})
+
+    key := "SELECT DISTINCT * FROM TABLE;"
+
+    assert.Equal(t, key, res)
+    assert.Equal(t, 0, len(vars))
+}
+
+func Test_ConvertInput(t *testing.T) {
+    type TestKeyPair struct{
+        Test interface{}
+        Key interface{}
+    }
+
+    tests := map[string]TestKeyPair {
+        "text" : TestKeyPair{"STRING_TEST", "STRING_TEST"},
+        "integer" : TestKeyPair{42, 42},
+        "json" : TestKeyPair{[]string{"TEST"}, `["TEST"]`},
+    }
+
+    shema := map[string]string{}
+
+    db, _ := sqlmock.New()
+    table := &Table{db, "junk", shema}
+
+    for trial, pair := range tests {
+        shema["COLUMN"] = trial
+        res := table.convertInput(pair.Test, "COLUMN")
+        assert.Equal(t, pair.Key, res)
+    }
+}
+
+func Test_ConvertOutput(t *testing.T) {
+    type TestKeyPair struct{
+        Test interface{}
+        Key interface{}
+    }
+
+    tests := map[string]TestKeyPair {
+        "text" : TestKeyPair{[]byte("STRING_TEST"), "STRING_TEST"},
+        "integer" : TestKeyPair{int64(42), 42},
+        "json" : TestKeyPair{[]byte(`["TEST"]`), []interface{}{"TEST"}, },
+    }
+
+    shema := map[string]string{}
+
+    db, _ := sqlmock.New()
+    table := &Table{db, "junk", shema}
+
+    for trial, pair := range tests {
+        shema["COLUMN"] = trial
+        res := table.convertOutput(pair.Test, "COLUMN")
+        assert.Equal(t, pair.Key, res)
+    }
 }

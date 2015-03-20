@@ -40,13 +40,6 @@ type Alias struct {
     Address string
 }
 
-func getDBSingleton() databases.TableInterface {
-    if aliases == nil {
-        panic("Aliases database not initialized")
-    }
-    return aliases
-}
-
 func Init() {
     if aliases == nil {
         aliases = databases.NewSchemaTable(postgres.Connection(), "aliases", schema)
@@ -59,7 +52,7 @@ func AddAlias(alias, address string) error {
         "Address" : address,
     }
 
-    _, err := getDBSingleton().InsertSchema(entry, "")
+    _, err := aliases.InsertSchema(entry, "")
 
     return err
 }
@@ -68,7 +61,7 @@ func UpdateAlias(alias, address string) error {
     to := databases.Filter{"Alias": alias}
     where := databases.Filter{"Address" : address}
 
-    return getDBSingleton().UpdateSchema(to, where)
+    return aliases.UpdateSchema(to, where)
 }
 
 func SetAlias(alias, address string) error {
@@ -87,7 +80,7 @@ func GetAddressOf(alias string) (string, error) {
     
     var val Alias
 
-    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    err := aliases.SelectRowSchema(cols, where, &val)
     
     if err != nil {
         return "", err
@@ -102,7 +95,7 @@ func GetAliasOf(address string) (string, error) {
     
     var val Alias
 
-    err := getDBSingleton().SelectRowSchema(cols, where, &val)
+    err := aliases.SelectRowSchema(cols, where, &val)
     
     if err != nil {
         return "", err
@@ -165,7 +158,7 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &alias)
     if err != nil {
-        code = http.StatusInternalServerError
+        code = http.StatusBadRequest
         return
     }
 

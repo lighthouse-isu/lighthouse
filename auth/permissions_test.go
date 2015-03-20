@@ -40,6 +40,7 @@ func Test_GetAuthLevel(t *testing.T) {
 	assert.Equal(t, 1, user.GetAuthLevel("Beacons", "GOOD"))
 	assert.Equal(t, -1, user.GetAuthLevel("Beacons", "WRONG TYPE"))
 	assert.Equal(t, -1, user.GetAuthLevel("Beacons", "BAD"))
+	assert.Equal(t, -1, user.GetAuthLevel("BAD TYPE", "JUNK"))
 }
 
 func Test_SetAuthLevel(t *testing.T) {
@@ -54,6 +55,15 @@ func Test_SetAuthLevel(t *testing.T) {
 
 	assert.Equal(t, 1, beaconPerms["KEY"].(int))
 	assert.Equal(t, 2, beaconPerms["OVERWRITE"].(int))
+
+	// Make sure this doesn't cause a panic
+	user.SetAuthLevel("BAD TYPE", "JUNK", 2)
+
+	user.Permissions["NEW TYPE"] = nil
+	user.SetAuthLevel("NEW TYPE", "KEY", 1)
+
+	newPerms := user.Permissions["NEW TYPE"].(map[string]interface{})
+	assert.Equal(t, 1, newPerms["KEY"].(int))
 }
 
 func Test_CanViewUser(t *testing.T) {

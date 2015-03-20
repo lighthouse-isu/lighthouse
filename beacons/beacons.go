@@ -34,8 +34,8 @@ const (
 
 var (
     TokenPermissionError = errors.New("beacons: user not permitted to access token")
-    NotEnoughParametersError = errors.New("beacons: not enough parameters given")
-    DuplicateInstanceError = errors.New("beacons: tried to add an instance which already exists")
+    NotEnoughParametersError = errors.New("beacons: not enough or invalid parameters given")
+    DuplicateBeaconError = errors.New("beacons: tried to add an beacon which already exists")
 )
 
 var beacons databases.TableInterface

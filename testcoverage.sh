@@ -2,15 +2,22 @@
 
 set -e
 
-list="$(find -path '.*test.go')"
+list="$(find -path '.*.go' | sort | uniq -u)"
 
 echo "mode: count\n" > profile.cov
+
+last=""
 
 for d in $list; do
 	path=$(echo $d | awk -F/ '{for (i=1; i<NF; i++) printf $i"/"}')
 
-	go test $path -v -coverprofile=cover.out -covermode=count
-    tail -n +2 cover.out >> profile.cov
+	if [[ $last != $path ]]
+	then
+		go test $path -v -coverprofile=cover.out -covermode=count
+	    tail -n +2 cover.out >> profile.cov
+	fi
+
+	last=$path
 done
 
 cat profile.cov | awk -F/ '!match($NF, "_testing_utils.go")' > no_utils.cov
