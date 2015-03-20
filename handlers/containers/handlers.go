@@ -15,7 +15,6 @@
 package containers
 
 import (
-    "fmt"
     "net/http"
 
     "github.com/lighthouse/lighthouse/databases"
@@ -62,7 +61,6 @@ func containerCreate(info handlers.HandlerInfo) *handlers.HandlerError {
     containerId, err := CreateContainer(appId, info.Host, name)
 
     if err != nil {
-        fmt.Println(err)
         errInfo.StatusCode = http.StatusInternalServerError
         errInfo.Cause = "control"
         errInfo.Message = "Failed to insert new container into database."

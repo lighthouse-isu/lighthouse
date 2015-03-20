@@ -236,7 +236,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &userInfo)
     if err != nil {
-        writeResponse(w, http.StatusInternalServerError, err)
+        writeResponse(w, http.StatusBadRequest, err)
         return
     }
 
@@ -292,8 +292,7 @@ func parseUserUpdateRequest(curUser, modUser *User, updateJSON []byte) (map[stri
 
     err := json.Unmarshal(updateJSON, &updates)
     if err != nil {
-        fmt.Println(err)
-        return nil, http.StatusInternalServerError
+        return nil, http.StatusBadRequest
     }
 
     updateValues := make(map[string]interface{})

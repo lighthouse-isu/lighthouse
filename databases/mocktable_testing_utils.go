@@ -15,8 +15,8 @@
 package databases
 
 import (
-    "errors"
     "reflect"
+    "strings"
 )
 
 /*
@@ -89,9 +89,16 @@ func (t *MockTable) Reload() {
 func CommonTestingTable(schema Schema) *MockTable {
     table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
 
+    uniqueCols := []int{}
+
     i := 0
-    for k, _ := range schema {
+    for k, t := range schema {
         table.Schema[k] = i
+
+        if strings.Contains(strings.ToLower(t), "unique") {
+            uniqueCols = append(uniqueCols, i)
+        }
+
         i += 1
     }
 
@@ -110,8 +117,10 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         for _, row := range table.Database {
-            if reflect.DeepEqual(row, addition) {
-                return -1, errors.New("duplicate row")
+            for _, col := range uniqueCols {
+                if reflect.DeepEqual(row[col], addition[col]) {
+                    return -1, DuplicateKeyError
+                }
             }
         }
 
@@ -158,7 +167,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         if !updated {
-            return errors.New("no update")
+            return NoUpdateError
         }
 
         return nil

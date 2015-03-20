@@ -31,21 +31,18 @@ import (
 	"github.com/lighthouse/lighthouse/databases"
 )
 
-func setupTests() (table *databases.MockTable, teardown func()) {
-    table = databases.CommonTestingTable(schema)
-    SetupCustomTestingTable(table)
-
-    teardown = func() {
-        TeardownTestingTable()
-    }
-
-    return
+func setup() {
+    SetupTestingTable()
 }
 
-func addUsers(table *databases.MockTable, users ...User) {
-	for _, user := range users {
+func teardown() {
+    TeardownTestingTable()
+}
 
-		table.InsertSchema(map[string]interface{}{
+func addUsers(list ...User) {
+	for _, user := range list {
+
+		users.InsertSchema(map[string]interface{}{
 	        "Email" : user.Email,
 	        "Salt" : user.Salt,
 	        "Password" : user.Password,
@@ -63,8 +60,14 @@ func handleAndServe(endpoint string, f http.HandlerFunc, r *http.Request) *httpt
     return w
 }
 
+func Test_WriteResponse_OK(t *testing.T) {
+    w := httptest.NewRecorder()
+    writeResponse(w, 200, nil)
+    assert.Equal(t, 200, w.Code)
+}
+
 func Test_CreateUser(t *testing.T) {
-    table, teardown := setupTests()
+    setup()
     defer teardown()
 
     email := "EMAIL"
@@ -78,13 +81,13 @@ func Test_CreateUser(t *testing.T) {
     }
 
     var actual User
-    table.SelectRowSchema(nil, nil, &actual)
+    users.SelectRowSchema(nil, nil, &actual)
 
 	assert.Equal(t, keyUser, actual)
 }
 
 func Test_CreateUserWithAuthLevel(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     email := "EMAIL"
@@ -99,13 +102,13 @@ func Test_CreateUserWithAuthLevel(t *testing.T) {
     }
 
     var actual User
-    table.SelectRowSchema(nil, nil, &actual)
+    users.SelectRowSchema(nil, nil, &actual)
 
 	assert.Equal(t, keyUser, actual)
 }
 
 func Test_GetUser_Valid(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     perms := NewPermission()
@@ -115,7 +118,7 @@ func Test_GetUser_Valid(t *testing.T) {
 	    "EMAIL", "SALT", "PASSWORD", 3, perms,
 	}
 
-    addUsers(table, keyUser)
+    addUsers(keyUser)
 
     user, err := GetUser(keyUser.Email)
 
@@ -128,7 +131,7 @@ func Test_GetUser_Valid(t *testing.T) {
 }
 
 func Test_GetUser_Invalid(t *testing.T) {
-	_, teardown := setupTests()
+	setup()
     defer teardown()
 
     user, err := GetUser("BAD EMAIL")
@@ -138,7 +141,7 @@ func Test_GetUser_Invalid(t *testing.T) {
 }
 
 func Test_GetCurrentUser(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     r, _ := http.NewRequest("GET", "/", nil)
@@ -151,7 +154,7 @@ func Test_GetCurrentUser(t *testing.T) {
 	    "EMAIL", "SALT", "PASSWORD", 3, perms,
 	}
 
-    addUsers(table, keyUser)
+    addUsers(keyUser)
 
     user := GetCurrentUser(r)
 
@@ -163,7 +166,7 @@ func Test_GetCurrentUser(t *testing.T) {
 }
 
 func Test_SetUserBeaconAuthLevel(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     perms := NewPermission()
@@ -175,24 +178,24 @@ func Test_SetUserBeaconAuthLevel(t *testing.T) {
 
     user := &User{Email: "EMAIL", Permissions: perms,}
 
-    addUsers(table, *user)
+    addUsers(*user)
 
     SetUserBeaconAuthLevel(user, "OVERWRITE", 1)
     SetUserBeaconAuthLevel(user, "NEW", 2)
 
     cols := []string{"Permissions"}
-    table.SelectRowSchema(cols, nil, user)
+    users.SelectRowSchema(cols, nil, user)
 
     assert.Equal(t, keyPerms, user.Permissions["Beacons"])
 }
 
 func Test_GetAllUsers(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
 	current := &User{Email: "current", AuthLevel: 1}
 
-	addUsers(table, 
+	addUsers(
 		*current,
 		User{Email : "lower",   AuthLevel : 0},
         User{Email : "equal",   AuthLevel : 1},
@@ -329,8 +332,26 @@ func Test_ParseUserUpdateRequest_Beacons_TooHigh(t *testing.T) {
 	assert.Nil(t, vals)
 }
 
+func Test_ParseUserUpdateRequest_BadJSON(t *testing.T) {
+    curPerms := NewPermission()
+    curPerms["Beacons"] = map[string]interface{}{
+        "Beacon" : ModifyAuthLevel,
+    }
+
+    modPerms := NewPermission()
+
+    curUser := &User{Permissions: curPerms}
+    modUser := &User{Permissions: modPerms}
+
+    updateStr := "{"
+
+    vals, code := parseUserUpdateRequest(curUser, modUser, []byte(updateStr))
+    assert.Equal(t, http.StatusBadRequest, code)
+    assert.Nil(t, vals)
+}
+
 func Test_HandleListUsers(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     keyEmail := "EMAIL"
@@ -339,7 +360,7 @@ func Test_HandleListUsers(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/", nil)
     session.SetValue(r, "auth", "email", keyEmail)
 
-    addUsers(table, User{Email: keyEmail})
+    addUsers(User{Email: keyEmail})
 
     http.Handler(http.HandlerFunc(handleListUsers)).ServeHTTP(w, r)
 
@@ -348,7 +369,7 @@ func Test_HandleListUsers(t *testing.T) {
 }
 
 func Test_HandleGetUsers_Valid(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     keyEmail := "EMAIL"
@@ -356,7 +377,7 @@ func Test_HandleGetUsers_Valid(t *testing.T) {
 	r, _ := http.NewRequest("GET", "/EMAIL", nil)
 
     session.SetValue(r, "auth", "email", keyEmail)
-    addUsers(table, User{Email: keyEmail, AuthLevel: 2})
+    addUsers(User{Email: keyEmail, AuthLevel: 2})
 
     w := handleAndServe("/{Email}", handleGetUser, r)
 
@@ -364,16 +385,13 @@ func Test_HandleGetUsers_Valid(t *testing.T) {
 }
 
 func Test_HandleGetUsers_NotFound(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
 	r, _ := http.NewRequest("GET", "/BAD", nil)
 
     session.SetValue(r, "auth", "email", "USER")
-    addUsers(
-    	table, 
-    	User{Email: "USER", AuthLevel: 0},
-    )
+    addUsers(User{Email: "USER", AuthLevel: 0})
 
     w := handleAndServe("/{Email}", handleGetUser, r)
 
@@ -381,14 +399,13 @@ func Test_HandleGetUsers_NotFound(t *testing.T) {
 }
 
 func Test_HandleGetUsers_NotAuthorized(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
 	r, _ := http.NewRequest("GET", "/ADMIN", nil)
 
     session.SetValue(r, "auth", "email", "USER")
     addUsers(
-    	table, 
     	User{Email: "ADMIN", AuthLevel: 2},
     	User{Email: "USER", AuthLevel: 0},
     )
@@ -399,7 +416,7 @@ func Test_HandleGetUsers_NotAuthorized(t *testing.T) {
 }
 
 func Test_HandleUpdateUser_Valid(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     keyUser := User{
@@ -424,7 +441,7 @@ func Test_HandleUpdateUser_Valid(t *testing.T) {
     	},
     }
 
-    addUsers(table, baseUser)
+    addUsers(baseUser)
 
     updateJSON, _ := json.Marshal(
     	map[string]interface{}{
@@ -442,14 +459,14 @@ func Test_HandleUpdateUser_Valid(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    table.SelectRowSchema(nil, nil, &user)
+    users.SelectRowSchema(nil, nil, &user)
 
     assert.Equal(t, http.StatusOK, w.Code)
     assert.Equal(t, keyUser, user)
 }
 
 func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     keyUser := User{
@@ -463,7 +480,7 @@ func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
     	},
     }
 
-    addUsers(table, keyUser)
+    addUsers(keyUser)
 
     updateJSON := []byte(`{"AuthLevel" : 1}`)
 
@@ -474,18 +491,66 @@ func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    table.SelectRowSchema(nil, nil, &user)
+    users.SelectRowSchema(nil, nil, &user)
 
     assert.Equal(t, http.StatusForbidden, w.Code)
     assert.Equal(t, keyUser, user)
 }
 
+func Test_HandleUpdateUser_CantView(t *testing.T) {
+    setup()
+    defer teardown()
+
+    actingUser := User {
+        Email : "USER", AuthLevel : 0,
+    }
+
+    modUser := User {
+        Email : "USER2", AuthLevel : 1,
+    }
+
+    addUsers(actingUser, modUser)
+
+    r, _ := http.NewRequest("PUT", "/USER2", bytes.NewBuffer([]byte(`{}`)))
+
+    session.SetValue(r, "auth", "email", "USER")
+
+    w := handleAndServe("/{Email}", handleUpdateUser, r)
+
+    var user User
+    users.SelectRowSchema(nil, nil, &user)
+
+    assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func Test_HandleUpdateUser_UnknownUser(t *testing.T) {
+    setup()
+    defer teardown()
+
+    actingUser := User {
+        Email : "USER", AuthLevel : 0,
+    }
+
+    addUsers(actingUser)
+
+    r, _ := http.NewRequest("PUT", "/BAD_USER", bytes.NewBuffer([]byte(`{}`)))
+
+    session.SetValue(r, "auth", "email", "USER")
+
+    w := handleAndServe("/{Email}", handleUpdateUser, r)
+
+    var user User
+    users.SelectRowSchema(nil, nil, &user)
+
+    assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
 func Test_HandleCreateUser_Valid(t *testing.T) {
-	table, teardown := setupTests()
+	setup()
     defer teardown()
 
     admin := User{Email : "ADMIN", AuthLevel : 1}
-    addUsers(table, admin)
+    addUsers(admin)
 
     add := map[string]string{"Email": "USER", "Password": "PASSWORD"}
     addJSON, _ := json.Marshal(add)
@@ -497,11 +562,66 @@ func Test_HandleCreateUser_Valid(t *testing.T) {
 
     var user User
     where := databases.Filter{"Email" : "USER"}
-    table.SelectRowSchema(nil, where, &user)
+    users.SelectRowSchema(nil, where, &user)
 
     assert.Equal(t, http.StatusOK, w.Code)
     assert.Equal(t, "USER", user.Email)
     assert.Equal(t, SaltPassword("PASSWORD", user.Salt), user.Password)
     assert.Equal(t, 0, user.AuthLevel)
 }
+
+func Test_HandleCreateUser_Unauthorized(t *testing.T) {
+    setup()
+    defer teardown()
+
+    admin := User{Email : "ADMIN", AuthLevel : 0}
+    addUsers(admin)
+
+    add := map[string]string{"Email": "USER", "Password": "PASSWORD"}
+    addJSON, _ := json.Marshal(add)
+
+    r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(addJSON))
+    session.SetValue(r, "auth", "email", "ADMIN")
+
+    w := handleAndServe("/", handleCreateUser, r)
+
+    assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func Test_HandleCreateUser_BadJSON(t *testing.T) {
+    setup()
+    defer teardown()
+
+    admin := User{Email : "ADMIN", AuthLevel : 1}
+    addUsers(admin)
+
+    add := []int{1}
+    addJSON, _ := json.Marshal(add)
+
+    r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(addJSON))
+    session.SetValue(r, "auth", "email", "ADMIN")
+
+    w := handleAndServe("/", handleCreateUser, r)
+
+    assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func Test_HandleCreateUser_Exists(t *testing.T) {
+    setup()
+    defer teardown()
+
+    admin := User{Email : "ADMIN", AuthLevel : 1}
+    addUsers(admin)
+
+    add := map[string]string{"Email": "ADMIN", "Password": "PASSWORD"}
+    addJSON, _ := json.Marshal(add)
+
+    r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(addJSON))
+    session.SetValue(r, "auth", "email", "ADMIN")
+
+    w := handleAndServe("/", handleCreateUser, r)
+
+    assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 

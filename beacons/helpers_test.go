@@ -160,6 +160,30 @@ func Test_UpdateBeaconData(t *testing.T) {
     assert.Equal(t, "ADDR_PASS", result.Address)
 }
 
+func Test_UpdateInstanceData(t *testing.T) {
+    setup()
+    defer teardown()
+
+    testInstanceData := map[string]interface{}{
+        "InstanceAddress" : "INST_ADDR", 
+        "Name" : "NAME",
+        "CanAccessDocker" : false,
+        "BeaconAddress" : "BEACON_ADDR", 
+    }
+
+    instances.InsertSchema(testInstanceData, "")
+
+    keyInstance := instanceData {
+        "INST_ADDR", "NAME_PASS", true, "BEACON_PASS",
+    }
+
+    var result instanceData
+    
+    updateInstance(keyInstance)
+    instances.SelectRowSchema(nil, nil, &result)
+    assert.Equal(t, keyInstance, result)
+}
+
 func Test_GetBeaconData_Found(t *testing.T) {
     setup()
     defer teardown()
@@ -300,45 +324,53 @@ func Test_ListInstances_BadUser(t *testing.T) {
     defer teardown()
 
     beacons.InsertSchema(map[string]interface{}{
-        "Address" : "BEACON_ADDR 1", "Token" : "TOKEN",
-    }, "")
-
-    beacons.InsertSchema(map[string]interface{}{
-        "Address" : "BEACON_ADDR 2", "Token" : "TOKEN",
+        "Address" : "BEACON_ADDR", "Token" : "TOKEN",
     }, "")
 
     auth.CreateUser("EMAIL", "", "")
     user, _ := auth.GetUser("EMAIL")
-    auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR 1", auth.OwnerAuthLevel)
 
-    goodInstance := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 1",
-        "Name" : "NAME 1",
+    instance := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR",
+        "Name" : "NAME",
         "CanAccessDocker" : true,
-        "BeaconAddress" : "BEACON_ADDR 1", 
+        "BeaconAddress" : "BEACON_ADDR", 
     }
 
-    badInstance := map[string]interface{} {
-        "InstanceAddress" : "INST_ADDR 2",
-        "Name" : "NAME 2",
-        "CanAccessDocker" : false,
-        "BeaconAddress" : "BEACON_ADDR 2", 
-    }
+    instances.InsertSchema(instance, "")
 
-    instances.InsertSchema(goodInstance, "")
-    instances.InsertSchema(badInstance, "")
+    key := []map[string]interface{}{}
 
-    key := goodInstance
-    key["Alias"] = ""
+    instanceList, err := getInstancesList("BEACON_ADDR", user, false)
 
-    instanceList, err := getInstancesList("BEACON_ADDR 1", user, false)
-
-    assert.Nil(t, err, "getInstancesList returned an error")
-    assert.Equal(t, 1, len(instanceList))
-    assert.Equal(t, key, instanceList[0])
+    assert.Nil(t, err)
+    assert.Equal(t, key, instanceList)
 }
 
-func Test_RefreshVMListOf(t *testing.T) {
+func Test_ListInstances_BadBeacon(t *testing.T) {
+    setup()
+    defer teardown()
+
+    auth.CreateUser("EMAIL", "", "")
+    user, _ := auth.GetUser("EMAIL")
+
+    instance := map[string]interface{} {
+        "InstanceAddress" : "INST_ADDR",
+        "Name" : "NAME",
+        "CanAccessDocker" : true,
+        "BeaconAddress" : "BEACON_ADDR", 
+    }
+
+    instances.InsertSchema(instance, "")
+
+    key := []map[string]interface{}{}
+
+    list, err := getInstancesList("BEACON_ADDR", user, false)
+    assert.Nil(t, err)
+    assert.Equal(t, key, list)
+}
+
+func Test_RefreshVMListOf_Valid(t *testing.T) {
     setup()
     defer teardown()
 
@@ -359,12 +391,97 @@ func Test_RefreshVMListOf(t *testing.T) {
     defer s.Close()
 
     url := strings.Replace(s.URL, "http://", "", 1)
+    data := beaconData{Address: url}
 
-    beacons.InsertSchema(map[string]interface{} {
-        "Address" : url, 
-        "Token" : "", 
+    refreshVMListOf(data)
+
+    key := instanceData {
+        fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version),
+        vm.Name,
+        vm.CanAccessDocker,
+        data.Address,
+    }
+
+    var inst instanceData
+    instances.SelectRowSchema(nil, nil, &inst)
+
+    assert.Equal(t, key, inst)
+}
+
+func Test_RefreshVMListOf_BadURL(t *testing.T) {
+    setup()
+    defer teardown()
+
+    data := beaconData{Address: "BAD ADDRESS"}
+    err := refreshVMListOf(data)
+
+    assert.NotNil(t, err)
+}
+
+func Test_RefreshVMListOf_ErrorCode(t *testing.T) {
+    setup()
+    defer teardown()
+
+    f := func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(500)
+    }
+
+    s := setupServer(&f)
+    defer s.Close()
+
+    url := strings.Replace(s.URL, "http://", "", 1)
+    data := beaconData{Address: url}
+
+    err := refreshVMListOf(data)
+    assert.NotNil(t, err)
+}
+
+func Test_RefreshVMListOf_BadJSON(t *testing.T) {
+    setup()
+    defer teardown()
+
+    f := func(w http.ResponseWriter, r *http.Request) {
+        fmt.Fprint(w, "gobbledygook")
+    }
+
+    s := setupServer(&f)
+    defer s.Close()
+
+    url := strings.Replace(s.URL, "http://", "", 1)
+    data := beaconData{Address: url}
+
+    err := refreshVMListOf(data)
+    assert.NotNil(t, err)
+}
+
+func Test_RefreshVMListOf_Update(t *testing.T) {
+    setup()
+    defer teardown()
+
+    vm := structs.VM {
+        Name : "NAME",
+        Address : "ADDR",
+        Port : "1234",
+        Version : "v1.12",
+        CanAccessDocker : true,
+    }
+
+    instances.InsertSchema(map[string]interface{}{
+        "InstanceAddress" : fmt.Sprintf("%s:%s/%s", vm.Address, vm.Port, vm.Version),
+        "Name" : "NAME_FAIL",
+        "CanAccessDocker" : false,
+        "BeaconAddress" : "ADDR_FAIL",
     }, "")
 
+    f := func(w http.ResponseWriter, r *http.Request) {
+        val, _ := json.Marshal([]structs.VM{vm})
+        fmt.Fprint(w, string(val))
+    }
+
+    s := setupServer(&f)
+    defer s.Close()
+
+    url := strings.Replace(s.URL, "http://", "", 1)
     data := beaconData{Address: url}
 
     refreshVMListOf(data)

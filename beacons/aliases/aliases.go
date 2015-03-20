@@ -156,7 +156,7 @@ func handleUpdateAlias(w http.ResponseWriter, r *http.Request) {
 
     err = json.Unmarshal(reqBody, &alias)
     if err != nil {
-        code = http.StatusInternalServerError
+        code = http.StatusBadRequest
         return
     }
 
