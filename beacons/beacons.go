@@ -24,7 +24,6 @@ import (
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 const (
@@ -65,13 +64,19 @@ type instanceData struct {
     BeaconAddress string
 }
 
-func Init() {
+func Init(reload bool) {
     if beacons == nil {
-        beacons = databases.NewSchemaTable(postgres.Connection(), "beacons", beaconSchema)
+        beacons = databases.NewSchemaTable(nil, "beacons", beaconSchema)
     }
 
     if instances == nil {
-        instances = databases.NewSchemaTable(postgres.Connection(), "instances", instanceSchema)
+        instances = databases.NewSchemaTable(nil, "instances", instanceSchema)
+    }
+
+    if reload {
+        beacons.Reload()
+        instances.Reload()
+        LoadBeacons()
     }
 }
 
@@ -137,8 +142,6 @@ func LoadBeacons() {
 }
 
 func Handle(r *mux.Router) {
-    LoadBeacons()
-
     r.HandleFunc("/token/{Endpoint:.*}", handleUpdateBeaconToken).Methods("PUT")
 
     r.HandleFunc("/create", handleBeaconCreate).Methods("POST")

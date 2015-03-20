@@ -31,10 +31,32 @@ import (
     
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 
 var SECRET_HASH_KEY string
+
+func Init(reload bool) {
+    if users == nil { // defined in users.go
+        users = databases.NewSchemaTable(databases.DefaultConnection(), "users", schema)
+    }
+
+    config := LoadAuthConfig()
+    SECRET_HASH_KEY = config.SecretKey
+
+    if reload {
+        users.Reload()
+        for _, admin := range config.Admins {
+            admin.convertPermissionsFromDB()
+
+            admin.Salt = GenerateSalt()
+            admin.Password = SaltPassword(admin.Password, admin.Salt)
+
+            addUser(admin)
+        }
+    }
+}
 
 func SaltPassword(password, salt string) string {
     key := fmt.Sprintf("%s:%s:%s", password, salt, SECRET_HASH_KEY)
@@ -105,19 +127,6 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
 }
 
 func Handle(r *mux.Router) {
-    config := LoadAuthConfig()
-
-    SECRET_HASH_KEY = config.SecretKey
-
-    for _, admin := range config.Admins {
-        admin.convertPermissionsFromDB()
-
-        admin.Salt = GenerateSalt()
-        admin.Password = SaltPassword(admin.Password, admin.Salt)
-
-        addUser(admin)
-    }
-
     r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
         loginForm := &LoginForm{}
         body, _ := ioutil.ReadAll(r.Body)

@@ -37,6 +37,8 @@ type MockTable struct {
     MockUpdateSchema     func(map[string]interface{}, map[string]interface{})(error)
     MockSelectRowSchema  func([]string, Filter, interface{})(error)
     MockSelectSchema     func([]string, Filter, SelectOptions)(ScannerInterface, error)
+
+    MockReload           func()
 }
 
 func (t *MockTable) Insert(s string, i interface{})(e error) {
@@ -76,6 +78,11 @@ func (t *MockTable) SelectRowSchema(c []string, w Filter, d interface{})(e error
 
 func (t *MockTable) SelectSchema(c []string, w Filter, opts SelectOptions)(s ScannerInterface, e error) {
     if t.MockSelectSchema != nil { return t.MockSelectSchema(c, w, opts) }
+    return
+}
+
+func (t *MockTable) Reload() {
+    if t.MockReload != nil { t.MockReload() }
     return
 }
 

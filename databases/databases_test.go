@@ -58,7 +58,7 @@ func makeTestingDatabase(t *testing.T) (*MockDatabase, testCallData, Schema) {
 
 func Test_NewTable(t *testing.T) {
     db, call, _ := makeTestingDatabase(t)
-    NewTable(db, "test_table")
+    NewTable(db, "test_table").Reload()
 
     q := call["exec"].query
 
@@ -70,7 +70,7 @@ func Test_NewTable(t *testing.T) {
 
 func Test_NewSchemaTable(t *testing.T) {
     db, call, schema := makeTestingDatabase(t)
-    NewSchemaTable(db, "test_table", schema)
+    NewSchemaTable(db, "test_table", schema).Reload()
 
     q := call["exec"].query
 

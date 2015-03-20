@@ -54,18 +54,43 @@ const (
     valueColumn string = "valueColumn"
 )
 
+var (
+    defaultConnection DBInterface
+)
+
+func SetDefaultConnection(conn DBInterface) {
+    defaultConnection = conn
+}
+
+func DefaultConnection() DBInterface {
+    return defaultConnection
+}
+
 func NewTable(db DBInterface, table string) TableInterface {
+    if db == nil {
+        db = defaultConnection
+    }
+
     this := &Table{db, table, nil}
-    this.drop()
-    this.init()
     return this
 }
 
 func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface {
+    if db == nil {
+        db = defaultConnection
+    }
+
     this := &Table{db, table, schema}
-    this.drop()
-    this.initSchema()
     return this
+}
+
+func (this *Table) Reload() {
+    this.drop()
+    if this.schema != nil {
+        this.initSchema()
+    } else {
+        this.init()
+    }
 }
 
 func (this *Table) init() {
