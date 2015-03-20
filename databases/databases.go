@@ -23,6 +23,8 @@ import (
     "encoding/json"
 
     "database/sql"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 var (
@@ -31,6 +33,7 @@ var (
     UnknownError = errors.New("databases: unknown error")
     KeyNotFoundError = errors.New("databases: given key not found")
     NoRowsError = errors.New("databases: result was empty")
+    DuplicateKeyError = errors.New("databases: key already exists")
 )
 
 type Table struct {
@@ -137,6 +140,10 @@ func (this *Table) convertOutput(orig interface{}, col string) interface{} {
 
         return read
     }
+
+    if strings.Contains(colType, "int") {
+        return int(orig.(int64))
+    }
     
     return orig
 }
@@ -149,12 +156,52 @@ func (this *Table) Insert(key string, value interface{}) error {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
 
-func (this *Table) InsertSchema(values map[string]interface{}) error {
+func (this *Table) InsertSchema(values map[string]interface{}, returning string) (interface{}, error) {
+    if returning == "" {
+        err := this.insertSchema_noReturn(values)
+        return nil, err
+    } else {
+        return this.insertSchema_return(values, returning)
+    }
+}
+
+func (this *Table) insertSchema_return(values map[string]interface{}, returnCol string) (interface{}, error) {
+    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
+    var res interface{}
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING %s`,
+        this.table, colBuf.String(), valBuf.String(), returnCol)
+    err := this.db.QueryRow(query, queryVals...).Scan(&res)
+
+    if err != nil {
+        return nil, err
+    }
+
+    return res, nil
+}
+
+func (this *Table) insertSchema_noReturn(values map[string]interface{}) (error) {
+    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
+    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
+        this.table, colBuf.String(), valBuf.String())
+    res, err := this.db.Exec(query, queryVals...)
+
+    if err == nil {
+        cnt, err := res.RowsAffected()
+
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
+
+    return err
+}
+
+func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes.Buffer, bytes.Buffer, []interface{}){
     var colBuf, valBuf bytes.Buffer
     queryVals := make([]interface{}, len(values))
     i := 0
@@ -174,9 +221,36 @@ func (this *Table) InsertSchema(values map[string]interface{}) error {
         i += 1
     }
 
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s)`,
-        this.table, colBuf.String(), valBuf.String())
-    res, err := this.db.Exec(query, queryVals...)
+    return colBuf, valBuf, queryVals
+}
+
+func (this *Table) DeleteRowsSchema(where Filter) (error) {
+    var buffer bytes.Buffer
+
+    buffer.WriteString("DELETE FROM ")
+    buffer.WriteString(this.table)
+    buffer.WriteString(" WHERE ")
+    vals := make([]interface{}, len(where))
+    
+    i := 1
+    for col, val := range where {
+        if i != 1 {
+            buffer.WriteString(" && ")
+        }
+
+        buffer.WriteString(col)
+        buffer.WriteString(" = ")
+        buffer.WriteString(fmt.Sprintf("($%d)", i))
+
+        vals[i - 1] = val
+        i += 1
+    }
+
+    buffer.WriteString(";")
+
+    query := buffer.String()
+
+    res, err := this.db.Exec(query, vals...)
 
     if err == nil {
         cnt, err := res.RowsAffected()
@@ -187,7 +261,7 @@ func (this *Table) InsertSchema(values map[string]interface{}) error {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -200,7 +274,7 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
     _, err := this.db.Exec(query, key, string(json))
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -259,7 +333,7 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
     }
 
     if err != nil {
-        fmt.Println(err.Error())
+        logging.Info(err.Error())
     }
     return err
 }
@@ -378,24 +452,7 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
         }
     }
 
-    if err != nil {
-        return err
-    }
-
     return err
-}
-
-//Deprecated (Really, don't ever use this. It's going away in a week)
-func (this *Table) CustomSelect(query string, queryParams []string) (row *sql.Row) {
-    var vals = make([]interface{}, len(queryParams))
-
-    for i, param := range queryParams {
-        vals[i] = param
-    }
-
-    row = this.db.QueryRow(query, vals)
-
-    return
 }
 
 func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {

@@ -12,39 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package users
+package applications
 
 import (
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
-var users databases.TableInterface
-
-type User struct {
-    Email string
-    Salt string
-    Password string
+func SetupCustomTestingTable(table *databases.MockTable) {
+    applications = table
 }
 
-func getDBSingleton() databases.TableInterface {
-    if users == nil {
-        panic("Users database not initialized")
-    }
-    return users
+func SetupTestingTable() {
+    applications = databases.CommonTestingTable(schema) // schema defined in applications.go
 }
 
-func Init() {
-    if users == nil {
-        users = databases.NewTable(postgres.Connection(), "users")
-    }
-}
-
-func CreateUser(email, salt, password string) error {
-    return getDBSingleton().Insert(email, User{email, salt, password})
-}
-
-func GetUser(email string) (user User, err error) {
-    err = getDBSingleton().SelectRow(email, &user)
-    return
+func TeardownTestingTable() {
+    applications = nil
 }

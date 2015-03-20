@@ -19,7 +19,7 @@ import (
     "net/http/httptest"
 
     "github.com/lighthouse/lighthouse/databases"
-
+    "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
@@ -34,14 +34,16 @@ func TeardownTestingTable() {
     instances = nil
 }
 
-func setup() (func()) {
+func setup() {
     SetupTestingTable()
+    auth.SetupTestingTable()
     aliases.SetupTestingTable()
+}
 
-    return func() {
-        TeardownTestingTable()
-        aliases.TeardownTestingTable()
-    }
+func teardown() {
+    TeardownTestingTable()
+    auth.TeardownTestingTable()
+    aliases.TeardownTestingTable()
 }
 
 func setupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {

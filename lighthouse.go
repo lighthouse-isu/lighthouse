@@ -24,9 +24,10 @@ import (
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
-    "github.com/lighthouse/lighthouse/users"
     "github.com/lighthouse/lighthouse/handlers/docker"
-    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/handlers/containers"
+    "github.com/lighthouse/lighthouse/handlers/containers/applications"
+	"github.com/lighthouse/lighthouse/session"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -67,9 +68,12 @@ func main() {
 
     logging.Info("Starting...")
 
-    users.Init()
+    auth.Init()
     beacons.Init()
     aliases.Init()
+    containers.Init()
+    applications.Init()
+
 
     baseRouter := mux.NewRouter()
 

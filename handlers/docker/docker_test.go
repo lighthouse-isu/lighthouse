@@ -77,7 +77,7 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -112,7 +112,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/?test=pass", nil)
-    info := handlers.HandlerInfo{"/?test=pass", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"/?test=pass", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -153,7 +153,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(testBody))
-    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{testPayload}, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{testPayload}, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -178,7 +178,7 @@ func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -208,7 +208,7 @@ func Test_DockerRequestHandler_ServerError(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -238,7 +238,7 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
-    info := handlers.HandlerInfo{"", "localhost:8080", nil, r}
+    info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
 
@@ -271,7 +271,7 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     router.ServeHTTP(httptest.NewRecorder(), r)
 
-    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r}
+    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r, nil}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")
