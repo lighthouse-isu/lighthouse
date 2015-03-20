@@ -248,6 +248,7 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
         for col, _ := range where {
             whereKeys = append(whereKeys, col)
         }
+        sort.Strings(whereKeys)
 
         i := 1
         for _, col := range whereKeys {
