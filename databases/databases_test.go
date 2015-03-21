@@ -44,6 +44,7 @@ func Test_NewTable(t *testing.T) {
     var inter interface{}
     inter = NewTable(db, "test_table")
     table := inter.(*Table)
+    table.Reload()
 
     assert.Nil(t, table.schema)
     assert.Equal(t, "test_table", table.table)
@@ -64,6 +65,7 @@ func Test_NewSchemaTable(t *testing.T) {
     var inter interface{}
     inter = NewSchemaTable(db, "test_table", testSchema)
     table := inter.(*Table)
+    table.Reload()
 
     assert.Equal(t, testSchema, table.schema)
     assert.Equal(t, "test_table", table.table)

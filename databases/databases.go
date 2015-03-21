@@ -81,6 +81,10 @@ func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface 
         db = defaultConnection
     }
 
+    if len(schema) == 0 {
+        panic("No schema given to database")
+    }
+
     this := &Table{db, table, schema}
     return this
 }
@@ -102,10 +106,6 @@ func (this *Table) init() {
 }
 
 func (this *Table) initSchema() {
-    if len(this.schema) == 0 {
-        panic("No schema given to database")
-    }
-
     var buffer bytes.Buffer
     first := true
 
