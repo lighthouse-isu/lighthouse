@@ -24,8 +24,6 @@ import (
     "encoding/json"
 
     "database/sql"
-
-    "github.com/lighthouse/lighthouse/logging"
 )
 
 var (
@@ -181,9 +179,6 @@ func (this *Table) Insert(key string, value interface{}) error {
 
     _, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -305,9 +300,6 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
         }
     }
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -318,9 +310,6 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
 
     _, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -390,9 +379,6 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
         }
     }
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -403,7 +389,7 @@ func (this *Table) SelectRow(key string, value interface{}) error {
     row := this.db.QueryRow(query, key)
 
     if row == nil {
-        return errors.New("unknown database error")
+        return UnknownError
     }
 
     var data interface{}
@@ -491,7 +477,7 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     row := this.db.QueryRow(query, queryVals...)
 
     if row == nil {
-        return errors.New("unknown database error")
+        return UnknownError
     }
 
     values := make([]interface{}, len(columns))
