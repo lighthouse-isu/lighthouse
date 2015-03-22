@@ -71,3 +71,11 @@ func Test_GetApplicationId(t *testing.T) {
     assert.Equal(t, appB, idB,
         "GetApplicationId should return the correct ID.")
 }
+
+func Test_Init(t *testing.T) {
+    SetupTestingTable()
+    defer TeardownTestingTable()
+
+    // Basically just making sure this doesn't panic...
+    Init(true)
+}

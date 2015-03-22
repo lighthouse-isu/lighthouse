@@ -160,3 +160,11 @@ func Test_Handle(t *testing.T) {
         tryHandleTest(t, req, r)
     }
 }
+
+func Test_Init(t *testing.T) {
+    SetupTestingTable()
+    defer TeardownTestingTable()
+
+    // Basically just making sure this doesn't panic...
+    Init(true)
+}

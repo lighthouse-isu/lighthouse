@@ -17,6 +17,7 @@ package auth
 
 import (
     "testing"
+
     "encoding/json"
     "net/http"
     "net/http/httptest"
@@ -152,7 +153,7 @@ func Test_Handle(t *testing.T) {
         Method string
         Endpoint string
     } {
-        {"POST",  "/login"},
+        {"POST", "/login"},
         {"GET",  "/logout"},
         {"GET",  "/users/list"},
         {"GET",  "/users/TEST"},
@@ -167,4 +168,12 @@ func Test_Handle(t *testing.T) {
         req, _ := http.NewRequest(m, e, bytes.NewBuffer([]byte("")))
         tryHandleTest(t, req, r)
     }
+}
+
+func Test_Init(t *testing.T) {
+    SetupTestingTable()
+    defer TeardownTestingTable()
+
+    // Basically just making sure this doesn't panic...
+    Init(true)
 }

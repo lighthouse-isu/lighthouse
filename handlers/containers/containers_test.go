@@ -176,3 +176,11 @@ func Test_containerHandler(t *testing.T) {
     err = GetContainerById(0, &container)
     assert.Equal(t, databases.NoRowsError, err)
 }
+
+func Test_Init(t *testing.T) {
+    SetupTestingTable()
+    defer TeardownTestingTable()
+
+    // Basically just making sure this doesn't panic...
+    Init(true)
+}
