@@ -26,6 +26,7 @@ import (
 
     "github.com/lighthouse/beacon/structs"
 
+    "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/beacons/aliases"
 )
@@ -102,6 +103,24 @@ func Test_AddBeaconData_Dup(t *testing.T) {
 
     assert.NotNil(t, addBeacon(testBeaconData))
 }
+
+func Test_RemoveBeacon(t *testing.T) {
+    setup()
+    defer teardown()
+
+    beacons.InsertSchema(map[string]interface{}{
+        "Address" : "ADDR",
+        "Token" : "TOKEN",
+    }, "")
+
+    removeBeacon("ADDR")
+
+    var values beaconData
+    err := beacons.SelectRowSchema(nil, nil, &values)
+
+    assert.Equal(t, databases.NoRowsError, err)
+}
+
 
 func Test_AddInstanceData_New(t *testing.T) {
     setup()

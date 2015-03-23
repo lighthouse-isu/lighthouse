@@ -53,6 +53,11 @@ func addBeacon(beacon beaconData) error {
     return err
 }
 
+func removeBeacon(address string) error {
+    where := databases.Filter{"Address" : address}
+    return beacons.DeleteRowsSchema(where)
+}
+
 func addInstance(instance instanceData) error {
     entry := map[string]interface{}{
         "InstanceAddress" : instance.InstanceAddress,
