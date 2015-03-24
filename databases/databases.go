@@ -411,19 +411,7 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
         buffer.WriteString("DISTINCT ")
     }
 
-    if columns == nil {
-        buffer.WriteString("*")
-    } else {
-        first := true
-        for _, col := range columns {
-            if !first {
-                buffer.WriteString(", ")
-            }
-            buffer.WriteString(col)
-
-            first = false
-        }
-    }
+    buffer.WriteString(strings.Join(columns, ", "))
 
     buffer.WriteString(" FROM ") 
     buffer.WriteString(table)
@@ -461,8 +449,6 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
 }
 
 func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
-    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
-
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 
@@ -473,6 +459,8 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
         }
         sort.Strings(columns)
     }
+
+    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
 
     row := this.db.QueryRow(query, queryVals...)
 
@@ -509,8 +497,6 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
 }
 
 func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
-    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
-
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 
@@ -520,6 +506,8 @@ func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptio
             i += 1
         }
     }
+
+    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
 
     rows, err := this.db.Query(query, queryVals...)
 
