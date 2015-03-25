@@ -36,6 +36,13 @@ type testObject struct {
     Phone string
 }
 
+func Test_SetAndGetDefaultConnection(t *testing.T) {
+    db, _ := sqlmock.New()
+
+    SetDefaultConnection(db)
+    assert.Equal(t, db, DefaultConnection())
+}
+
 func Test_NewTable(t *testing.T) {
     db, _ := sqlmock.New()
 
@@ -44,6 +51,7 @@ func Test_NewTable(t *testing.T) {
     var inter interface{}
     inter = NewTable(db, "test_table")
     table := inter.(*Table)
+    table.Reload()
 
     assert.Nil(t, table.schema)
     assert.Equal(t, "test_table", table.table)
@@ -52,6 +60,17 @@ func Test_NewTable(t *testing.T) {
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
+}
+
+func Test_NewTableDefault(t *testing.T) {
+    db, _ := sqlmock.New()
+    SetDefaultConnection(db)
+
+    var inter interface{}
+    inter = NewTable(nil, "test_table")
+    table := inter.(*Table)
+
+    assert.Equal(t, db, table.db)
 }
 
 func Test_NewSchemaTable(t *testing.T) {
@@ -64,6 +83,7 @@ func Test_NewSchemaTable(t *testing.T) {
     var inter interface{}
     inter = NewSchemaTable(db, "test_table", testSchema)
     table := inter.(*Table)
+    table.Reload()
 
     assert.Equal(t, testSchema, table.schema)
     assert.Equal(t, "test_table", table.table)
@@ -72,6 +92,17 @@ func Test_NewSchemaTable(t *testing.T) {
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
+}
+
+func Test_NewSchemaTableDefault(t *testing.T) {
+    db, _ := sqlmock.New()
+    SetDefaultConnection(db)
+
+    var inter interface{}
+    inter = NewSchemaTable(nil, "test_table", testSchema)
+    table := inter.(*Table)
+    
+    assert.Equal(t, db, table.db)
 }
 
 func Test_NewSchemaTable_Panic(t *testing.T) {

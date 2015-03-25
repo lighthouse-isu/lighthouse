@@ -25,7 +25,6 @@ import (
 
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 var aliases databases.TableInterface
@@ -40,9 +39,14 @@ type Alias struct {
     Address string
 }
 
-func Init() {
+func Init(reload bool) {
     if aliases == nil {
-        aliases = databases.NewSchemaTable(postgres.Connection(), "aliases", schema)
+        aliases = databases.NewSchemaTable(nil, "aliases", schema)
+    }
+
+    if reload {
+        aliases.Reload()
+        LoadAliases()
     }
 }
 
@@ -104,34 +108,28 @@ func GetAliasOf(address string) (string, error) {
     return val.Alias, nil
 }
 
-func LoadAliases() map[string]string {
+func LoadAliases() {
     var fileName string
-    if _, err := os.Stat("/config/aliases.json"); os.IsNotExist(err) {
+    if _, err := os.Stat("./config/aliases.json.dev"); !os.IsNotExist(err)  {
+        fileName = "./config/aliases.json.dev"
+    } else if _, err := os.Stat("./config/aliases.json"); !os.IsNotExist(err)  {
         fileName = "./config/aliases.json"
     } else {
         fileName = "/config/aliases.json"
     }
+
     configFile, _ := ioutil.ReadFile(fileName)
 
     var data []Alias
 
     json.Unmarshal(configFile, &data)
 
-    configAliases := make(map[string]string)
     for _, item := range data {
-        configAliases[item.Alias] = item.Address
+        AddAlias(item.Alias, item.Address)
     }
-
-    return configAliases
 }
 
 func Handle(r *mux.Router) {
-    aliasConfig := LoadAliases()
-
-    for alias, address := range aliasConfig {
-        AddAlias(alias, address)
-    }
-
     r.HandleFunc("/{Address:.*}", handleUpdateAlias).Methods("PUT")
 }
 

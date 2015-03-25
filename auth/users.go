@@ -26,7 +26,6 @@ import (
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 const (
@@ -61,12 +60,6 @@ func getDBSingleton() databases.TableInterface {
         panic("Users database not initialized")
     }
     return users
-}
-
-func Init() {
-    if users == nil {
-        users = databases.NewSchemaTable(postgres.Connection(), "users", schema)
-    }
 }
 
 func CreateUser(email, salt, password string) error {

@@ -16,7 +16,6 @@ package applications
 
 import (
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 var applications databases.TableInterface
@@ -31,16 +30,13 @@ type applicationData struct {
     Name string
 }
 
-func getDBSingleton() databases.TableInterface {
+func Init(reload bool) {
     if applications == nil {
-        panic("Applications database not initialized")
+        applications = databases.NewSchemaTable(nil, "applications", schema)
     }
-    return applications
-}
 
-func Init() {
-    if applications == nil {
-        applications = databases.NewSchemaTable(postgres.Connection(), "applications", schema)
+    if reload {
+        applications.Reload()
     }
 }
 
@@ -50,7 +46,7 @@ func CreateApplication(Name string) (int64, error) {
 //    values["Id"] = "DEFAULT"
     values["Name"] = Name
 
-    appId, err := getDBSingleton().InsertSchema(values, "Id")
+    appId, err := applications.InsertSchema(values, "Id")
     if err != nil {
         return -1, err
     }
@@ -67,7 +63,7 @@ func GetApplicationName(Id int64) (string, error) {
         columns = append(columns, k)
     }
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &application)
+    err := applications.SelectRowSchema(columns, where, &application)
 
     if err != nil {
         return "", err
@@ -85,7 +81,7 @@ func GetApplicationId(Name string) (int64, error) {
         columns = append(columns, k)
     }
 
-    err := getDBSingleton().SelectRowSchema(columns, where, &application)
+    err := applications.SelectRowSchema(columns, where, &application)
 
     if err != nil {
         return -1, err

@@ -17,6 +17,7 @@ package main
 import (
     "os"
     "fmt"
+    "flag"
     "net/http"
     "html/template"
 
@@ -28,6 +29,8 @@ import (
     "github.com/lighthouse/lighthouse/handlers/containers"
     "github.com/lighthouse/lighthouse/handlers/containers/applications"
 	"github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases/postgres"
 
     "github.com/lighthouse/lighthouse/logging"
 
@@ -37,6 +40,9 @@ import (
 const (
     API_VERSION_0_2 = "/api/v0.2"
 )
+
+var databasesReload = flag.Bool("databases-reload", false, "Start all databases from empty if true")
+var databasesDriver = flag.String("databases-driver", "postgres", "Type of database to connect to")
 
 func ServeIndex(w http.ResponseWriter, r *http.Request) {
     authData := struct {
@@ -64,16 +70,29 @@ func ServeIndex(w http.ResponseWriter, r *http.Request) {
     }
 }
 
+func init() {
+    flag.Parse()
+
+    connections := map[string]func() databases.DBInterface {
+        "postgres" : postgres.Connection,
+    }
+ 
+    if connFunc, ok := connections[*databasesDriver]; ok {
+        databases.SetDefaultConnection(connFunc())
+    } else {
+        fmt.Fprintf(os.Stderr, "Driver '%s' not supported\n", *databasesDriver)
+        os.Exit(-1)
+    }
+
+    auth.Init(*databasesReload)
+    beacons.Init(*databasesReload)
+    aliases.Init(*databasesReload)
+    containers.Init(*databasesReload)
+    applications.Init(*databasesReload)
+}
+
 func main() {
-
     logging.Info("Starting...")
-
-    auth.Init()
-    beacons.Init()
-    aliases.Init()
-    containers.Init()
-    applications.Init()
-
 
     baseRouter := mux.NewRouter()
 
