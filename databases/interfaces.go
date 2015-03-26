@@ -32,14 +32,11 @@ type DBInterface interface {
 }
 
 type TableInterface interface {
-    Insert(string, interface{})(error)
-    Update(string, interface{})(error)
-    SelectRow(string, interface{})(error)
-    InsertSchema(map[string]interface{}, string)(interface{}, error)
-    DeleteRowsSchema(Filter) (error)
-    UpdateSchema(map[string]interface{}, map[string]interface{})(error)
-    SelectRowSchema([]string, Filter, interface{})(error)
-    SelectSchema([]string, Filter, SelectOptions)(ScannerInterface, error)
+    Insert(map[string]interface{}, string)(interface{}, error)
+    Delete(Filter) (error)
+    Update(map[string]interface{}, Filter)(error)
+    SelectRow([]string, Filter, interface{})(error)
+    Select([]string, Filter, SelectOptions)(ScannerInterface, error)
     Reload()
 }
 

@@ -30,7 +30,7 @@ func beaconExists(beacon string) bool {
     columns := []string{"Address"}
     where := databases.Filter{"Address" : beacon}
 
-    err := beacons.SelectRowSchema(columns, where, &test)
+    err := beacons.SelectRow(columns, where, &test)
     return err != databases.NoRowsError
 }
 
@@ -39,7 +39,7 @@ func instanceExists(instance string) bool {
     columns := []string{"InstanceAddress"}
     where := databases.Filter{"InstanceAddress" : instance}
 
-    err := instances.SelectRowSchema(columns, where, &test)
+    err := instances.SelectRow(columns, where, &test)
     return err != databases.NoRowsError
 }
 
@@ -49,7 +49,7 @@ func addBeacon(beacon beaconData) error {
         "Token" : beacon.Token,
     }
 
-    _, err := beacons.InsertSchema(entry, "")
+    _, err := beacons.Insert(entry, "")
     return err
 }
 
@@ -60,7 +60,7 @@ func addInstance(instance instanceData) error {
         "CanAccessDocker" : instance.CanAccessDocker,
         "BeaconAddress" : instance.BeaconAddress,
     }
-    _, err := instances.InsertSchema(entry, "")
+    _, err := instances.Insert(entry, "")
     return err
 }
 
@@ -73,21 +73,21 @@ func updateInstance(instance instanceData) error {
 
     where := map[string]interface{} {"InstanceAddress": instance.InstanceAddress}
 
-    return instances.UpdateSchema(to, where)
+    return instances.Update(to, where)
 }
 
 func updateBeaconField(field string, val interface{}, beacon string) error {
     to := databases.Filter{field : val}
     where := databases.Filter{"Address": beacon}
 
-    return beacons.UpdateSchema(to, where)
+    return beacons.Update(to, where)
 }
 
 func getBeaconData(beacon string) (beaconData, error) {
     var data beaconData
     where := databases.Filter{"Address" : beacon}
 
-    err := beacons.SelectRowSchema(nil, where, &data)
+    err := beacons.SelectRow(nil, where, &data)
 
     if err != nil {
         return beaconData{}, err
@@ -99,7 +99,7 @@ func getBeaconData(beacon string) (beaconData, error) {
 func getBeaconsList(user *auth.User) ([]aliases.Alias, error) {
     opts := databases.SelectOptions{}
     cols := []string{"Address"}
-    scanner, err := beacons.SelectSchema(cols, nil, opts)
+    scanner, err := beacons.Select(cols, nil, opts)
 
     if err != nil {
         return nil, err
@@ -145,7 +145,7 @@ func getInstancesList(beacon string, user *auth.User, refresh bool) ([]map[strin
     opts := databases.SelectOptions{Distinct : true}
     where := databases.Filter{"BeaconAddress": beacon}
 
-    scanner, err := instances.SelectSchema(nil, where, opts)
+    scanner, err := instances.Select(nil, where, opts)
     if err != nil {
         return nil, err
     }

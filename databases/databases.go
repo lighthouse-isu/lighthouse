@@ -48,11 +48,6 @@ type SelectOptions struct {
 type Schema map[string]string
 type Filter map[string]interface{}
 
-const (
-    keyColumn string = "keyColumn"
-    valueColumn string = "valueColumn"
-)
-
 var (
     defaultConnection DBInterface
 )
@@ -65,16 +60,7 @@ func DefaultConnection() DBInterface {
     return defaultConnection
 }
 
-func NewTable(db DBInterface, table string) TableInterface {
-    if db == nil {
-        db = defaultConnection
-    }
-
-    this := &Table{db, table, nil}
-    return this
-}
-
-func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface {
+func NewTable(db DBInterface, table string, schema Schema) TableInterface {
     if db == nil {
         db = defaultConnection
     }
@@ -89,21 +75,10 @@ func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface 
 
 func (this *Table) Reload() {
     this.drop()
-    if this.schema != nil {
-        this.initSchema()
-    } else {
-        this.init()
-    }
+    this.init()
 }
 
 func (this *Table) init() {
-    query := fmt.Sprintf(`CREATE TABLE %s (%s text UNIQUE PRIMARY KEY, %s json);`,
-        this.table, keyColumn, valueColumn)
-
-    this.db.Exec(query)
-}
-
-func (this *Table) initSchema() {
     var buffer bytes.Buffer
     first := true
 
@@ -172,17 +147,7 @@ func (this *Table) convertOutput(orig interface{}, col string) interface{} {
     return orig
 }
 
-func (this *Table) Insert(key string, value interface{}) error {
-    json, _ := json.Marshal(value)
-    query := fmt.Sprintf(`INSERT INTO %s (%s, %s) VALUES (($1), ($2));`,
-        this.table, keyColumn, valueColumn)
-
-    _, err := this.db.Exec(query, key, string(json))
-
-    return err
-}
-
-func (this *Table) InsertSchema(values map[string]interface{}, returning string) (interface{}, error) {
+func (this *Table) Insert(values map[string]interface{}, returning string) (interface{}, error) {
     if returning == "" {
         err := this.insertSchema_noReturn(values)
         return nil, err
@@ -254,7 +219,7 @@ func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes
     return colBuf, valBuf, queryVals
 }
 
-func (this *Table) DeleteRowsSchema(where Filter) (error) {
+func (this *Table) Delete(where Filter) (error) {
     var buffer bytes.Buffer
     vals := make([]interface{}, len(where))
 
@@ -303,17 +268,7 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
     return err
 }
 
-func (this *Table) Update(key string, newValue interface{}) (error) {
-    json, _ := json.Marshal(newValue)
-    query := fmt.Sprintf(`UPDATE %s SET %s = ($2) WHERE %s = ($1);`,
-        this.table, valueColumn, keyColumn)
-
-    _, err := this.db.Exec(query, key, string(json))
-
-    return err
-}
-
-func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
+func (this *Table) Update(to map[string]interface{}, where Filter) (error) {
     var buffer bytes.Buffer
 
     buffer.WriteString("UPDATE ")
@@ -382,26 +337,6 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
     return err
 }
 
-func (this *Table) SelectRow(key string, value interface{}) error {
-    query := fmt.Sprintf(`SELECT %s FROM %s WHERE %s = ($1);`,
-        valueColumn, this.table, keyColumn)
-
-    row := this.db.QueryRow(query, key)
-
-    if row == nil {
-        return UnknownError
-    }
-
-    var data interface{}
-    err := row.Scan(&data)
-
-    if err == nil {
-        err = json.Unmarshal(data.([]byte), value)
-    }
-
-    return err
-}
-
 func buildQueryFrom(table string, columns []string, where Filter, opts SelectOptions) (string, []interface{})  {
     var buffer bytes.Buffer
 
@@ -448,7 +383,7 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
     return buffer.String(), whereVals
 }
 
-func (this *Table) SelectRowSchema(columns []string, where Filter, dest interface{}) error {
+func (this *Table) SelectRow(columns []string, where Filter, dest interface{}) error {
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 
@@ -496,7 +431,7 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     return err
 }
 
-func (this *Table) SelectSchema(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
+func (this *Table) Select(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
     if columns == nil || len(columns) == 0 {
         columns = make([]string, len(this.schema))
 

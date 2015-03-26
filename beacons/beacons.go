@@ -66,11 +66,11 @@ type instanceData struct {
 
 func Init(reload bool) {
     if beacons == nil {
-        beacons = databases.NewSchemaTable(nil, "beacons", beaconSchema)
+        beacons = databases.NewTable(nil, "beacons", beaconSchema)
     }
 
     if instances == nil {
-        instances = databases.NewSchemaTable(nil, "instances", instanceSchema)
+        instances = databases.NewTable(nil, "instances", instanceSchema)
     }
 
     if reload {
@@ -85,7 +85,7 @@ func GetBeaconAddress(instance string) (string, error) {
     where := databases.Filter{"InstanceAddress" : instance}
     columns := []string{"BeaconAddress"}
 
-    err := instances.SelectRowSchema(columns, where, &beacon)
+    err := instances.SelectRow(columns, where, &beacon)
 
     if err != nil {
         return "", err
@@ -103,7 +103,7 @@ func TryGetBeaconToken(beacon string, user *auth.User) (string, error) {
     where := databases.Filter{"Address" : beacon}
     columns := []string{"Token"}
 
-    err := beacons.SelectRowSchema(columns, where, &data)
+    err := beacons.SelectRow(columns, where, &data)
 
     if err != nil {
         return "", err

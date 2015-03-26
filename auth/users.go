@@ -55,13 +55,6 @@ var schema = databases.Schema {
     "Permissions" : "json",
 }
 
-func getDBSingleton() databases.TableInterface {
-    if users == nil {
-        panic("Users database not initialized")
-    }
-    return users
-}
-
 func CreateUser(email, salt, password string) error {
     return createUserWithAuthLevel(email, salt, password, DefaultAuthLevel)
 }   
@@ -79,14 +72,14 @@ func addUser(user User) error {
         "Permissions" : user.Permissions,
     }
 
-    _, err := getDBSingleton().InsertSchema(entry, "")
+    _, err := users.Insert(entry, "")
     return err
 }
 
 func GetUser(email string) (*User, error) {
     user := &User{}
     where := databases.Filter{"Email" : email}
-    err := getDBSingleton().SelectRowSchema(nil, where, user)
+    err := users.SelectRow(nil, where, user)
 
     if err != nil {
         return nil, err
@@ -109,7 +102,7 @@ func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
     to := map[string]interface{}{"Permissions" : user.Permissions}
     where := map[string]interface{}{"Email" : user.Email}
 
-    return getDBSingleton().UpdateSchema(to, where)
+    return users.Update(to, where)
 }
 
 func writeResponse(w http.ResponseWriter, code int, err error) {
@@ -205,7 +198,7 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
     }
 
     where := map[string]interface{}{"Email" : reqEmail}
-    err = getDBSingleton().UpdateSchema(values, where)
+    err = users.Update(values, where)
 
     if err != nil {
         writeResponse(w, http.StatusInternalServerError, err)
@@ -255,7 +248,7 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 func getAllUsers(currentUser *User) ([]string, error) {
     opts := databases.SelectOptions{}
     cols := []string{"Email", "AuthLevel"}
-    userRows, err := getDBSingleton().SelectSchema(cols, nil, opts)
+    userRows, err := users.Select(cols, nil, opts)
 
     if err != nil {
         return nil, err

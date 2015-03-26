@@ -32,7 +32,7 @@ type applicationData struct {
 
 func Init(reload bool) {
     if applications == nil {
-        applications = databases.NewSchemaTable(nil, "applications", schema)
+        applications = databases.NewTable(nil, "applications", schema)
     }
 
     if reload {
@@ -46,7 +46,7 @@ func CreateApplication(Name string) (int64, error) {
 //    values["Id"] = "DEFAULT"
     values["Name"] = Name
 
-    appId, err := applications.InsertSchema(values, "Id")
+    appId, err := applications.Insert(values, "Id")
     if err != nil {
         return -1, err
     }
@@ -63,7 +63,7 @@ func GetApplicationName(Id int64) (string, error) {
         columns = append(columns, k)
     }
 
-    err := applications.SelectRowSchema(columns, where, &application)
+    err := applications.SelectRow(columns, where, &application)
 
     if err != nil {
         return "", err
@@ -81,7 +81,7 @@ func GetApplicationId(Name string) (int64, error) {
         columns = append(columns, k)
     }
 
-    err := applications.SelectRowSchema(columns, where, &application)
+    err := applications.SelectRow(columns, where, &application)
 
     if err != nil {
         return -1, err

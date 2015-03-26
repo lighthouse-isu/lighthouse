@@ -29,55 +29,37 @@ type MockTable struct {
     Schema map[string]int
     lastUpdateRow int64
 
-    MockInsert           func(string, interface{})(error)
-    MockUpdate           func(string, interface{})(error)
-    MockSelectRow        func(string, interface{})(error)
-    MockInsertSchema     func(map[string]interface{}, string)(interface{}, error)
-    MockDeleteRowsSchema func(Filter)(error)
-    MockUpdateSchema     func(map[string]interface{}, map[string]interface{})(error)
-    MockSelectRowSchema  func([]string, Filter, interface{})(error)
-    MockSelectSchema     func([]string, Filter, SelectOptions)(ScannerInterface, error)
+    MockInsert     func(map[string]interface{}, string)(interface{}, error)
+    MockDelete     func(Filter)(error)
+    MockUpdate     func(map[string]interface{}, Filter)(error)
+    MockSelectRow  func([]string, Filter, interface{})(error)
+    MockSelect     func([]string, Filter, SelectOptions)(ScannerInterface, error)
 
     MockReload           func()
 }
 
-func (t *MockTable) Insert(s string, i interface{})(e error) {
-    if t.MockInsert != nil { return t.MockInsert(s, i) }
+func (t *MockTable) Insert(v map[string]interface{}, returnCol string)(i interface{}, e error) {
+    if t.MockInsert != nil { return t.MockInsert(v, returnCol) }
     return
 }
 
-func (t *MockTable) Update(s string, i interface{})(e error) {
-    if t.MockUpdate != nil { return t.MockUpdate(s, i) }
+func (t *MockTable) Delete(w Filter)(e error) {
+    if t.MockDelete != nil { return t.MockDelete(w) }
     return
 }
 
-func (t *MockTable) SelectRow(s string, i interface{})(e error) {
-    if t.MockSelectRow != nil { return t.MockSelectRow(s, i) }
+func (t *MockTable) Update(to map[string]interface{}, w Filter)(e error) {
+    if t.MockUpdate != nil { return t.MockUpdate(to, w) }
     return
 }
 
-func (t *MockTable) InsertSchema(v map[string]interface{}, returnCol string)(i interface{}, e error) {
-    if t.MockInsertSchema != nil { return t.MockInsertSchema(v, returnCol) }
+func (t *MockTable) SelectRow(c []string, w Filter, d interface{})(e error) {
+    if t.MockSelectRow != nil { return t.MockSelectRow(c, w, d) }
     return
 }
 
-func (t *MockTable) DeleteRowsSchema(w Filter)(e error) {
-    if t.MockDeleteRowsSchema != nil { return t.MockDeleteRowsSchema(w) }
-    return
-}
-
-func (t *MockTable) UpdateSchema(to, w map[string]interface{})(e error) {
-    if t.MockUpdateSchema != nil { return t.MockUpdateSchema(to, w) }
-    return
-}
-
-func (t *MockTable) SelectRowSchema(c []string, w Filter, d interface{})(e error) {
-    if t.MockSelectRowSchema != nil { return t.MockSelectRowSchema(c, w, d) }
-    return
-}
-
-func (t *MockTable) SelectSchema(c []string, w Filter, opts SelectOptions)(s ScannerInterface, e error) {
-    if t.MockSelectSchema != nil { return t.MockSelectSchema(c, w, opts) }
+func (t *MockTable) Select(c []string, w Filter, opts SelectOptions)(s ScannerInterface, e error) {
+    if t.MockSelect != nil { return t.MockSelect(c, w, opts) }
     return
 }
 
@@ -102,7 +84,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         i += 1
     }
 
-    table.MockInsertSchema = func(values map[string]interface{}, returnCol string)(interface{}, error) {
+    table.MockInsert = func(values map[string]interface{}, returnCol string)(interface{}, error) {
         addition := make([]interface{}, len(table.Schema))
 
         for k, orig := range values {
@@ -135,7 +117,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         return nil, nil
     }
 
-    table.MockDeleteRowsSchema = func(where Filter)(error) {
+    table.MockDelete = func(where Filter)(error) {
         updated := false
         var toDelete []int
 
@@ -173,7 +155,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         return nil
     }
 
-    table.MockUpdateSchema = func(to, where map[string]interface{})(error) {
+    table.MockUpdate = func(to map[string]interface{}, where Filter)(error) {
         updated := false
         for _, row := range table.Database {
 
@@ -200,7 +182,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         return nil
     }
 
-    table.MockSelectRowSchema = func(cols []string, where Filter, dest interface{})(error) {
+    table.MockSelectRow = func(cols []string, where Filter, dest interface{})(error) {
 
         if cols == nil {
             cols = make([]string, len(table.Schema))
@@ -231,7 +213,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         return NoRowsError
     }
 
-    table.MockSelectSchema = func(cols []string, where Filter, opts SelectOptions)(ScannerInterface, error) {
+    table.MockSelect = func(cols []string, where Filter, opts SelectOptions)(ScannerInterface, error) {
 
         if cols == nil {
             cols = make([]string, len(table.Schema))
