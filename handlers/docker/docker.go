@@ -149,6 +149,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 */
 func GetHandlerInfo(r *http.Request) (handlers.HandlerInfo, bool) {
     var info handlers.HandlerInfo
+    info.HandlerData = make(map[string]interface{})
 
     params, ok := handlers.GetEndpointParams(r, []string{"Host", "DockerEndpoint"})
 
