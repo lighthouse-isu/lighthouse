@@ -271,7 +271,8 @@ func Test_GetHandlerInfo(t *testing.T) {
 
     router.ServeHTTP(httptest.NewRecorder(), r)
 
-    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r, nil}
+    expected_map := make(map[string]interface{})
+    expected := handlers.HandlerInfo{"Test/Endpoint", "AliasHost", nil, r, expected_map}
 
     assert.Equal(t, expected, info,
         "GetHandlerInfo did not extract data correctly")
