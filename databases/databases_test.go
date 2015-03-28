@@ -81,6 +81,19 @@ func Test_SetAndGetDefaultConnection(t *testing.T) {
     assert.Equal(t, db, DefaultConnection())
 }
 
+func Test_DefaultSelectOptions(t *testing.T) {
+    opts := DefaultSelectOptions()
+
+    key := &SelectOptions {
+        Distinct: false,
+        Top: 0,
+        OrderBy: nil,
+        Desc: false,
+    }
+
+    assert.Equal(t, key, opts)
+}
+
 func Test_NewTableDefault(t *testing.T) {
     db := testDB()
     SetDefaultConnection(db)
@@ -101,7 +114,47 @@ func Test_NewTable_Panic(t *testing.T) {
     t.Errorf("Nil schema in NewTable should panic")
 }
 
-func Test_Insert_WithReturn(t *testing.T) {
+
+func Test_NewLockingTableDefault(t *testing.T) {
+    db := testDB()
+    SetDefaultConnection(db)
+
+    var inter interface{}
+    inter = NewLockingTable(nil, "test_table", testSchema)
+    table := inter.(*Table)
+    
+    assert.Equal(t, db, table.db)
+}
+
+func Test_NewLockingTable_Panic(t *testing.T) {
+    defer func() { recover() }()
+
+    db := testDB()
+    NewLockingTable(db, "test_table", nil)
+
+    t.Errorf("Nil schema in NewTable should panic")
+}
+
+func Test_Reload(t *testing.T) {
+    db := testDB()
+    schema := Schema {
+        "Name" : "text UNIQUE PRIMARY KEY",
+        "Age" : "integer",
+        "Phone" : "text",
+        "Info" : "json",
+    }
+
+    sqlmock.ExpectExec(`DROP TABLE test_table;`)
+    sqlmock.ExpectExec(`CREATE TABLE test_table .+`)
+
+    NewTable(db, "test_table", schema).Reload()
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_InsertReturn(t *testing.T) {
     db := testDB()
     table := NewLockingTable(db, "test_table", testSchema)
 
@@ -130,7 +183,7 @@ func Test_Insert_WithReturn(t *testing.T) {
     }
 }
 
-func Test_Insert_WithReturn_NoInsert(t *testing.T) {
+func Test_InsertReturn_NoInsert(t *testing.T) {
     db := testDB()
     table := NewLockingTable(db, "test_table", testSchema)
 
@@ -148,13 +201,28 @@ func Test_Insert_WithReturn_NoInsert(t *testing.T) {
     err := table.InsertReturn(newData, cols, nil, &res)
 
     assert.Equal(t, NoUpdateError, err)
-
-    if err := db.Close(); err != nil {
-        t.Errorf(err.Error())
-    }
 }
 
-func Test_Insert_NoReturn(t *testing.T) {
+func Test_InsertReturn_Panic(t *testing.T) {
+    defer func() { recover() }()
+
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
+
+    newData := map[string]interface{}{
+        "Name" : "John Doe",
+        "Age" : 42,
+    }
+
+    var res testObject
+
+    cols := []string{"Age"}
+    table.InsertReturn(newData, cols, nil, &res)
+
+    t.Fail()
+}
+
+func Test_Insert(t *testing.T) {
     db := testDB()
     table := NewTable(db, "test_table", testSchema)
 
@@ -175,7 +243,7 @@ func Test_Insert_NoReturn(t *testing.T) {
     }
 }
 
-func Test_Insert_NoReturn_NoInsert(t *testing.T) {
+func Test_Insert_NoInsert(t *testing.T) {
     db := testDB()
     table := NewTable(db, "test_table", testSchema)
 
@@ -190,6 +258,23 @@ func Test_Insert_NoReturn_NoInsert(t *testing.T) {
     err := table.Insert(newData)
 
     assert.Equal(t, NoUpdateError, err)
+}
+
+func Test_Insert_Locking(t *testing.T) {
+    db := testDB()
+    table := NewLockingTable(db, "test_table", testSchema)
+
+    newData := map[string]interface{}{
+        "Name" : "John Doe",
+        "Age" : 42,
+    }
+
+    sqlmock.ExpectExec(`INSERT`).
+        WillReturnResult(sqlmock.NewResult(0, 1))
+
+    err := table.Insert(newData)
+
+    assert.Nil(t, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -221,6 +306,27 @@ func Test_Update(t *testing.T) {
     }
 }
 
+func Test_Update_NoUpdate(t *testing.T) {
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
+
+    to := map[string]interface{} {
+        "Name": "Jane Doe",
+        "Age" : 42,
+    }
+
+    where := map[string]interface{} {
+        "Age" : 41,
+        "Phone" : "123-456-7890",
+    }
+
+    sqlmock.ExpectExec(`UPDATE`).
+        WillReturnResult(sqlmock.NewResult(0, 0))
+
+    err := table.Update(to, where)
+    assert.Equal(t, NoUpdateError, err)
+}
+
 func Test_SelectRow(t *testing.T) {
     db := testDB()
     table := NewTable(db, "test_table", testSchema)
@@ -244,6 +350,24 @@ func Test_SelectRow(t *testing.T) {
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
+}
+
+func Test_SelectRow_NoRows(t *testing.T) {
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
+
+    columns := []string {"Phone", "Name"}
+    filter := Filter {
+        "Age" : 1,
+    }
+
+    sqlmock.ExpectQuery(`SELECT`).
+        WillReturnRows(sqlmock.NewRows(columns))
+
+    var res testObject
+    err := table.SelectRow(columns, filter, nil, &res)
+
+    assert.Equal(t, NoRowsError, err)
 }
 
 func Test_Select(t *testing.T) {

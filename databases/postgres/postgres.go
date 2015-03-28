@@ -66,9 +66,10 @@ func transformError(err error) error {
     } 
 
     if !ok {
-        return nil
+        return err
     }
 
+    // Code listed at https://github.com/lib/pq/blob/master/error.go
     switch pqErr.Code {
     case "23505": 
         return databases.DuplicateKeyError
