@@ -33,7 +33,7 @@ var testSchema databases.Schema = databases.Schema{
 
 func Test_Connection(t *testing.T) {
 	db, _ := sqlmock.New()
-	connection = &postgresConn{*db}
+	connection = &postgresConn{db}
 
 	res := Connection()
 
@@ -42,7 +42,7 @@ func Test_Connection(t *testing.T) {
 
 func Test_Compiler(t *testing.T) {
 	db, _ := sqlmock.New()
-	conn := &postgresConn{*db}
+	conn := &postgresConn{db}
 
 	var inter interface{}
 
@@ -70,7 +70,7 @@ func Test_TransformError(t *testing.T) {
 
 func Test_Exec(t *testing.T) {
 	db, _ := sqlmock.New()
-	conn := &postgresConn{*db}
+	conn := &postgresConn{db}
 
 	exec := `TEST EXEC`
 	args := []interface{}{42, "TEST", false}

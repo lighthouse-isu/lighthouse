@@ -30,7 +30,7 @@ import (
 )
 
 type postgresConn struct {
-    sql.DB
+    *sql.DB
 }
 
 type postgresCompiler struct {
@@ -113,7 +113,7 @@ func setup() *postgresConn {
         panic(err.Error())
     }
 
-    return &postgresConn{*postgres}
+    return &postgresConn{postgres}
 }
 
 func (this *postgresCompiler) CompileInsert(table string, values map[string]interface{}) (string, []interface{}) {
