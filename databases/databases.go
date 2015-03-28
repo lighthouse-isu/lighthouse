@@ -16,12 +16,12 @@ package databases
 
 import (
     "fmt"
+    "sync"
     "bytes"
     "sort"
     "strings"
     "errors"
     "reflect"
-    "encoding/json"
 
     "database/sql"
 )
@@ -39,10 +39,17 @@ type Table struct {
     db DBInterface
     table string
     schema Schema
+
+    compiler Compiler
+
+    mutex *sync.Mutex
 }
 
 type SelectOptions struct {
     Distinct bool
+    Top int
+    OrderBy []string
+    Desc bool
 }
 
 type Schema map[string]string
@@ -60,6 +67,10 @@ func DefaultConnection() DBInterface {
     return defaultConnection
 }
 
+func DefaultSelectOptions() *SelectOptions {
+    return &SelectOptions{}
+}
+
 func NewTable(db DBInterface, table string, schema Schema) TableInterface {
     if db == nil {
         db = defaultConnection
@@ -69,7 +80,20 @@ func NewTable(db DBInterface, table string, schema Schema) TableInterface {
         panic("No schema given to database")
     }
 
-    this := &Table{db, table, schema}
+    this := &Table{db, table, schema, db.Compiler(schema), nil}
+    return this
+}
+
+func NewLockingTable(db DBInterface, table string, schema Schema) TableInterface {
+    if db == nil {
+        db = defaultConnection
+    }
+
+    if len(schema) == 0 {
+        panic("No schema given to database")
+    }
+
+    this := &Table{db, table, schema, db.Compiler(schema), &sync.Mutex{}}
     return this
 }
 
@@ -101,7 +125,6 @@ func (this *Table) init() {
 
     query := fmt.Sprintf(`CREATE TABLE %s (%s);`, this.table, buffer.String())
     this.db.Exec(query)
-
 }
 
 func (this *Table) drop() {
@@ -111,150 +134,66 @@ func (this *Table) drop() {
     this.db.Exec(query)
 }
 
-func (this *Table) convertInput(orig interface{}, col string) interface{} {
-    colType := this.schema[col]
+func (this *Table) allColumns() []string {
+    columns := make([]string, len(this.schema))
 
-    if strings.Contains(colType, "json") {
-        b, _ := json.Marshal(orig)
-        return string(b)
-    }
-    
-    return orig
-}
-
-func (this *Table) convertOutput(orig interface{}, col string) interface{} {
-    colType := this.schema[col]
-
-    if strings.Contains(colType, "text") {
-        return string(orig.([]byte))
-    }
-
-    if strings.Contains(colType, "json") {
-        var read interface{}
-
-        err := json.Unmarshal(orig.([]byte), &read)
-        if err != nil {
-            return orig
-        }
-
-        return read
-    }
-
-    if strings.Contains(colType, "int") {
-        return int(orig.(int64))
-    }
-    
-    return orig
-}
-
-func (this *Table) Insert(values map[string]interface{}, returning string) (interface{}, error) {
-    if returning == "" {
-        err := this.insertSchema_noReturn(values)
-        return nil, err
-    } else {
-        return this.insertSchema_return(values, returning)
-    }
-}
-
-func (this *Table) insertSchema_return(values map[string]interface{}, returnCol string) (interface{}, error) {
-    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
-    var res interface{}
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s) RETURNING %s;`,
-        this.table, colBuf.String(), valBuf.String(), returnCol)
-
-    err := this.db.QueryRow(query, queryVals...).Scan(&res)
-
-    if err != nil {
-        return nil, err
-    }
-
-    return res, nil
-}
-
-func (this *Table) insertSchema_noReturn(values map[string]interface{}) (error) {
-    colBuf, valBuf, queryVals := this.buildInsertQueryBuffers(values)
-    query := fmt.Sprintf(`INSERT INTO %s (%s) VALUES (%s);`,
-        this.table, colBuf.String(), valBuf.String())
-    res, err := this.db.Exec(query, queryVals...)
-
-    if err == nil {
-        cnt, err := res.RowsAffected()
-
-        if err == nil && cnt < 1 {
-            return NoUpdateError
-        }
-    }
-
-    return err
-}
-
-func (this *Table) buildInsertQueryBuffers(values map[string]interface{}) (bytes.Buffer, bytes.Buffer, []interface{}){
-    var colBuf, valBuf bytes.Buffer
-    queryVals := make([]interface{}, len(values))
     i := 0
-    var keys []string
-
-    for col, _ := range values {
-        keys = append(keys, col)
-    }
-
-    sort.Strings(keys)
-
-    for _, col := range keys {
-        val := values[col]
-        if i != 0 {
-            colBuf.WriteString(", ")
-            valBuf.WriteString(", ")
-        }
-        colBuf.WriteString(col)
-
-        s := fmt.Sprintf(`($%d)`, i + 1)
-        valBuf.WriteString(s)
-
-        queryVals[i] = this.convertInput(val, col)
-
+    for col, _ := range this.schema {
+        columns[i] = col
         i += 1
     }
 
-    return colBuf, valBuf, queryVals
+    sort.Strings(columns)
+    return columns
+}
+
+func (this *Table) Insert(values map[string]interface{}) error {
+    if this.mutex != nil {
+        this.mutex.Lock()
+        defer this.mutex.Unlock()
+    }
+
+    query, queryVals := this.compiler.CompileInsert(this.table, values)
+    res, err := this.db.Exec(query, queryVals...)
+
+    if err != nil {
+        return err
+    }
+
+    cnt, err := res.RowsAffected()
+    if err == nil && cnt < 1 {
+        return NoUpdateError
+    }
+
+    return nil
+}
+
+func (this *Table) InsertReturn(values map[string]interface{}, cols []string, opts *SelectOptions, dest interface{}) error {
+    if this.mutex == nil {
+        panic("Only LockingTables can perform InsertReturns")
+    }
+
+    this.mutex.Lock()
+    defer this.mutex.Unlock()
+
+    query, queryVals := this.compiler.CompileInsert(this.table, values)
+    res, err := this.db.Exec(query, queryVals...)
+
+    if err != nil {
+        return err
+    }
+
+    cnt, err := res.RowsAffected()
+    if err == nil && cnt < 1 {
+        return NoUpdateError
+    }
+
+    return this.SelectRow(cols, values, opts, dest)
 }
 
 func (this *Table) Delete(where Filter) (error) {
-    var buffer bytes.Buffer
-    vals := make([]interface{}, len(where))
 
-    buffer.WriteString("DELETE FROM ")
-    buffer.WriteString(this.table)
-
-    if len(where) > 0 {
-        buffer.WriteString(" WHERE ")
-
-        var whereKeys []string
-        for col, _ := range where {
-            whereKeys = append(whereKeys, col)
-        }
-        sort.Strings(whereKeys)
-
-        i := 1
-        for _, col := range whereKeys {
-            val := where[col]
-            if i != 1 {
-                buffer.WriteString(" && ")
-            }
-
-            buffer.WriteString(col)
-            buffer.WriteString(" = ")
-            buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-            vals[i - 1] = val
-            i += 1
-        }
-    }
-
-    buffer.WriteString(";")
-
-    query := buffer.String()
-
+    query, vals := this.compiler.CompileDelete(this.table, where)
     res, err := this.db.Exec(query, vals...)
 
     if err == nil {
@@ -269,61 +208,7 @@ func (this *Table) Delete(where Filter) (error) {
 }
 
 func (this *Table) Update(to map[string]interface{}, where Filter) (error) {
-    var buffer bytes.Buffer
-
-    buffer.WriteString("UPDATE ")
-    buffer.WriteString(this.table)
-    buffer.WriteString(" SET ")
-
-    vals := make([]interface{}, len(where) + len(to))
-    var toKeys, whereKeys []string
-    i := 1
-
-    for col, _ := range to {
-        toKeys = append(toKeys, col)
-    }
-
-    for col, _ := range where {
-        whereKeys = append(whereKeys, col)
-    }
-
-    sort.Strings(toKeys)
-    sort.Strings(whereKeys)
-
-    for _, col := range toKeys {
-        val := to[col]
-        if i != 1 {
-            buffer.WriteString(", ")
-        }
-
-        buffer.WriteString(col)
-        buffer.WriteString(" = ")
-        buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-        vals[i - 1] = this.convertInput(val, col)
-        i += 1
-    }
-
-    buffer.WriteString(" WHERE ")
-
-    for _, col := range whereKeys {
-        val := where[col]
-        if i != len(to) + 1 {
-            buffer.WriteString(" && ")
-        }
-
-        buffer.WriteString(col)
-        buffer.WriteString(" = ")
-        buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-        vals[i - 1] = val
-        i += 1
-    }
-
-    buffer.WriteString(";")
-
-    query := buffer.String()
-
+    query, vals := this.compiler.CompileUpdate(this.table, to, where)
     res, err := this.db.Exec(query, vals...)
 
     if err == nil {
@@ -337,66 +222,12 @@ func (this *Table) Update(to map[string]interface{}, where Filter) (error) {
     return err
 }
 
-func buildQueryFrom(table string, columns []string, where Filter, opts SelectOptions) (string, []interface{})  {
-    var buffer bytes.Buffer
-
-    buffer.WriteString("SELECT ")
-
-    if opts.Distinct {
-        buffer.WriteString("DISTINCT ")
+func (this *Table) SelectRow(columns []string, where Filter, opts *SelectOptions, dest interface{}) error {
+    if len(columns) == 0 {
+        columns = this.allColumns()
     }
 
-    buffer.WriteString(strings.Join(columns, ", "))
-
-    buffer.WriteString(" FROM ") 
-    buffer.WriteString(table)
-
-    whereVals := make([]interface{}, len(where))
-    if where != nil {
-        i := 1
-        buffer.WriteString(" WHERE ")
-
-        var whereKeys []string
-        for col, _ := range where {
-            whereKeys = append(whereKeys, col)
-        }
-
-        sort.Strings(whereKeys)
-
-        for _, col := range whereKeys {
-            val := where[col]
-            if i != 1 {
-                buffer.WriteString(" && ")
-            }
-
-            buffer.WriteString(col)
-            buffer.WriteString(" = ")
-            buffer.WriteString(fmt.Sprintf("($%d)", i))
-
-            whereVals[i - 1] = val
-            i += 1
-        }
-    }
-
-    buffer.WriteString(";")
-
-    return buffer.String(), whereVals
-}
-
-func (this *Table) SelectRow(columns []string, where Filter, dest interface{}) error {
-    if columns == nil || len(columns) == 0 {
-        columns = make([]string, len(this.schema))
-
-        i := 0
-        for col, _ := range this.schema {
-            columns[i] = col
-            i += 1
-        }
-        sort.Strings(columns)
-    }
-
-    query, queryVals := buildQueryFrom(this.table, columns, where, SelectOptions{})
-
+    query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
     row := this.db.QueryRow(query, queryVals...)
 
     if row == nil {
@@ -422,7 +253,7 @@ func (this *Table) SelectRow(columns []string, where Filter, dest interface{}) e
 
     rv := reflect.ValueOf(dest).Elem()
     for i, colName := range columns {
-        setVal := this.convertOutput(values[i], colName)
+        setVal := this.compiler.ConvertOutput(values[i], colName)
         if setVal != nil {
             rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
         }
@@ -431,19 +262,12 @@ func (this *Table) SelectRow(columns []string, where Filter, dest interface{}) e
     return err
 }
 
-func (this *Table) Select(columns []string, where Filter, opts SelectOptions) (ScannerInterface, error) {
-    if columns == nil || len(columns) == 0 {
-        columns = make([]string, len(this.schema))
-
-        i := 0
-        for col, _ := range this.schema {
-            columns[i] = col
-            i += 1
-        }
+func (this *Table) Select(columns []string, where Filter, opts *SelectOptions) (ScannerInterface, error) {
+    if len(columns) == 0 {
+        columns = this.allColumns()
     }
 
-    query, queryVals := buildQueryFrom(this.table, columns, where, opts)
-
+    query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
     rows, err := this.db.Query(query, queryVals...)
 
     if err != nil {

@@ -85,7 +85,7 @@ func GetBeaconAddress(instance string) (string, error) {
     where := databases.Filter{"InstanceAddress" : instance}
     columns := []string{"BeaconAddress"}
 
-    err := instances.SelectRow(columns, where, &beacon)
+    err := instances.SelectRow(columns, where, nil, &beacon)
 
     if err != nil {
         return "", err
@@ -103,7 +103,7 @@ func TryGetBeaconToken(beacon string, user *auth.User) (string, error) {
     where := databases.Filter{"Address" : beacon}
     columns := []string{"Token"}
 
-    err := beacons.SelectRow(columns, where, &data)
+    err := beacons.SelectRow(columns, where, nil, &data)
 
     if err != nil {
         return "", err

@@ -72,14 +72,14 @@ func addUser(user User) error {
         "Permissions" : user.Permissions,
     }
 
-    _, err := users.Insert(entry, "")
+    err := users.Insert(entry)
     return err
 }
 
 func GetUser(email string) (*User, error) {
     user := &User{}
     where := databases.Filter{"Email" : email}
-    err := users.SelectRow(nil, where, user)
+    err := users.SelectRow(nil, where, nil, user)
 
     if err != nil {
         return nil, err
@@ -246,9 +246,8 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func getAllUsers(currentUser *User) ([]string, error) {
-    opts := databases.SelectOptions{}
     cols := []string{"Email", "AuthLevel"}
-    userRows, err := users.Select(cols, nil, opts)
+    userRows, err := users.Select(cols, nil, nil)
 
     if err != nil {
         return nil, err

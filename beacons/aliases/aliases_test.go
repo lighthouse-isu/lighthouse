@@ -49,7 +49,7 @@ func Test_AddAlias(t *testing.T) {
 		Address string
 	}
 
-	table.SelectRow([]string{"Address"}, nil, &real)
+	table.SelectRow([]string{"Address"}, nil, nil, &real)
 
 	assert.Equal(t, keyAddress, real.Address)
 }
@@ -63,7 +63,7 @@ func Test_UpdateAlias(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.Insert(alias, "")
+	table.Insert(alias)
 
 	keyAlias := "ALIAS_PASS"
 
@@ -73,7 +73,7 @@ func Test_UpdateAlias(t *testing.T) {
 		Alias string
 	}
 
-	table.SelectRow([]string{"Alias"}, nil, &real)
+	table.SelectRow([]string{"Alias"}, nil, nil, &real)
 
 	assert.Equal(t, keyAlias, real.Alias)
 }
@@ -87,7 +87,7 @@ func Test_SetAlias(t *testing.T) {
 		"Address" : "ADDRESS_OVERWRITE",
 	}
 
-	table.Insert(alias, "")
+	table.Insert(alias)
 
 	overwriteAlias := "ALIAS_UPDATED"
 	SetAlias(overwriteAlias, "ADDRESS_OVERWRITE")
@@ -99,12 +99,12 @@ func Test_SetAlias(t *testing.T) {
 	where := make(databases.Filter)
 
 	where["Address"] = "ADDRESS_OVERWRITE"
-	table.SelectRow([]string{"Alias"}, where, &real)
+	table.SelectRow([]string{"Alias"}, where, nil, &real)
 
 	assert.Equal(t, overwriteAlias, real.Alias)
 
 	where["Address"] = "ADDRESS_ADDED"
-	table.SelectRow([]string{"Alias"}, where, &real)
+	table.SelectRow([]string{"Alias"}, where, nil, &real)
 
 	assert.Equal(t, addedAlias, real.Alias)
 }
@@ -118,7 +118,7 @@ func Test_GetAddressOf(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.Insert(alias, "")
+	table.Insert(alias)
 
 	keyAddress := "ADDRESS"
 	var realAddress string
@@ -142,7 +142,7 @@ func Test_GetAliasOf(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.Insert(alias, "")
+	table.Insert(alias)
 
 	keyAlias := "ALIAS"
 	var realAddress string
@@ -166,7 +166,7 @@ func Test_HandleUpdateAlias_Existing(t *testing.T) {
 		"Address" : "ADDRESS",
 	}
 
-	table.Insert(alias, "")
+	table.Insert(alias)
 
 	keyAlias := "ALIAS_PASS"
 	aliasJSON, _ := json.Marshal(keyAlias)
@@ -184,7 +184,7 @@ func Test_HandleUpdateAlias_Existing(t *testing.T) {
 		Alias string
 	}
 
-	table.SelectRow([]string{"Alias"}, nil, &real)
+	table.SelectRow([]string{"Alias"}, nil, nil, &real)
 	assert.Equal(t, keyAlias, real.Alias)
 }
 
@@ -208,7 +208,7 @@ func Test_HandleUpdateAlias_New(t *testing.T) {
 		Alias string
 	}
 
-	table.SelectRow([]string{"Alias"}, nil, &real)
+	table.SelectRow([]string{"Alias"}, nil, nil, &real)
 	assert.Equal(t, keyAlias, real.Alias)
 }
 

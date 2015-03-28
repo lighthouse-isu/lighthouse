@@ -32,7 +32,7 @@ type applicationData struct {
 
 func Init(reload bool) {
     if applications == nil {
-        applications = databases.NewTable(nil, "applications", schema)
+        applications = databases.NewLockingTable(nil, "applications", schema)
     }
 
     if reload {
@@ -46,12 +46,17 @@ func CreateApplication(Name string) (int64, error) {
 //    values["Id"] = "DEFAULT"
     values["Name"] = Name
 
-    appId, err := applications.Insert(values, "Id")
+    cols := []string{"Id"}
+    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
+
+    var app applicationData
+
+    err := applications.InsertReturn(values, cols, &opts, &app)
     if err != nil {
         return -1, err
     }
 
-    return appId.(int64), err
+    return app.Id, err
 }
 
 func GetApplicationName(Id int64) (string, error) {
@@ -63,7 +68,7 @@ func GetApplicationName(Id int64) (string, error) {
         columns = append(columns, k)
     }
 
-    err := applications.SelectRow(columns, where, &application)
+    err := applications.SelectRow(columns, where, nil, &application)
 
     if err != nil {
         return "", err
@@ -81,7 +86,7 @@ func GetApplicationId(Name string) (int64, error) {
         columns = append(columns, k)
     }
 
-    err := applications.SelectRow(columns, where, &application)
+    err := applications.SelectRow(columns, where, nil, &application)
 
     if err != nil {
         return -1, err

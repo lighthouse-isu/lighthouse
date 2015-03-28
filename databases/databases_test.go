@@ -16,7 +16,7 @@ package databases
 
 import (
     "testing"
-    "strings"
+    "database/sql"
 
     "github.com/stretchr/testify/assert"
 
@@ -35,15 +35,54 @@ type testObject struct {
     Phone string
 }
 
-func Test_SetAndGetDefaultConnection(t *testing.T) {
+type testDatabase struct {
+    sql.DB
+}
+
+func (this *testDatabase) Compiler(schema Schema) Compiler {
+    return &testCompiler{}
+}
+
+type testCompiler struct {}
+
+func (t *testCompiler) ConvertInput(o interface{}, c string) (interface{}) { 
+    return o 
+}
+
+func (t *testCompiler) ConvertOutput(o interface{}, c string) (interface{}) { 
+    return o 
+}
+
+func (t *testCompiler) CompileInsert(tab string, val map[string]interface{}) (string, []interface{}) {
+    return "INSERT", []interface{}{}
+}
+
+func (t *testCompiler) CompileDelete(tab string, f Filter) (string, []interface{}) {
+    return "DELETE", []interface{}{}
+}
+
+func (t *testCompiler) CompileUpdate(tab string, to map[string]interface{}, w Filter) (string, []interface{}) {
+    return "UPDATE", []interface{}{}
+}
+
+func (t *testCompiler) CompileSelect(tab string, c []string, f Filter, o *SelectOptions) (string, []interface{}) {
+    return "SELECT", []interface{}{}
+}
+
+func testDB() DBInterface {
     db, _ := sqlmock.New()
+    return &testDatabase{*db}
+}
+
+func Test_SetAndGetDefaultConnection(t *testing.T) {
+    db := testDB()
 
     SetDefaultConnection(db)
     assert.Equal(t, db, DefaultConnection())
 }
 
 func Test_NewTableDefault(t *testing.T) {
-    db, _ := sqlmock.New()
+    db := testDB()
     SetDefaultConnection(db)
 
     var inter interface{}
@@ -56,29 +95,59 @@ func Test_NewTableDefault(t *testing.T) {
 func Test_NewTable_Panic(t *testing.T) {
     defer func() { recover() }()
 
-    db, _ := sqlmock.New()
+    db := testDB()
     NewTable(db, "test_table", nil)
 
     t.Errorf("Nil schema in NewTable should panic")
 }
 
 func Test_Insert_WithReturn(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewLockingTable(db, "test_table", testSchema)
 
     newData := map[string]interface{}{
         "Name" : "John Doe",
         "Age" : 42,
     }
 
-    sqlmock.ExpectQuery(`INSERT INTO test_table (.+) VALUES (.+) RETURNING Age;`).
-        WithArgs(42, "John Doe").
-        WillReturnRows(sqlmock.NewRows([]string{"Age"}).AddRow(1))
+    sqlmock.ExpectExec(`INSERT`).
+        WillReturnResult(sqlmock.NewResult(0, 1))
 
-    retval, err := table.Insert(newData, "Age")
+    sqlmock.ExpectQuery(`SELECT`).
+        WillReturnRows(sqlmock.NewRows([]string{"Age"}).
+            AddRow(42))
+
+    var res testObject
+
+    cols := []string{"Age"}
+    err := table.InsertReturn(newData, cols, nil, &res)
 
     assert.Nil(t, err)
-    assert.Equal(t, 1, retval)
+    assert.Equal(t, 42, res.Age)
+
+    if err := db.Close(); err != nil {
+        t.Errorf(err.Error())
+    }
+}
+
+func Test_Insert_WithReturn_NoInsert(t *testing.T) {
+    db := testDB()
+    table := NewLockingTable(db, "test_table", testSchema)
+
+    newData := map[string]interface{}{
+        "Name" : "John Doe",
+        "Age" : 42,
+    }
+
+    sqlmock.ExpectExec(`INSERT`).
+        WillReturnResult(sqlmock.NewResult(0, 0))
+
+    var res testObject
+
+    cols := []string{"Age"}
+    err := table.InsertReturn(newData, cols, nil, &res)
+
+    assert.Equal(t, NoUpdateError, err)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
@@ -86,42 +155,39 @@ func Test_Insert_WithReturn(t *testing.T) {
 }
 
 func Test_Insert_NoReturn(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     newData := map[string]interface{}{
         "Name" : "John Doe",
         "Age" : 42,
     }
 
-    sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
-        WithArgs(42, "John Doe").
+    sqlmock.ExpectExec(`INSERT`).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
-    retval, err := table.Insert(newData, "")
+    err := table.Insert(newData)
 
     assert.Nil(t, err)
-    assert.Nil(t, retval)
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
 }
 
-func Test_Insert_NoInsert(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+func Test_Insert_NoReturn_NoInsert(t *testing.T) {
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     newData := map[string]interface{}{
         "Name" : "John Doe",
         "Age" : 42,
     }
 
-    sqlmock.ExpectExec(`INSERT INTO test_table (.+) VALUES (.+);`).
-        WithArgs(42, "John Doe").
+    sqlmock.ExpectExec(`INSERT`).
         WillReturnResult(sqlmock.NewResult(0, 0))
 
-    _, err := table.Insert(newData, "")
+    err := table.Insert(newData)
 
     assert.Equal(t, NoUpdateError, err)
 
@@ -131,8 +197,8 @@ func Test_Insert_NoInsert(t *testing.T) {
 }
 
 func Test_Update(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     to := map[string]interface{} {
         "Name": "Jane Doe",
@@ -144,8 +210,7 @@ func Test_Update(t *testing.T) {
         "Phone" : "123-456-7890",
     }
 
-    sqlmock.ExpectExec(`UPDATE test_table SET (.+) WHERE (.+);`).
-        WithArgs(42, "Jane Doe", 41, "123-456-7890").
+    sqlmock.ExpectExec(`UPDATE`).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
     err := table.Update(to, where)
@@ -157,22 +222,21 @@ func Test_Update(t *testing.T) {
 }
 
 func Test_SelectRow(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     columns := []string {"Phone", "Name"}
     filter := Filter {
         "Age" : 1,
     }
 
-    sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
-        WithArgs(1).
-        WillReturnRows(sqlmock.NewRows(columns).AddRow([]byte("123-456-7890"), []byte("Sam")))
+    sqlmock.ExpectQuery(`SELECT`).
+        WillReturnRows(sqlmock.NewRows(columns).AddRow("123-456-7890", "Sam"))
 
     key := testObject{"Sam", 0, "123-456-7890"}
 
     var res testObject
-    err := table.SelectRow(columns, filter, &res)
+    err := table.SelectRow(columns, filter, nil, &res)
 
     assert.Equal(t, key, res)
     assert.Nil(t, err)
@@ -183,8 +247,8 @@ func Test_SelectRow(t *testing.T) {
 }
 
 func Test_Select(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     columns := []string {"Phone", "Name"}
     filter := Filter {
@@ -197,15 +261,14 @@ func Test_Select(t *testing.T) {
         testObject{"Bob", 0, "319-256-7380"},
     }
 
-    sqlmock.ExpectQuery(`SELECT Phone, Name FROM test_table WHERE Age = .+;`).
-        WithArgs(1).
+    sqlmock.ExpectQuery(`SELECT`).
         WillReturnRows(sqlmock.NewRows(columns).
-            AddRow([]byte(key[0].Phone), []byte(key[0].Name)).
-            AddRow([]byte(key[1].Phone), []byte(key[1].Name)).
-            AddRow([]byte(key[2].Phone), []byte(key[2].Name)))
+            AddRow(key[0].Phone, key[0].Name).
+            AddRow(key[1].Phone, key[1].Name).
+            AddRow(key[2].Phone, key[2].Name))
 
     var res testObject
-    scan, err := table.Select(columns, filter, SelectOptions{})
+    scan, err := table.Select(columns, filter, nil)
 
     assert.Nil(t, err)
 
@@ -219,32 +282,14 @@ func Test_Select(t *testing.T) {
     }
 }
 
-func Test_Select_Options(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
-
-    columns := []string {"Phone", "Name"}
-
-    sqlmock.ExpectQuery(`SELECT DISTINCT .+;`).
-        WillReturnRows(sqlmock.NewRows(columns))
-
-    _, err := table.Select(columns, nil, SelectOptions{Distinct: true})
-
-    assert.Nil(t, err)
-
-    if err := db.Close(); err != nil {
-        t.Errorf(err.Error())
-    }
-}
-
 func Test_Select_Star(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", Schema{"Name" : "text"}}
+    db := testDB()
+    table := NewTable(db, "test_table", Schema{"Name" : "text"})
 
-    sqlmock.ExpectQuery(`SELECT Name .+;`).
+    sqlmock.ExpectQuery(`SELECT`).
         WillReturnRows(sqlmock.NewRows([]string{"Name"}))
 
-    _, err := table.Select(nil, nil, SelectOptions{})
+    _, err := table.Select(nil, nil, nil)
 
     assert.Nil(t, err)
 
@@ -254,15 +299,15 @@ func Test_Select_Star(t *testing.T) {
 }
 
 func Test_SelectRow_Star(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", Schema{"Name" : "text"}}
+    db := testDB()
+    table := NewTable(db, "test_table", Schema{"Name" : "text"})
 
     var data testObject
 
-    sqlmock.ExpectQuery(`SELECT Name .+;`).
-        WillReturnRows(sqlmock.NewRows([]string{"Name"}).AddRow([]byte("Sam")))
+    sqlmock.ExpectQuery(`SELECT`).
+        WillReturnRows(sqlmock.NewRows([]string{"Name"}).AddRow("Sam"))
 
-    err := table.SelectRow(nil, nil, &data)
+    err := table.SelectRow(nil, nil, nil, &data)
 
     assert.Nil(t, err)
 
@@ -272,16 +317,15 @@ func Test_SelectRow_Star(t *testing.T) {
 }
 
 func Test_Delete(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
     where := map[string]interface{} {
         "Age" : 41,
         "Phone" : "123-456-7890",
     }
 
-    sqlmock.ExpectExec(`DELETE FROM test_table WHERE (.+);`).
-        WithArgs(41, "123-456-7890").
+    sqlmock.ExpectExec(`DELETE`).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
     err := table.Delete(where)
@@ -293,10 +337,10 @@ func Test_Delete(t *testing.T) {
 }
 
 func Test_Delete_Nil(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
-    sqlmock.ExpectExec(`DELETE FROM test_table;`).
+    sqlmock.ExpectExec(`DELETE`).
         WillReturnResult(sqlmock.NewResult(0, 1))
 
     err := table.Delete(nil)
@@ -308,92 +352,13 @@ func Test_Delete_Nil(t *testing.T) {
 }
 
 func Test_Delete_NoUpdate(t *testing.T) {
-    db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    db := testDB()
+    table := NewTable(db, "test_table", testSchema)
 
-    sqlmock.ExpectExec(`.*`).
+    sqlmock.ExpectExec(`DELETE`).
         WillReturnResult(sqlmock.NewResult(0, 0))
 
     err := table.Delete(nil)
 
     assert.Equal(t, NoUpdateError, err)
-}
-
-func Test_BuildQueryFrom_Normal(t *testing.T) {
-    columns := []string {"Phone", "Name"}
-    filter := Filter {"Age" : 1, "Name" : "Sam"}
-
-    res, vars := buildQueryFrom("TABLE", columns, filter, SelectOptions{})
-
-    key := "SELECT Phone, Name FROM TABLE WHERE "
-
-    assert.True(t, strings.HasPrefix(res, key))
-    res = res[len(key):]
-
-    assert.True(t, strings.Contains(res, "Age") && strings.Contains(res, "Name"))
-
-    if strings.HasPrefix(res, "Age") {
-        assert.Equal(t, 1, vars[0])
-        assert.Equal(t, "Sam", vars[1])
-    } else {
-        assert.Equal(t, "Sam", vars[0])
-        assert.Equal(t, 1, vars[1])
-    } 
-}
-
-func Test_BuildQueryFrom_Options(t *testing.T) {
-    res, vars := buildQueryFrom("TABLE", []string{"Name"}, nil, SelectOptions{Distinct: true})
-
-    key := "SELECT DISTINCT Name FROM TABLE;"
-
-    assert.Equal(t, key, res)
-    assert.Equal(t, 0, len(vars))
-}
-
-func Test_ConvertInput(t *testing.T) {
-    type TestKeyPair struct{
-        Test interface{}
-        Key interface{}
-    }
-
-    tests := map[string]TestKeyPair {
-        "text" : TestKeyPair{"STRING_TEST", "STRING_TEST"},
-        "integer" : TestKeyPair{42, 42},
-        "json" : TestKeyPair{[]string{"TEST"}, `["TEST"]`},
-    }
-
-    shema := map[string]string{}
-
-    db, _ := sqlmock.New()
-    table := &Table{db, "junk", shema}
-
-    for trial, pair := range tests {
-        shema["COLUMN"] = trial
-        res := table.convertInput(pair.Test, "COLUMN")
-        assert.Equal(t, pair.Key, res)
-    }
-}
-
-func Test_ConvertOutput(t *testing.T) {
-    type TestKeyPair struct{
-        Test interface{}
-        Key interface{}
-    }
-
-    tests := map[string]TestKeyPair {
-        "text" : TestKeyPair{[]byte("STRING_TEST"), "STRING_TEST"},
-        "integer" : TestKeyPair{int64(42), 42},
-        "json" : TestKeyPair{[]byte(`["TEST"]`), []interface{}{"TEST"}, },
-    }
-
-    shema := map[string]string{}
-
-    db, _ := sqlmock.New()
-    table := &Table{db, "junk", shema}
-
-    for trial, pair := range tests {
-        shema["COLUMN"] = trial
-        res := table.convertOutput(pair.Test, "COLUMN")
-        assert.Equal(t, pair.Key, res)
-    }
 }

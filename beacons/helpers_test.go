@@ -39,7 +39,7 @@ func Test_BeaconExists_True(t *testing.T) {
         "Token" : "TOKEN", 
     }
 
-    beacons.Insert(testData, "")
+    beacons.Insert(testData)
 
     assert.True(t, beaconExists("BEACON_ADDR"))
 }
@@ -62,7 +62,7 @@ func Test_InstanceExists_True(t *testing.T) {
         "CanAccessDocker" : true,
     }
 
-    instances.Insert(testData, "")
+    instances.Insert(testData)
 
     assert.True(t, instanceExists("INST_ADDR"))
 }
@@ -85,7 +85,7 @@ func Test_AddBeaconData_New(t *testing.T) {
     addBeacon(testBeaconData)
 
     var values beaconData
-    beacons.SelectRow(nil, nil, &values)
+    beacons.SelectRow(nil, nil, nil, &values)
 
     assert.Equal(t, testBeaconData, values)
 }
@@ -117,7 +117,7 @@ func Test_AddInstanceData_New(t *testing.T) {
     addInstance(testData)
 
     var values instanceData
-    instances.SelectRow(nil, nil, &values)
+    instances.SelectRow(nil, nil, nil, &values)
 
     assert.Equal(t, testData, values)
 }
@@ -147,16 +147,16 @@ func Test_UpdateBeaconData(t *testing.T) {
         "Token" : "TOKEN_FAIL", 
     }
 
-    beacons.Insert(testBeaconData, "")
+    beacons.Insert(testBeaconData)
 
     var result beaconData
     
     updateBeaconField("Token", "TOKEN_PASS", "ADDR_FAIL")
-    beacons.SelectRow(nil, nil, &result)
+    beacons.SelectRow(nil, nil, nil, &result)
     assert.Equal(t, "TOKEN_PASS", result.Token)
 
     updateBeaconField("Address", "ADDR_PASS", "ADDR_FAIL")
-    beacons.SelectRow(nil, nil, &result)
+    beacons.SelectRow(nil, nil, nil, &result)
     assert.Equal(t, "ADDR_PASS", result.Address)
 }
 
@@ -171,7 +171,7 @@ func Test_UpdateInstanceData(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR", 
     }
 
-    instances.Insert(testInstanceData, "")
+    instances.Insert(testInstanceData)
 
     keyInstance := instanceData {
         "INST_ADDR", "NAME_PASS", true, "BEACON_PASS",
@@ -180,7 +180,7 @@ func Test_UpdateInstanceData(t *testing.T) {
     var result instanceData
     
     updateInstance(keyInstance)
-    instances.SelectRow(nil, nil, &result)
+    instances.SelectRow(nil, nil, nil, &result)
     assert.Equal(t, keyInstance, result)
 }
 
@@ -193,7 +193,7 @@ func Test_GetBeaconData_Found(t *testing.T) {
         "Token" : "TOKEN", 
     }
 
-    beacons.Insert(testBeaconData, "")
+    beacons.Insert(testBeaconData)
 
     res, err := getBeaconData("BEACON_ADDR")
 
@@ -242,7 +242,7 @@ func Test_ListBeacons_ValidUser(t *testing.T) {
         auth.SetUserBeaconAuthLevel(user, addr, auth.OwnerAuthLevel)
 
         keyList = append(keyList, aliases.Alias{"", newBeacon["Address"].(string)})
-        beacons.Insert(newBeacon, "")
+        beacons.Insert(newBeacon)
     }
 
     beaconList, err := getBeaconsList(user)
@@ -269,8 +269,8 @@ func Test_ListBeacons_BadUser(t *testing.T) {
     user, _ := auth.GetUser("EMAIL")
     auth.SetUserBeaconAuthLevel(user, "BEACON_ADDR 1", auth.OwnerAuthLevel)
 
-    beacons.Insert(goodBeacon, "")
-    beacons.Insert(badBeacon, "")
+    beacons.Insert(goodBeacon)
+    beacons.Insert(badBeacon)
 
     beaconList, err := getBeaconsList(user)
 
@@ -289,7 +289,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
 
     beacons.Insert(map[string]interface{}{
         "Address" : "BEACON_ADDR", "Token" : "TOKEN",
-    }, "")
+    })
 
     keyList := make([]map[string]interface{}, 0)
 
@@ -307,7 +307,7 @@ func Test_ListInstances_ValidUser(t *testing.T) {
             "BeaconAddress" : "BEACON_ADDR", 
         }
 
-        instances.Insert(newInstance, "")
+        instances.Insert(newInstance)
 
         newInstance["Alias"] = ""
         keyList = append(keyList, newInstance)
@@ -325,7 +325,7 @@ func Test_ListInstances_BadUser(t *testing.T) {
 
     beacons.Insert(map[string]interface{}{
         "Address" : "BEACON_ADDR", "Token" : "TOKEN",
-    }, "")
+    })
 
     auth.CreateUser("EMAIL", "", "")
     user, _ := auth.GetUser("EMAIL")
@@ -337,7 +337,7 @@ func Test_ListInstances_BadUser(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR", 
     }
 
-    instances.Insert(instance, "")
+    instances.Insert(instance)
 
     key := []map[string]interface{}{}
 
@@ -361,7 +361,7 @@ func Test_ListInstances_BadBeacon(t *testing.T) {
         "BeaconAddress" : "BEACON_ADDR", 
     }
 
-    instances.Insert(instance, "")
+    instances.Insert(instance)
 
     key := []map[string]interface{}{}
 
@@ -403,7 +403,7 @@ func Test_RefreshVMListOf_Valid(t *testing.T) {
     }
 
     var inst instanceData
-    instances.SelectRow(nil, nil, &inst)
+    instances.SelectRow(nil, nil, nil, &inst)
 
     assert.Equal(t, key, inst)
 }
@@ -471,7 +471,7 @@ func Test_RefreshVMListOf_Update(t *testing.T) {
         "Name" : "NAME_FAIL",
         "CanAccessDocker" : false,
         "BeaconAddress" : "ADDR_FAIL",
-    }, "")
+    })
 
     f := func(w http.ResponseWriter, r *http.Request) {
         val, _ := json.Marshal([]structs.VM{vm})
@@ -494,7 +494,7 @@ func Test_RefreshVMListOf_Update(t *testing.T) {
     }
 
     var inst instanceData
-    instances.SelectRow(nil, nil, &inst)
+    instances.SelectRow(nil, nil, nil, &inst)
 
     assert.Equal(t, key, inst)
 }

@@ -56,7 +56,7 @@ func AddAlias(alias, address string) error {
         "Address" : address,
     }
 
-    _, err := aliases.Insert(entry, "")
+    err := aliases.Insert(entry)
 
     return err
 }
@@ -84,7 +84,7 @@ func GetAddressOf(alias string) (string, error) {
     
     var val Alias
 
-    err := aliases.SelectRow(cols, where, &val)
+    err := aliases.SelectRow(cols, where, nil, &val)
     
     if err != nil {
         return "", err
@@ -99,7 +99,7 @@ func GetAliasOf(address string) (string, error) {
     
     var val Alias
 
-    err := aliases.SelectRow(cols, where, &val)
+    err := aliases.SelectRow(cols, where, nil, &val)
     
     if err != nil {
         return "", err
