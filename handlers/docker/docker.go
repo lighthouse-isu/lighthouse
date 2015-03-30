@@ -16,8 +16,8 @@ package docker
 
 import (
     "fmt"
+    "io"
     "net/http"
-    "io/ioutil"
     "bytes"
     "encoding/json"
 	"regexp"
@@ -28,7 +28,8 @@ import (
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons/aliases"
-	"github.com/lighthouse/lighthouse/handlers/containers"
+    "github.com/lighthouse/lighthouse/logging"
+    "github.com/lighthouse/lighthouse/handlers/containers"
 )
 
 /*
@@ -94,13 +95,21 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         return &handlers.HandlerError{resp.StatusCode, "docker", resp.Status}
     }
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return &handlers.HandlerError{500, "control", "Failed reading response body"}
+    w.WriteHeader(resp.StatusCode)
+    var bodyBuffer = make([]byte, 16)
+
+    for {
+        n, err := resp.Body.Read(bodyBuffer)
+        w.Write(bodyBuffer[:n])
+
+        if err != nil {
+            if err != io.EOF {
+                logging.Info("An unexpected error occured while reading the docker stream")
+            }
+            break
+        }
     }
 
-    w.WriteHeader(resp.StatusCode)
-    w.Write(body)
     return nil
 }
 
@@ -149,6 +158,7 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 */
 func GetHandlerInfo(r *http.Request) (handlers.HandlerInfo, bool) {
     var info handlers.HandlerInfo
+    info.HandlerData = make(map[string]interface{})
 
     params, ok := handlers.GetEndpointParams(r, []string{"Host", "DockerEndpoint"})
 

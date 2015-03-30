@@ -16,7 +16,6 @@ package containers
 
 import (
     "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/databases/postgres"
 )
 
 var containers databases.TableInterface
@@ -35,16 +34,13 @@ type Container struct {
     Name string
 }
 
-func getDBSingleton() databases.TableInterface {
+func Init(reload bool) {
     if containers == nil {
-        panic("Containers database not initialized")
+        containers = databases.NewSchemaTable(nil, "containers", schema)
     }
-    return containers
-}
 
-func Init() {
-    if containers == nil {
-        containers = databases.NewSchemaTable(postgres.Connection(), "containers", schema)
+    if reload {
+        containers.Reload()
     }
 }
 
@@ -55,7 +51,7 @@ func CreateContainer(AppId int64, DockerInstance string, Name string) (int64, er
     values["DockerInstance"] = DockerInstance
     values["Name"] = Name
 
-    containerId, err := getDBSingleton().InsertSchema(values, "Id")
+    containerId, err := containers.InsertSchema(values, "Id")
     if err != nil {
         return -1, err
     }
@@ -65,7 +61,7 @@ func CreateContainer(AppId int64, DockerInstance string, Name string) (int64, er
 
 func DeleteContainer(Id int64) (err error) {
     where := databases.Filter{"Id" : Id}
-    return getDBSingleton().DeleteRowsSchema(where)
+    return containers.DeleteRowsSchema(where)
 }
 
 func GetContainerById(Id int64, container *Container) (err error) {
@@ -76,7 +72,7 @@ func GetContainerById(Id int64, container *Container) (err error) {
         columns = append(columns, k)
     }
 
-    err = getDBSingleton().SelectRowSchema(columns, where, container)
+    err = containers.SelectRowSchema(columns, where, container)
 
     return
 }

@@ -24,8 +24,6 @@ import (
     "encoding/json"
 
     "database/sql"
-
-    "github.com/lighthouse/lighthouse/logging"
 )
 
 var (
@@ -55,18 +53,47 @@ const (
     valueColumn string = "valueColumn"
 )
 
+var (
+    defaultConnection DBInterface
+)
+
+func SetDefaultConnection(conn DBInterface) {
+    defaultConnection = conn
+}
+
+func DefaultConnection() DBInterface {
+    return defaultConnection
+}
+
 func NewTable(db DBInterface, table string) TableInterface {
+    if db == nil {
+        db = defaultConnection
+    }
+
     this := &Table{db, table, nil}
-    this.drop()
-    this.init()
     return this
 }
 
 func NewSchemaTable(db DBInterface, table string, schema Schema) TableInterface {
+    if db == nil {
+        db = defaultConnection
+    }
+
+    if len(schema) == 0 {
+        panic("No schema given to database")
+    }
+
     this := &Table{db, table, schema}
-    this.drop()
-    this.initSchema()
     return this
+}
+
+func (this *Table) Reload() {
+    this.drop()
+    if this.schema != nil {
+        this.initSchema()
+    } else {
+        this.init()
+    }
 }
 
 func (this *Table) init() {
@@ -77,10 +104,6 @@ func (this *Table) init() {
 }
 
 func (this *Table) initSchema() {
-    if len(this.schema) == 0 {
-        panic("No schema given to database")
-    }
-
     var buffer bytes.Buffer
     first := true
 
@@ -156,9 +179,6 @@ func (this *Table) Insert(key string, value interface{}) error {
 
     _, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -280,9 +300,6 @@ func (this *Table) DeleteRowsSchema(where Filter) (error) {
         }
     }
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -293,9 +310,6 @@ func (this *Table) Update(key string, newValue interface{}) (error) {
 
     _, err := this.db.Exec(query, key, string(json))
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -365,9 +379,6 @@ func (this *Table) UpdateSchema(to, where map[string]interface{}) (error) {
         }
     }
 
-    if err != nil {
-        logging.Info(err.Error())
-    }
     return err
 }
 
@@ -378,7 +389,7 @@ func (this *Table) SelectRow(key string, value interface{}) error {
     row := this.db.QueryRow(query, key)
 
     if row == nil {
-        return errors.New("unknown database error")
+        return UnknownError
     }
 
     var data interface{}
@@ -400,15 +411,7 @@ func buildQueryFrom(table string, columns []string, where Filter, opts SelectOpt
         buffer.WriteString("DISTINCT ")
     }
 
-    first := true
-    for _, col := range columns {
-        if !first {
-            buffer.WriteString(", ")
-        }
-        buffer.WriteString(col)
-
-        first = false
-    }
+    buffer.WriteString(strings.Join(columns, ", "))
 
     buffer.WriteString(" FROM ") 
     buffer.WriteString(table)
@@ -462,7 +465,7 @@ func (this *Table) SelectRowSchema(columns []string, where Filter, dest interfac
     row := this.db.QueryRow(query, queryVals...)
 
     if row == nil {
-        return errors.New("unknown database error")
+        return UnknownError
     }
 
     values := make([]interface{}, len(columns))

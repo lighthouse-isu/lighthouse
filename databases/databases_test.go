@@ -36,6 +36,13 @@ type testObject struct {
     Phone string
 }
 
+func Test_SetAndGetDefaultConnection(t *testing.T) {
+    db, _ := sqlmock.New()
+
+    SetDefaultConnection(db)
+    assert.Equal(t, db, DefaultConnection())
+}
+
 func Test_NewTable(t *testing.T) {
     db, _ := sqlmock.New()
 
@@ -44,6 +51,7 @@ func Test_NewTable(t *testing.T) {
     var inter interface{}
     inter = NewTable(db, "test_table")
     table := inter.(*Table)
+    table.Reload()
 
     assert.Nil(t, table.schema)
     assert.Equal(t, "test_table", table.table)
@@ -52,6 +60,17 @@ func Test_NewTable(t *testing.T) {
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
+}
+
+func Test_NewTableDefault(t *testing.T) {
+    db, _ := sqlmock.New()
+    SetDefaultConnection(db)
+
+    var inter interface{}
+    inter = NewTable(nil, "test_table")
+    table := inter.(*Table)
+
+    assert.Equal(t, db, table.db)
 }
 
 func Test_NewSchemaTable(t *testing.T) {
@@ -64,6 +83,7 @@ func Test_NewSchemaTable(t *testing.T) {
     var inter interface{}
     inter = NewSchemaTable(db, "test_table", testSchema)
     table := inter.(*Table)
+    table.Reload()
 
     assert.Equal(t, testSchema, table.schema)
     assert.Equal(t, "test_table", table.table)
@@ -72,6 +92,17 @@ func Test_NewSchemaTable(t *testing.T) {
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())
     }
+}
+
+func Test_NewSchemaTableDefault(t *testing.T) {
+    db, _ := sqlmock.New()
+    SetDefaultConnection(db)
+
+    var inter interface{}
+    inter = NewSchemaTable(nil, "test_table", testSchema)
+    table := inter.(*Table)
+    
+    assert.Equal(t, db, table.db)
 }
 
 func Test_NewSchemaTable_Panic(t *testing.T) {
@@ -319,18 +350,12 @@ func Test_SelectSchema_Options(t *testing.T) {
 
 func Test_SelectSchema_Star(t *testing.T) {
     db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
+    table := &Table{db, "test_table", Schema{"Name" : "text"}}
 
-    columns := []string {"Phone", "Name"}
-    filter := Filter {
-        "Age" : 1,
-    }
+    sqlmock.ExpectQuery(`SELECT Name .+;`).
+        WillReturnRows(sqlmock.NewRows([]string{"Name"}))
 
-    sqlmock.ExpectQuery(`SELECT \* .+;`).
-        WithArgs(1).
-        WillReturnRows(sqlmock.NewRows(columns))
-
-    _, err := table.SelectSchema(nil, filter, SelectOptions{})
+    _, err := table.SelectSchema(nil, nil, SelectOptions{})
 
     assert.Nil(t, err)
 
@@ -341,20 +366,14 @@ func Test_SelectSchema_Star(t *testing.T) {
 
 func Test_SelectRowSchema_Star(t *testing.T) {
     db, _ := sqlmock.New()
-    table := &Table{db, "test_table", testSchema}
-
-    columns := []string {"Age", "Name", "Phone"}
-    filter := Filter {
-        "Age" : 1,
-    }
+    table := &Table{db, "test_table", Schema{"Name" : "text"}}
 
     var data testObject
 
-    sqlmock.ExpectQuery(`SELECT \* .+;`).
-        WithArgs(1).
-        WillReturnRows(sqlmock.NewRows(columns).AddRow(int64(1), []byte("Sam"), []byte("123-456-7890")))
+    sqlmock.ExpectQuery(`SELECT Name .+;`).
+        WillReturnRows(sqlmock.NewRows([]string{"Name"}).AddRow([]byte("Sam")))
 
-    err := table.SelectRowSchema(nil, filter, &data)
+    err := table.SelectRowSchema(nil, nil, &data)
 
     assert.Nil(t, err)
 
@@ -433,10 +452,10 @@ func Test_BuildQueryFrom_Normal(t *testing.T) {
     } 
 }
 
-func Test_BuildQueryFrom_NilsAndOptions(t *testing.T) {
-    res, vars := buildQueryFrom("TABLE", nil, nil, SelectOptions{Distinct: true})
+func Test_BuildQueryFrom_Options(t *testing.T) {
+    res, vars := buildQueryFrom("TABLE", []string{"Name"}, nil, SelectOptions{Distinct: true})
 
-    key := "SELECT DISTINCT * FROM TABLE;"
+    key := "SELECT DISTINCT Name FROM TABLE;"
 
     assert.Equal(t, key, res)
     assert.Equal(t, 0, len(vars))

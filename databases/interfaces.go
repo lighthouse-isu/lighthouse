@@ -40,6 +40,7 @@ type TableInterface interface {
     UpdateSchema(map[string]interface{}, map[string]interface{})(error)
     SelectRowSchema([]string, Filter, interface{})(error)
     SelectSchema([]string, Filter, SelectOptions)(ScannerInterface, error)
+    Reload()
 }
 
 type ScannerInterface interface {
