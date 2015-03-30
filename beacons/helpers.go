@@ -13,6 +13,7 @@ package beacons
 
 import (
     "fmt"
+    "time"
     "errors"
     "encoding/json"
     "io/ioutil"
@@ -195,7 +196,11 @@ func refreshVMListOf(beacon beaconData) error {
     // Assuming user has permission to access token since they provided it
     req.Header.Set(HEADER_TOKEN_KEY, beacon.Token)
 
-    resp, err := http.DefaultClient.Do(req)
+    client := http.Client{
+        Timeout: time.Duration(3 * time.Second),
+    }
+
+    resp, err := client.Do(req)
     if err != nil {
         return err
     }
