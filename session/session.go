@@ -16,6 +16,7 @@ package session
 
 import (
     "os"
+    "path"
     "io/ioutil"
     "net/http"
 
@@ -26,7 +27,8 @@ import (
 var cookieStore *sessions.CookieStore
 
 func init() {
-    sessionKey, err := loadSessionKey(os.TempDir() + "lighthouse_session.key")
+    sessionKey, err := loadSessionKey(
+        path.Join(os.TempDir(), "lighthouse_session.key"))
 
     if err != nil {
         panic(err.Error())
