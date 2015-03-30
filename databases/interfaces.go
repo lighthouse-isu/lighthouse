@@ -55,6 +55,8 @@ type Compiler interface {
     ConvertInput(interface{}, string) interface{}
     ConvertOutput(interface{}, string) interface{}
 
+    CompileCreate(string) (string)
+    CompileDrop(string) (string)
     CompileInsert(string, map[string]interface{}) (string, []interface{})
     CompileDelete(string, Filter) (string, []interface{})
     CompileUpdate(string, map[string]interface{}, Filter) (string, []interface{})

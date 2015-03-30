@@ -90,6 +90,22 @@ func Test_Exec(t *testing.T) {
 	assert.Equal(t, 73, cnt)
 }
 
+func Test_CompileCreate(t *testing.T) {
+    comp := &postgresCompiler{testSchema}
+    exec := comp.CompileCreate("TABLE")
+
+    key := "CREATE TABLE TABLE (Age integer, Name text UNIQUE PRIMARY KEY, Phone text);"
+    assert.Equal(t, key, exec)
+}
+
+func TestCompileDrop(t *testing.T) {
+    comp := &postgresCompiler{testSchema}
+    exec := comp.CompileDrop("TABLE")
+
+    key := "DROP TABLE TABLE;"
+    assert.Equal(t, key, exec)
+}
+
 func Test_CompileInsert(t *testing.T) {
     values := map[string]interface{}{"Age" : 1, "Name" : "Sam"}
 

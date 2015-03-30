@@ -53,6 +53,14 @@ func (t *testCompiler) ConvertOutput(o interface{}, c string) (interface{}) {
     return o 
 }
 
+func (t *testCompiler) CompileCreate(tab string) (string) {
+    return "CREATE"
+}
+
+func (t *testCompiler) CompileDrop(tab string) (string) {
+    return "DROP"
+}
+
 func (t *testCompiler) CompileInsert(tab string, val map[string]interface{}) (string, []interface{}) {
     return "INSERT", []interface{}{}
 }
@@ -137,17 +145,11 @@ func Test_NewLockingTable_Panic(t *testing.T) {
 
 func Test_Reload(t *testing.T) {
     db := testDB()
-    schema := Schema {
-        "Name" : "text UNIQUE PRIMARY KEY",
-        "Age" : "integer",
-        "Phone" : "text",
-        "Info" : "json",
-    }
 
-    sqlmock.ExpectExec(`DROP TABLE test_table;`)
-    sqlmock.ExpectExec(`CREATE TABLE test_table .+`)
+    sqlmock.ExpectExec(`DROP`)
+    sqlmock.ExpectExec(`CREATE`)
 
-    NewTable(db, "test_table", schema).Reload()
+    NewTable(db, "test_table", testSchema).Reload()
 
     if err := db.Close(); err != nil {
         t.Errorf(err.Error())

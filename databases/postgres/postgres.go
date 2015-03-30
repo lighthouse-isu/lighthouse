@@ -116,6 +116,29 @@ func setup() *postgresConn {
     return &postgresConn{postgres}
 }
 
+func (this *postgresCompiler) CompileCreate(table string) string {
+    var cols []string
+
+    for col, colType := range this.schema {
+        // JSON type doesn't have an equality operator which breaks queries
+        if strings.Contains(colType, "json") {
+            colType = "text"
+        }
+
+        cols = append(cols, fmt.Sprintf("%s %s", col, colType))
+    }
+
+    sort.Strings(cols)
+
+    colStr := strings.Join(cols, ", ")
+
+    return fmt.Sprintf(`CREATE TABLE %s (%s);`, table, colStr)
+}
+
+func (this *postgresCompiler) CompileDrop(table string) string {
+    return fmt.Sprintf(`DROP TABLE %s;`, table)
+}
+
 func (this *postgresCompiler) CompileInsert(table string, values map[string]interface{}) (string, []interface{}) {
     var valBuf bytes.Buffer
     queryVals := make([]interface{}, len(values))

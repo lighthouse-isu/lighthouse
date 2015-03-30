@@ -15,11 +15,8 @@
 package databases
 
 import (
-    "fmt"
     "sync"
-    "bytes"
     "sort"
-    "strings"
     "errors"
     "reflect"
 
@@ -39,9 +36,7 @@ type Table struct {
     db DBInterface
     table string
     schema Schema
-
     compiler Compiler
-
     mutex *sync.Mutex
 }
 
@@ -71,7 +66,7 @@ func DefaultSelectOptions() *SelectOptions {
     return &SelectOptions{}
 }
 
-func NewTable(db DBInterface, table string, schema Schema) TableInterface {
+func NewTable(db DBInterface, table string, schema Schema) *Table {
     if db == nil {
         db = defaultConnection
     }
@@ -84,16 +79,10 @@ func NewTable(db DBInterface, table string, schema Schema) TableInterface {
     return this
 }
 
-func NewLockingTable(db DBInterface, table string, schema Schema) TableInterface {
-    if db == nil {
-        db = defaultConnection
-    }
-
-    if len(schema) == 0 {
-        panic("No schema given to database")
-    }
-
-    this := &Table{db, table, schema, db.Compiler(schema), &sync.Mutex{}}
+func NewLockingTable(db DBInterface, table string, schema Schema) *Table {
+    var this *Table
+    this = NewTable(db, table, schema)
+    this.mutex = &sync.Mutex{}
     return this
 }
 
@@ -103,35 +92,13 @@ func (this *Table) Reload() {
 }
 
 func (this *Table) init() {
-    var buffer bytes.Buffer
-    first := true
-
-    for col, colType := range this.schema {
-        if !first {
-            buffer.WriteString(", ")
-        }
-
-        // JSON type doesn't have an equality operator which breaks queries
-        if strings.Contains(colType, "json") {
-            colType = "text"
-        }
-
-        buffer.WriteString(col)
-        buffer.WriteString(" ")
-        buffer.WriteString(colType)
-
-        first = false
-    }
-
-    query := fmt.Sprintf(`CREATE TABLE %s (%s);`, this.table, buffer.String())
-    this.db.Exec(query)
+    exec := this.compiler.CompileCreate(this.table)
+    this.db.Exec(exec)
 }
 
 func (this *Table) drop() {
-    query := fmt.Sprintf(`DROP TABLE %s;`,
-        this.table)
-
-    this.db.Exec(query)
+    exec := this.compiler.CompileDrop(this.table)
+    this.db.Exec(exec)
 }
 
 func (this *Table) allColumns() []string {
