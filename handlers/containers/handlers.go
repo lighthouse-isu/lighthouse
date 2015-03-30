@@ -47,7 +47,7 @@ func containerCreate(info handlers.HandlerInfo) *handlers.HandlerError {
     //get or create application
     appId, err := applications.GetApplicationId(name)
     if err == databases.NoRowsError {
-        appId, err = applications.CreateApplication(name)
+        appId, err = applications.CreateApplication(name, info.Body)
     }
 
     if err != nil {

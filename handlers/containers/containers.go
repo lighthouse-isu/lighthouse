@@ -81,3 +81,27 @@ func GetContainerById(Id int64, container *Container) (err error) {
 
     return
 }
+
+func GetContainersOf(app int64) ([]int64, error) {
+    cols := []string{"Id"}
+    where := databases.Filter{"AppId" : app}
+
+    var ids []int64
+    var cont Container
+
+    scan, err := containers.Select(cols, where, nil)
+    if err != nil {
+        return nil, err
+    }
+
+    for scan.Next() {
+        err = scan.Scan(&cont)
+        if err != nil {
+            return nil, err
+        }
+
+        ids = append(ids, cont.Id)
+    }
+
+    return ids, nil
+}
