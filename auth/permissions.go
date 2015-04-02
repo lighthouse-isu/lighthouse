@@ -24,14 +24,15 @@ const (
 
 func NewPermission() Permission {
 	return Permission{
-		"Beacons" : make(map[string]interface{}),
+		"Beacons" : make(map[interface{}]interface{}),
+		"Applications" : make(map[interface{}]interface{})
 	}
 }
 
 func (this *User) convertPermissionsFromDB() {
 	for _, permInter := range this.Permissions {
 
-		permSet := permInter.(map[string]interface{})
+		permSet := permInter.(map[interface{}]interface{})
 
 		for perm, level := range permSet {
 			val, ok := level.(float64)
@@ -44,13 +45,13 @@ func (this *User) convertPermissionsFromDB() {
 	}
 }
 
-func (this *User) GetAuthLevel(field, key string) int {
+func (this *User) GetAuthLevel(field string, key interface{}) int {
 	permMap, ok := this.Permissions[field]
 	if !ok {
 		return -1
 	}
 
-	val, ok := permMap.(map[string]interface{})[key]
+	val, ok := permMap.(map[interface{}]interface{})[key]
 	if !ok {
 		return -1
 	}
@@ -58,15 +59,15 @@ func (this *User) GetAuthLevel(field, key string) int {
 	return val.(int)
 }
 
-func (this *User) SetAuthLevel(field, key string, level int) {
+func (this *User) SetAuthLevel(field string, key interface{}, level int) {
 	fieldInter, ok := this.Permissions[field]
 	if !ok {
 		return
 	}
 
-	fieldVal, _ := fieldInter.(map[string]interface{})
+	fieldVal, _ := fieldInter.(map[interface{}]interface{})
 	if fieldVal == nil {
-		fieldVal = make(map[string]interface{})
+		fieldVal = make(map[interface{}]interface{})
 	}
 
 	if level < DefaultAuthLevel {
@@ -95,5 +96,15 @@ func (this *User) CanAccessBeacon(beaconAddress string) bool {
 
 func (this *User) CanModifyBeacon(beaconAddress string) bool {
 	level := this.GetAuthLevel("Beacons", beaconAddress)
+	return level >= ModifyAuthLevel
+}
+
+func (this *User) CanAccessApplication(app int64) bool {
+	level := this.GetAuthLevel("Applications", app)
+	return level >= AccessAuthLevel
+}
+
+func (this *User) CanModifyApplcation(app int64) bool {
+	level := this.GetAuthLevel("Applications", app)
 	return level >= ModifyAuthLevel
 }

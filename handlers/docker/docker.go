@@ -28,7 +28,6 @@ import (
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons/aliases"
-	"github.com/lighthouse/lighthouse/handlers/containers"
 )
 
 /*
@@ -125,7 +124,6 @@ func DockerHandler(w http.ResponseWriter, r *http.Request) {
 
     var customHandlers = handlers.CustomHandlerMap{
         //regexp.MustCompile("example"): ExampleHandler,
-        regexp.MustCompile("containers/create.*") : containers.ContainerCreateHandler,
     }
 
     runCustomHandlers, err := handlers.RunCustomHandlers(info, customHandlers)

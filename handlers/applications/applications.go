@@ -22,6 +22,7 @@ import (
 var (
     UnknownApplicationError := errors.New("applications: unknown application ID")
     NotEnoughDeploymentsError := errors.New("applications: no previous deployment to rollback to")
+    StateNotChangedError := errors.New("applications: application already in requested state")
 )
 
 var applications databases.TableInterface
@@ -29,24 +30,41 @@ var deployments databases.TableInterface
 
 var appSchema = databases.Schema {
     "Id" : "serial primary key",
-    "Name" : "text",
+    "CurrentDeployment" : "integer",
+    "Name" : "text UNIQUE",
+    "Active" "boolean",
+    "Instances" : "json",
 }
 
 var deploySchema = databases.Schema {
+    "Id" : "serial primary key"
     "AppId" : "integer",
     "Command" : "json",
+    "User" : "text",
     "Date" : "datetime DEFAULT current_timestamp",
 }
 
 type applicationData struct {
     Id int64
+    CurrentDeployment int64
     Name string
+    Active bool
+    Instances []string
 }
 
 type deployData struct {
+    Id int64
     AppId int64
     Command interface{}
+    User string
     Date string
+}
+
+type streamUpdate struct {
+    Status string
+    Progress int
+    Message string
+    Total int
 }
 
 func Init(reload bool) {
@@ -64,52 +82,42 @@ func Init(reload bool) {
     }
 }
 
-func CreateApplication(name string, cmd interface{) (int64, error) {
-    values := map[string]interface{} {
-        "Name" : name,
-    }
-
-    cols := []string{"Id"}
-    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
-
-    var app applicationData
-
-    err := applications.InsertReturn(values, cols, &opts, &app)
-    if err != nil {
-        return -1, err
-    }
-
-    err = Deploy(app.Id, cmd)
-    if err != nil {
-        deleteApplication(app.Id)
-        return -1, err
-    }
-
-    return app.Id, err
-}
-
-func GetApplicationName(Id int64) (string, error) {
+func GetApplicationById(Id int64) (applicationData, error) {
     var application applicationData
     where := databases.Filter{"Id" : Id}
 
     err := applications.SelectRow(nil, where, nil, &application)
 
-    if err != nil {
-        return "", err
+    if err == databases.NoRowsError {
+        err = UnknownApplicationError
     }
 
-    return application.Name, err
+    return application, err
 }
 
-func GetApplicationId(Name string) (int64, error) {
+func GetApplicationByName(Name string) (applicationData, error) {
     var application applicationData
     where := databases.Filter{"Name" : Name}
 
     err := applications.SelectRow(nil, where, nil, &application)
 
-    if err != nil {
-        return -1, err
+    if err == databases.NoRowsError {
+        err = UnknownApplicationError
     }
 
-    return application.Id, err
+    return application, err
+}
+
+func Handle(r *mux.Router) {
+    r.HandleFunc("/create", handleCreateApplication).Methods("POST")
+
+    r.HandleFunc("/list", handleListApplications).Methods("GET")
+
+    r.HandleFunc("/list/{Id:.*}", handleGetApplicationHistory).Methods("GET")
+
+    r.HandleFunc("/start/{Id:.*}", handleStartApplication).Methods("POST")
+
+    r.HandleFunc("/stop/{Id:.*}", handleStopApplication).Methods("POST")
+
+    r.HandleFunc("/revert/{Id:.*}", handleRevertApplication).Methods("PUT")
 }
