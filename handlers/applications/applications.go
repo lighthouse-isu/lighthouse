@@ -60,13 +60,6 @@ type deployData struct {
     Date string
 }
 
-type streamUpdate struct {
-    Status string
-    Progress int
-    Message string
-    Total int
-}
-
 func Init(reload bool) {
     if applications == nil {
         applications = databases.NewLockingTable(nil, "applications", appSchema)

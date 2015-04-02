@@ -121,8 +121,27 @@ func stopApplication(app int64, w http.ResponseWriter) error {
 	return nil
 }
 
-func doDeployment(app applicationData, deploy deploymentData, pullImages bool) error {
+func doDeployment(app applicationData, deploy deploymentData, start, pullImages bool) error {
+	if forcePull {
+		image := struct {
+			Image string
+		}{}
 
+		jsonCmd, err := json.Marshal(deploy.Command)
+		if err == nil {
+			json.Unmarshal(jsonCmd, &image)
+		}
+		
+		if err != nil {
+			return err
+		}
+
+		endpoint := fmt.Sprintf("images/create?fromImage?%s", image.Image)
+		runBatch(w, app.Instances, "POST", nil, endpoint)
+	}
+
+
+	completed := runBatch(w, app.Instances, "POST", deploy.Command, "containers/create")
 }
 
 func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean {
@@ -134,23 +153,12 @@ func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean 
 		targetState, rollbackState := "start", "stop"
 	}
 
-	toRun := make([]string, len(application.Instances))
-	for i, inst := range application.Instances {
-		toRun[i] = fmt.Sprintf("%s/containers/%s/%s", 
-			inst, application.Name, targetState)
-	}
-
-	completed := runBatch(toRun, changeContainerState)
+	endpoint := fmt.Sprintf("containers/%s/%s", app.Name, targetState)
+	completed := runBatch(w, app.Instances, "POST", nil, endpoint)
 
 	if len(completed) != len(application.Instances) {
-		rollback := make([]string, len(completed))
-		for i, dest := range completed {
-			prefix := dest[:strings.LastIndex(dest, "/")]
-			rollback[i] = fmt.Sprintf("%s/%s", prefix, rollbackState)
-		}
-
-		runBatch(rollback, changeContainerState)
-
+		endpoint = fmt.Sprintf("containers/%s/%s", app.Name, rollbackState)
+		runBatch(w, app.Instances, "POST", nil, endpoint)
 		return false
 	}
 
@@ -159,16 +167,6 @@ func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean 
 	applications.Update(to, where)
 
 	return true
-}
-
-func changeContainerState(dest string) (*http.Response, error) {
-	req, err := http.NewRequest("POST", dest, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return http.DefaultClient.Do(req)
 }
 
 func getRollbackCommand(app int64, target int64) (interface{}, error) {
@@ -212,50 +210,4 @@ func getRollbackCommand(app int64, target int64) (interface{}, error) {
 	}
 
 	return deployment.Command, nil
-}
-
-func runBatch(items []string, f func(string)(*http.Response, error), w http.ResponseWriter) []string {
-	var completed []string
-	total := len(items)
-
-	wg := sync.WaitGroup{}
-	wg.Add(total)
-	for i, item := range items {
-		go func(item string, number int) {
-			resp, err := f(item)
-			update, ok := getStreamStatus(resp, err)
-
-			update.Progress = number
-			update.Total = total
-
-			body, _ := json.Marshal(update)
-			w.Write(body)
-
-			if ok {
-				completed = append(completed, item)
-			}
-		}(item, i)
-	}
-	wg.Wait()
-
-	return completed
-}
-
-func getStreamStatus(resp *http.Response, err error) (streamUpdate, bool) {
-	if err != nil {
-		return streamUpdate{Status : "Error", Message : err.Error()}, false
-	}
-
-	switch resp.Status {
-	case 201, 204:
-		return streamUpdate{Status : "OK", Message : ""}, true
-	case 304:
-		return streamUpdate{Status : "Warning", Message : "Container was already in requested state"}, true
-	case 404:
-		return streamUpdate{Status : "Error", Message : "Resource missing at instance"}, false
-	case 500, 504:
-		return streamUpdate{Status : "Error", Message : "Server error at instance"}, false
-	default:
-		return streamUpdate{Status : "Error", Message : fmt.Sprintf("Unknown status code: %d", resp.Status)}, false
-	}
 }
