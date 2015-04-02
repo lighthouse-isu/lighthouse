@@ -23,6 +23,8 @@ var (
     UnknownApplicationError := errors.New("applications: unknown application ID")
     NotEnoughDeploymentsError := errors.New("applications: no previous deployment to rollback to")
     StateNotChangedError := errors.New("applications: application already in requested state")
+    ImageNotPulledError := errors.New("applications: deployment failed to pull an image")
+    DeploymentFailedError := errors.New("applications: deployment failed on at least one instance")
 )
 
 var applications databases.TableInterface

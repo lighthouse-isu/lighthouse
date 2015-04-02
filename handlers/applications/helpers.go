@@ -16,6 +16,7 @@ package applications
 
 import (
 	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/databases"
 )
 
@@ -60,7 +61,7 @@ func removeDeployment(deploy int64) error {
     return deployments.Delete(where)
 }
 
-func createApplication(user *auth.User, name string, cmd interface{}, instances []string) error {
+func createApplication(w http.ResponseWriter, user *auth.User, name string, cmd interface{}, instances []string, start, pullImages bool) error {
 	application, err := createApplication(name, instances)
     if err != nil {
     	return err
@@ -72,7 +73,11 @@ func createApplication(user *auth.User, name string, cmd interface{}, instances 
         return err
     }
 
-    err = doDeployment(application, deployment)
+    err = doDeployment(application, deployment, pullImages)
+    if err == nil && start {
+    	err = startApplication(application, w)
+    }
+
     if err != nil {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
@@ -80,9 +85,6 @@ func createApplication(user *auth.User, name string, cmd interface{}, instances 
     }
 
     auth.SetUserApplicationAuthLevel(user, application.Id, auth.OwnerAuthLevel)
-
-    // TODO
-    // - Check query params to start or force pull
 
     return nil
 }
@@ -136,12 +138,55 @@ func doDeployment(app applicationData, deploy deploymentData, start, pullImages 
 			return err
 		}
 
-		endpoint := fmt.Sprintf("images/create?fromImage?%s", image.Image)
-		runBatch(w, app.Instances, "POST", nil, endpoint)
+		completed := handlers.NewBatchProcess(w, app.Instances).
+			AddStep("POST", nil, fmt.Sprintf("images/create?fromImage?%s", image.Image)).
+			Run()
+
+		if len(completed) != len(app.Instances) {
+			return ImageNotPulledError
+		}
 	}
 
+	batch := handlers.NewBatchProcess(w, app.Instances).
+		AddStep("DELETE", nil, fmt.Sprintf("containers/%s?force=true", app.Name)).
+		AddStep("POST", deploy.Command, "containers/create")
 
-	completed := runBatch(w, app.Instances, "POST", deploy.Command, "containers/create")
+	if app.Active {
+		batch.AddStep("POST", nil, fmt.Sprintf("containers/%s/start", app.Name))
+	}
+
+	completed := batch.Run()
+
+	if len(completed) != len(app.Instances) {
+		return DeploymentFailedError
+	}
+
+	return nil
+}
+
+func getApplicationList(user *auth.User) ([]applicationData, error) {
+	cols := []string{"Id", "CurrentDeployment", "Name", "Active"}
+    scanner, err := applications.Select(cols, nil, nil)
+
+    if err != nil {
+        return nil, err
+    }
+
+    apps := make([]applicationData, 0)
+    var app applicationData
+
+    for scanner.Next() {
+        err = scanner.Scan(&app)
+        if err != nil {
+	        return nil, err
+	    }
+
+        if user.CanAccessApplication(app.Id) {
+            apps = append(apps, app)
+        }
+    }
+   
+    return apps, nil
 }
 
 func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean {
@@ -153,12 +198,15 @@ func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean 
 		targetState, rollbackState := "start", "stop"
 	}
 
-	endpoint := fmt.Sprintf("containers/%s/%s", app.Name, targetState)
-	completed := runBatch(w, app.Instances, "POST", nil, endpoint)
+	completed := handlers.NewBatchProcess(w, app.Instances).
+		AddStep("POST", nil, fmt.Sprintf("containers/%s/%s", app.Name, targetState)).
+		Run()
 
 	if len(completed) != len(application.Instances) {
-		endpoint = fmt.Sprintf("containers/%s/%s", app.Name, rollbackState)
-		runBatch(w, app.Instances, "POST", nil, endpoint)
+		handlers.NewBatchProcess(w, completed).
+			AddStep("POST", nil, fmt.Sprintf("containers/%s/%s", app.Name, rollbackState)).
+			Run()
+
 		return false
 	}
 
@@ -169,7 +217,7 @@ func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean 
 	return true
 }
 
-func getRollbackCommand(app int64, target int64) (interface{}, error) {
+func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	var deployment deploymentData
 	var err error
 
@@ -185,17 +233,15 @@ func getRollbackCommand(app int64, target int64) (interface{}, error) {
 			Desc : true,
 		}
 
-		scan, err := deployments.Select(cols, where, opts)
+		scan, err := deployments.Select(nil, where, opts)
 		if err != nil {
 			return nil, err
 		}
 
-		// No deployments known, application doesn't exist
 		if !scan.Next() {
 			return nil, UnknownApplicationError
 		}
 
-		// Skip the previous deployments (and prep the target deployment)
 		for i := 0; i < priorCnt; i += 1 {
 			if !scan.Next() {
 				return nil, NotEnoughDeploymentsError
@@ -209,5 +255,5 @@ func getRollbackCommand(app int64, target int64) (interface{}, error) {
 		return nil, err
 	}
 
-	return deployment.Command, nil
+	return deployment, nil
 }

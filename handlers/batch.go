@@ -15,13 +15,16 @@
 package handlers
 
 import (
+	"fmt"
+	"sync"
 	"runtime"
+	"net/http"
+	"io/ioutil"
 )
 
 type batchProcess struct {
 	writer http.ResponseWriter
 	instances []string
-	steps []batchStep
 }
 
 type batchStep struct {
@@ -33,8 +36,8 @@ type batchStep struct {
 
 type StepResult struct {
     Status string
-    Message string
     Code int
+    Message string  
 
     progress int
     total int
@@ -42,20 +45,21 @@ type StepResult struct {
 
 type ResponseInterpreter func(resp *http.Response, err error) (StepResult, bool)
 
-func NewBatchProcess(writer http.ResponseWriter, instances []string) *batchProcess {
-	return &batchProcess{writer, instances, []batchStep{}}
+func NewBatchProcess(w http.ResponseWriter, instances []string) *batchProcess {
+	return &batchProcess{w, instances, []batchStep{}}
 }
 
-func (this *batchProcess) AddStep(method string, body interface{}, endpoint string) {
-	this.AddInterprettedStep(method, body, endpoint, interpretResponseDefault)
+func (this *batchProcess) AddStep(method string, body interface{}, endpoint string) *batchProcess {
+	return this.AddInterprettedStep(method, body, endpoint, interpretResponseDefault)
 }
 
-func (this *batchProcess) AddInterprettedStep(method string, body interface{}, endpoint string, inter ResponseInterpreter) {
+func (this *batchProcess) AddInterprettedStep(method string, body interface{}, endpoint string, inter ResponseInterpreter) *batchProcess {
 	step := batchStep{method, body, endpoint, inter}
 	this.steps = append(this.steps, step)
+	return this
 }
 
-func (this *batchProcess) Exec() []string {
+func (this *batchProcess) Run() []string {
 	var completed []string
 	total := len(this.instances)
 
@@ -63,28 +67,27 @@ func (this *batchProcess) Exec() []string {
 	queue := make(chan string, 1)
 
 	wg.Add(total)
-	for i, inst := range instances {
+	for i, inst := range this.instances {
 		go func(inst string, number int) {
 			defer wg.Done()
 
-			var resp *http.Response
-			var err error
+			var result StepResult
 
 			for _, step := range this.steps {
 				dest := fmt.Sprintf("%s/%s", inst, step.endpoint)
 				resp, err = runBatchRequest(step.method, dest, step.body)
 
-				if err != nil {
+				result, ok := step.interpret(resp, err)
+
+				if !ok {
 					break
 				}
 			}
 
-			update, ok := getStreamStatus(resp, err)
+			result.Progress = number
+			result.Total = total
 
-			update.Progress = number
-			update.Total = total
-
-			body, _ := json.Marshal(update)
+			body, _ := json.Marshal(result)
 			this.writer.Write(body)
 
 			// Yield to other goroutines
@@ -97,7 +100,7 @@ func (this *batchProcess) Exec() []string {
 	}
 
 	go func() {
-		wg.Done()
+		defer wg.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
 		}
@@ -118,6 +121,24 @@ func runBatchRequest(method, dest string, body interface{}) (*http.Response, err
 	return http.DefaultClient.Do(req)
 }
 
-func interpretResponseDefault(resp *http.Response, err error) (streamUpdate, bool) {
+func interpretResponseDefault(resp *http.Response, err error) (StepResult, bool) {
+	if err != nil {
+		return StepResult{"Error", 500, err.Error()}, false
+	}
 
+	body, err := ioutil.ReadAll(resp.Body)
+    if err != nil {
+        return StepResult{"Error", 500, err.Error()}, false
+    }
+
+    switch {
+    case resp.Status >= 200 && resp.Status <= 299:
+    	return StepResult{"OK", resp.Code, string(body)}, true
+
+	case resp.Status >= 300 && resp.Status <= 399:
+		return StepResult{"Warning", resp.Code, string(body)}, true
+
+	default:
+		return StepResult{"Error", resp.Code, string(body)}, false
+    }
 }
