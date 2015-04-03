@@ -34,6 +34,15 @@ type Result struct {
     Code int
 }
 
+type progressUpdate struct {
+	Status string
+    Message string
+    Code int
+    Endpoint string
+    Item int
+    Total int
+}
+
 type ResponseInterpreter func(resp *http.Response, err error)(Result, bool)
 
 func NewProcessor(writer http.ResponseWriter, instances []string) *Processor {
@@ -72,7 +81,6 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 			} else {
 				errorToReport = err
 			}
-
 		}(inst, i)
 	}
 
@@ -92,14 +100,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 }
 
 func (this *Processor) writeUpdate(res Result, endpoint string, progress, total int) {
-	update := struct {
-		Status string
-	    Message string
-	    Code int
-	    Endpoint string
-	    Progress int
-	    Total int
-	}{
+	update := progressUpdate {
 		res.Status, res.Message, res.Code, endpoint, progress, total,
 	}
 
