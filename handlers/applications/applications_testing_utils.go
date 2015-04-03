@@ -18,14 +18,12 @@ import (
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func SetupCustomTestingTable(table *databases.MockTable) {
-    applications = table
-}
-
 func SetupTestingTable() {
-    applications = databases.CommonTestingTable(schema) // schema defined in applications.go
+    applications = databases.CommonTestingTable(appSchema) // defined in applications.go
+    deployments = databases.CommonTestingTable(deploySchema) // defined in applications.go
 }
 
 func TeardownTestingTable() {
     applications = nil
+    deployments = nil
 }

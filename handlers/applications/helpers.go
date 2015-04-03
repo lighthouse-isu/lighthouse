@@ -15,16 +15,19 @@
 package applications
 
 import (
+	"fmt"
+	"net/http"
+	"encoding/json"
 	"github.com/lighthouse/lighthouse/auth"
-	"github.com/lighthouse/lighthouse/handlers"
+	"github.com/lighthouse/lighthouse/handlers/batch"
     "github.com/lighthouse/lighthouse/databases"
 )
 
-func createApplication(name string, instances []string) (applicationData, error) {
+func addApplication(name string, instances []string) (applicationData, error) {
 	values := map[string]interface{} {
         "Name" : name,
         "Instances" : instances,
-        "Active" : false
+        "Active" : false,
         "CurrentDeployment" : -1,
     }
 
@@ -36,7 +39,7 @@ func createApplication(name string, instances []string) (applicationData, error)
     return app, err
 }
 
-func createDeployment(app int64, cmd interface{}, email string) (deploymentData, error) {
+func addDeployment(app int64, cmd interface{}, email string) (deploymentData, error) {
 	values := map[string]interface{} {
         "AppId" : app,
         "Command" : cmd,
@@ -52,31 +55,28 @@ func createDeployment(app int64, cmd interface{}, email string) (deploymentData,
 }
 
 func removeApplication(app int64) error {
-    where := database.Filter{"Id" : app}
+    where := databases.Filter{"Id" : app}
     return applications.Delete(where)
 }
 
 func removeDeployment(deploy int64) error {
-    where := database.Filter{"Id" : deploy}
+    where := databases.Filter{"Id" : deploy}
     return deployments.Delete(where)
 }
 
-func createApplication(w http.ResponseWriter, user *auth.User, name string, cmd interface{}, instances []string, start, pullImages bool) error {
-	application, err := createApplication(name, instances)
+func createApplication(user *auth.User, name string, cmd interface{}, instances []string, startApp, pullImages bool, w http.ResponseWriter) error {
+	application, err := addApplication(name, instances)
     if err != nil {
     	return err
     }
 
-    deployment, err := createDeployment(application.Id, name, cmd, user.Email)
+    deployment, err := addDeployment(application.Id, cmd, user.Email)
     if err != nil {
     	removeApplication(application.Id)
         return err
     }
 
-    err = doDeployment(application, deployment, pullImages)
-    if err == nil && start {
-    	err = startApplication(application, w)
-    }
+    err = doDeployment(application, deployment, startApp, pullImages, w)
 
     if err != nil {
         removeDeployment(deployment.Id)
@@ -84,13 +84,13 @@ func createApplication(w http.ResponseWriter, user *auth.User, name string, cmd 
         return err
     }
 
-    auth.SetUserApplicationAuthLevel(user, application.Id, auth.OwnerAuthLevel)
+    auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
 
     return nil
 }
 
 func startApplication(app int64, w http.ResponseWriter) error {
-	application, err := getApplicationById(app)
+	application, err := GetApplicationById(app)
 	if err != nil {
 		return err
 	}
@@ -99,15 +99,11 @@ func startApplication(app int64, w http.ResponseWriter) error {
 		return StateNotChangedError
 	}
 
-	if !toggleApplicationState(app, w) {
-		return StateNotChangedError
-	}
-
-	return nil
+	return toggleApplicationState(application, w)
 }
 
 func stopApplication(app int64, w http.ResponseWriter) error {
-	application, err := getApplicationById(app)
+	application, err := GetApplicationById(app)
 	if err != nil {
 		return err
 	}
@@ -116,20 +112,18 @@ func stopApplication(app int64, w http.ResponseWriter) error {
 		return StateNotChangedError
 	}
 
-	if !toggleApplicationState(app, w) {
-		return StateNotChangedError
-	}
-
-	return nil
+	return toggleApplicationState(application, w)
 }
 
-func doDeployment(app applicationData, deploy deploymentData, start, pullImages bool) error {
-	if forcePull {
+func doDeployment(app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) error {
+	deploy := batch.NewProcessor(w, app.Instances)
+
+	if pullImages {
 		image := struct {
 			Image string
 		}{}
 
-		jsonCmd, err := json.Marshal(deploy.Command)
+		jsonCmd, err := json.Marshal(deployment.Command)
 		if err == nil {
 			json.Unmarshal(jsonCmd, &image)
 		}
@@ -138,28 +132,52 @@ func doDeployment(app applicationData, deploy deploymentData, start, pullImages 
 			return err
 		}
 
-		completed := handlers.NewBatchProcess(w, app.Instances).
-			AddStep("POST", nil, fmt.Sprintf("images/create?fromImage?%s", image.Image)).
-			Run()
+		pullTarget := fmt.Sprintf("images/create?fromImage?%s", image.Image)
+		err = deploy.Do("POST", nil, pullTarget, nil)
 
-		if len(completed) != len(app.Instances) {
-			return ImageNotPulledError
+		if err != nil {
+			return err
 		}
 	}
 
-	batch := handlers.NewBatchProcess(w, app.Instances).
-		AddStep("DELETE", nil, fmt.Sprintf("containers/%s?force=true", app.Name)).
-		AddStep("POST", deploy.Command, "containers/create")
+	tmpName := fmt.Sprint("%s_tmp", app.Name)
 
-	if app.Active {
-		batch.AddStep("POST", nil, fmt.Sprintf("containers/%s/start", app.Name))
+	createTarget := fmt.Sprintf("containers/create?name=%s", tmpName)
+	err := deploy.Do("POST", deployment.Command, createTarget, nil)
+
+	if err != nil {
+		deleteTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
+		deploy.Do("DELETE", nil, deleteTarget, nil)
+		return err
 	}
 
-	completed := batch.Run()
-
-	if len(completed) != len(app.Instances) {
-		return DeploymentFailedError
+	deleteTarget := fmt.Sprintf("containers/%s?force=true", app.Name)
+	err = deploy.Do("DELETE", nil, deleteTarget, nil)
+	if err != nil {
+		return err
 	}
+
+	renameTarget := fmt.Sprintf("containers/%s/rename?name=%s", tmpName, app.Name)
+	err = deploy.Do("POST", nil, renameTarget, nil)
+
+	if err != nil {
+		deleteTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
+		deploy.Do("DELETE", nil, deleteTarget, nil)
+		return err
+	}
+
+	if app.Active || startApp {
+		startTarget := fmt.Sprintf("containers/%s/start", app.Name)
+		err = deploy.Do("POST", nil, startTarget, nil)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	to := map[string]interface{} {"CurrentDeployment" : deployment.Id}
+	where := databases.Filter{"Id" : app.Id}
+	applications.Update(to, where)
 
 	return nil
 }
@@ -181,7 +199,7 @@ func getApplicationList(user *auth.User) ([]applicationData, error) {
 	        return nil, err
 	    }
 
-        if user.CanAccessApplication(app.Id) {
+        if user.CanAccessApplication(app.Name) {
             apps = append(apps, app)
         }
     }
@@ -189,32 +207,64 @@ func getApplicationList(user *auth.User) ([]applicationData, error) {
     return apps, nil
 }
 
-func toggleApplicationState(app applicationData, w http.ResponseWriter) boolean {
-	var targetState, rollbackState string
+func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]interface{}, error) {
+	if !user.CanAccessApplication(app.Name) {
+		return []map[string]interface{}{}, nil
+	}
+
+	cols := []string{"Id", "User", "Date"}
+    scanner, err := deployments.Select(cols, nil, nil)
+
+    if err != nil {
+        return nil, err
+    }
+
+    deploys := make([]map[string]interface{}, 0)
+    var deploy deploymentData
+
+    for scanner.Next() {
+        err = scanner.Scan(&deploy)
+        if err != nil {
+	        return nil, err
+	    }
+
+	    deploys = append(deploys, map[string]interface{}{
+            "Id" : deploy.Id,
+            "Creator" : deploy.User,
+            "Date" : deploy.Date,
+        })
+    }
+   
+    return deploys, nil
+}
+
+func toggleApplicationState(app applicationData, w http.ResponseWriter) error {
+	var target, rollback string
 
 	if app.Active {
-		targetState, rollbackState := "stop", "start"
+		target = fmt.Sprintf("containers/%s/stop", app.Name)
+		rollback = fmt.Sprintf("containers/%s/start", app.Name)
 	} else {
-		targetState, rollbackState := "start", "stop"
+		target = fmt.Sprintf("containers/%s/start", app.Name)
+		rollback = fmt.Sprintf("containers/%s/stop", app.Name)
 	}
 
-	completed := handlers.NewBatchProcess(w, app.Instances).
-		AddStep("POST", nil, fmt.Sprintf("containers/%s/%s", app.Name, targetState)).
-		Run()
+	toggle := batch.NewProcessor(w, app.Instances)
 
-	if len(completed) != len(application.Instances) {
-		handlers.NewBatchProcess(w, completed).
-			AddStep("POST", nil, fmt.Sprintf("containers/%s/%s", app.Name, rollbackState)).
-			Run()
+	err := toggle.Do("POST", nil, target, nil)
 
-		return false
+	if err == nil {
+		to := map[string]interface{} {"Active" : !app.Active}
+		where := databases.Filter{"Id" : app.Id}
+		err = applications.Update(to, where)
 	}
 
-	to := map[string]interface{} {"Active" : !app.Active}
-	where := databases.Filter{"Id" : app.Id}
-	applications.Update(to, where)
+	if err != nil {
+		toggle.Do("POST", nil, rollback, nil)
+		return err
+	}
 
-	return true
+	return nil
 }
 
 func getRevertDeployment(app int64, target int64) (deploymentData, error) {
@@ -235,16 +285,16 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 
 		scan, err := deployments.Select(nil, where, opts)
 		if err != nil {
-			return nil, err
+			return deployment, err
 		}
 
 		if !scan.Next() {
-			return nil, UnknownApplicationError
+			return deployment, UnknownApplicationError
 		}
 
 		for i := 0; i < priorCnt; i += 1 {
 			if !scan.Next() {
-				return nil, NotEnoughDeploymentsError
+				return deployment, NotEnoughDeploymentsError
 			}
 		}
 
@@ -252,7 +302,7 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	}
 
 	if err != nil {
-		return nil, err
+		return deployment, err
 	}
 
 	return deployment, nil

@@ -20,7 +20,6 @@ import (
     "io/ioutil"
     "bytes"
     "encoding/json"
-	"regexp"
 
     "github.com/gorilla/mux"
 

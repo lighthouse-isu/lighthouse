@@ -1,0 +1,138 @@
+// Copyright 2014 Caleb Brose, Chris Fogerty, Rob Sheehy, Zach Taylor, Nick Miller
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package batch
+
+import (
+	"fmt"
+	"sync"
+	"bytes"
+	"runtime"
+	"net/http"
+	"encoding/json"
+)
+
+type Processor struct {
+	writer http.ResponseWriter
+	instances []string
+}
+
+type Result struct {
+    Status string
+    Message string
+    Code int
+}
+
+type ResponseInterpreter func(resp *http.Response, err error)(Result, bool)
+
+func NewProcessor(writer http.ResponseWriter, instances []string) *Processor {
+	return &Processor{writer, instances}
+}
+
+func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
+	var completed []string
+	var errorToReport error = nil
+	var total int = len(this.instances)
+	var wg sync.WaitGroup
+	var queue chan string = make(chan string, 1)
+
+	if interpret == nil {
+		interpret = interpretResponseDefault
+	}
+
+	this.writeUpdate(Result{"Starting", "", 0}, endpoint, 0, total)
+
+	wg.Add(total)
+	for i, inst := range this.instances {
+		go func(inst string, itemNumber int) {
+			defer wg.Done()
+
+			dest := fmt.Sprintf("%s/%s", inst, endpoint)
+			resp, err := runBatchRequest(method, dest, body)
+			result, ok := interpret(resp, err)
+
+			this.writeUpdate(result, dest, itemNumber, total)
+
+			// Yield to other goroutines
+			runtime.Gosched()
+
+			if ok {
+				queue <- inst
+			} else {
+				errorToReport = err
+			}
+
+		}(inst, i)
+	}
+
+	go func() {
+		defer wg.Done()
+		for inst := range queue {
+			completed = append(completed, inst)
+		}
+	}()
+
+	wg.Wait()
+
+	this.writeUpdate(Result{"Complete", "", 0}, endpoint, total, total)
+
+	this.instances = completed
+	return errorToReport
+}
+
+func (this *Processor) writeUpdate(res Result, endpoint string, progress, total int) {
+	update := struct {
+		Status string
+	    Message string
+	    Code int
+	    Endpoint string
+	    Progress int
+	    Total int
+	}{
+		res.Status, res.Message, res.Code, endpoint, progress, total,
+	}
+
+	jsonBody, _ := json.Marshal(update)
+	this.writer.Write(jsonBody)
+}
+
+func runBatchRequest(method, dest string, body interface{}) (*http.Response, error) {
+	jsonBody, _ := json.Marshal(body)
+	req, err := http.NewRequest(method, dest, bytes.NewBuffer(jsonBody))
+
+	if err != nil {
+		return nil, err
+	}
+
+	return http.DefaultClient.Do(req)
+}
+
+func interpretResponseDefault(resp *http.Response, err error) (Result, bool) {
+	if err != nil {
+		return Result{"Error", err.Error(), 500}, false
+	}
+
+	code := resp.StatusCode
+
+	switch {
+	case 200 <= code && code <= 299: 
+		return Result{"OK", "", code}, true
+
+	case 300 <= code && code <= 399: 
+		return Result{"Warning", "", code}, true
+
+	default:
+		return Result{"Error", "", code}, false
+	}
+}

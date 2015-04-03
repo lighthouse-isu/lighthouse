@@ -96,24 +96,6 @@ func GetCurrentUser(r *http.Request) *User {
     return user
 }
 
-func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
-    user.SetAuthLevel("Beacons", beacon, level)
-    
-    to := map[string]interface{}{"Permissions" : user.Permissions}
-    where := map[string]interface{}{"Email" : user.Email}
-
-    return users.Update(to, where)
-}
-
-func SetUserApplicationAuthLevel(user *User, app int64, level int) error {
-    user.SetAuthLevel("Applications", app, level)
-    
-    to := map[string]interface{}{"Permissions" : user.Permissions}
-    where := map[string]interface{}{"Email" : user.Email}
-
-    return users.Update(to, where)
-}
-
 func writeResponse(w http.ResponseWriter, code int, err error) {
     if err == nil {
         w.WriteHeader(code)

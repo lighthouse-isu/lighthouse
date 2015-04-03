@@ -16,15 +16,17 @@ package applications
 
 import (
     "errors"
+
+    "github.com/gorilla/mux"
+
     "github.com/lighthouse/lighthouse/databases"
 )
 
 var (
-    UnknownApplicationError := errors.New("applications: unknown application ID")
-    NotEnoughDeploymentsError := errors.New("applications: no previous deployment to rollback to")
-    StateNotChangedError := errors.New("applications: application already in requested state")
-    ImageNotPulledError := errors.New("applications: deployment failed to pull an image")
-    DeploymentFailedError := errors.New("applications: deployment failed on at least one instance")
+    UnknownApplicationError = errors.New("applications: unknown application ID")
+    NotEnoughDeploymentsError = errors.New("applications: no previous deployment to rollback to")
+    StateNotChangedError = errors.New("applications: application already in requested state")
+    ImageNotPulledError = errors.New("applications: deployment failed to pull an image")
 )
 
 var applications databases.TableInterface
@@ -34,12 +36,12 @@ var appSchema = databases.Schema {
     "Id" : "serial primary key",
     "CurrentDeployment" : "integer",
     "Name" : "text UNIQUE",
-    "Active" "boolean",
+    "Active" : "boolean",
     "Instances" : "json",
 }
 
 var deploySchema = databases.Schema {
-    "Id" : "serial primary key"
+    "Id" : "serial primary key",
     "AppId" : "integer",
     "Command" : "json",
     "User" : "text",
@@ -54,7 +56,7 @@ type applicationData struct {
     Instances []string
 }
 
-type deployData struct {
+type deploymentData struct {
     Id int64
     AppId int64
     Command interface{}
@@ -104,15 +106,15 @@ func GetApplicationByName(Name string) (applicationData, error) {
 }
 
 func Handle(r *mux.Router) {
-    r.HandleFunc("/create", handleCreateApplication).Methods("POST")
+    // r.HandleFunc("/create", handleCreateApplication).Methods("POST")
 
-    r.HandleFunc("/list", handleListApplications).Methods("GET")
+    // r.HandleFunc("/list", handleListApplications).Methods("GET")
 
-    r.HandleFunc("/list/{Id:.*}", handleGetApplicationHistory).Methods("GET")
+    // r.HandleFunc("/list/{Id:.*}", handleGetApplicationHistory).Methods("GET")
 
-    r.HandleFunc("/start/{Id:.*}", handleStartApplication).Methods("POST")
+    // r.HandleFunc("/start/{Id:.*}", handleStartApplication).Methods("POST")
 
-    r.HandleFunc("/stop/{Id:.*}", handleStopApplication).Methods("POST")
+    // r.HandleFunc("/stop/{Id:.*}", handleStopApplication).Methods("POST")
 
-    r.HandleFunc("/revert/{Id:.*}", handleRevertApplication).Methods("PUT")
+    // r.HandleFunc("/revert/{Id:.*}", handleRevertApplication).Methods("PUT")
 }

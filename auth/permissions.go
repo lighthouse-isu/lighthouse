@@ -24,15 +24,15 @@ const (
 
 func NewPermission() Permission {
 	return Permission{
-		"Beacons" : make(map[interface{}]interface{}),
-		"Applications" : make(map[interface{}]interface{})
+		"Beacons" : make(map[string]interface{}),
+		"Applications" : make(map[string]interface{}),
 	}
 }
 
 func (this *User) convertPermissionsFromDB() {
 	for _, permInter := range this.Permissions {
 
-		permSet := permInter.(map[interface{}]interface{})
+		permSet := permInter.(map[string]interface{})
 
 		for perm, level := range permSet {
 			val, ok := level.(float64)
@@ -45,13 +45,13 @@ func (this *User) convertPermissionsFromDB() {
 	}
 }
 
-func (this *User) GetAuthLevel(field string, key interface{}) int {
+func (this *User) GetAuthLevel(field, key string) int {
 	permMap, ok := this.Permissions[field]
 	if !ok {
 		return -1
 	}
 
-	val, ok := permMap.(map[interface{}]interface{})[key]
+	val, ok := permMap.(map[string]interface{})[key]
 	if !ok {
 		return -1
 	}
@@ -59,15 +59,15 @@ func (this *User) GetAuthLevel(field string, key interface{}) int {
 	return val.(int)
 }
 
-func (this *User) SetAuthLevel(field string, key interface{}, level int) {
+func (this *User) SetAuthLevel(field, key string, level int) {
 	fieldInter, ok := this.Permissions[field]
 	if !ok {
 		return
 	}
 
-	fieldVal, _ := fieldInter.(map[interface{}]interface{})
+	fieldVal, _ := fieldInter.(map[string]interface{})
 	if fieldVal == nil {
-		fieldVal = make(map[interface{}]interface{})
+		fieldVal = make(map[string]interface{})
 	}
 
 	if level < DefaultAuthLevel {
@@ -99,12 +99,30 @@ func (this *User) CanModifyBeacon(beaconAddress string) bool {
 	return level >= ModifyAuthLevel
 }
 
-func (this *User) CanAccessApplication(app int64) bool {
-	level := this.GetAuthLevel("Applications", app)
+func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
+    user.SetAuthLevel("Beacons", beacon, level)
+    
+    to := map[string]interface{}{"Permissions" : user.Permissions}
+    where := map[string]interface{}{"Email" : user.Email}
+
+    return users.Update(to, where)
+}
+
+func (this *User) CanAccessApplication(name string) bool {
+	level := this.GetAuthLevel("Applications", name)
 	return level >= AccessAuthLevel
 }
 
-func (this *User) CanModifyApplcation(app int64) bool {
-	level := this.GetAuthLevel("Applications", app)
+func (this *User) CanModifyApplcation(name string) bool {
+	level := this.GetAuthLevel("Applications", name)
 	return level >= ModifyAuthLevel
+}
+
+func SetUserApplicationAuthLevel(user *User, name string, level int) error {
+    user.SetAuthLevel("Applications", name, level)
+    
+    to := map[string]interface{}{"Permissions" : user.Permissions}
+    where := map[string]interface{}{"Email" : user.Email}
+
+    return users.Update(to, where)
 }
