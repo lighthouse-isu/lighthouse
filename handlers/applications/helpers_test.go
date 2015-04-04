@@ -424,22 +424,22 @@ func Test_DoDeployment(t *testing.T) {
 
 	cmd := map[string]interface{}{"Image" : "test"}
 	dNormal := &deploymentData{42, 0, cmd, "email", "12345"}
-	//dNoImage := &deploymentData{42, 0, "BAD", "email", "12345"}
+	dNoImage := &deploymentData{42, 0, "BAD", "email", "12345"}
 
 	tests := map[testCase]testResult{
 		// Success cases
-		// testCase{dNormal, true, true}   : testResult{[]int{0, 1, 3, 4, 5}, -1}, 
-		// testCase{dNormal, false, true}  : testResult{[]int{0, 1, 3, 4}, -1},
-		// testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, -1}, 
-		// testCase{dNormal, false, false} : testResult{[]int{1, 3, 4}, -1}, 
+		testCase{dNormal, true, true}   : testResult{[]int{0, 1, 3, 4, 5}, -1}, 
+		testCase{dNormal, false, true}  : testResult{[]int{0, 1, 3, 4}, -1},
+		testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, -1}, 
+		testCase{dNormal, false, false} : testResult{[]int{1, 3, 4}, -1}, 
 
-		// // Failure cases
-		// testCase{dNoImage, false, true} : testResult{[]int{}, 0}, // Bad command
-		// testCase{dNormal, false, true}  : testResult{[]int{0}, 0}, // Bad pull
-		// testCase{dNormal, false, false} : testResult{[]int{1, 2}, 0}, // Bad create
-		// testCase{dNormal, false, false} : testResult{[]int{1, 3}, 1}, // Bad delete
+		// Failure cases
+		testCase{dNoImage, false, true} : testResult{[]int{}, 0}, // Bad command
+		testCase{dNormal, false, true}  : testResult{[]int{0}, 0}, // Bad pull
+		testCase{dNormal, false, false} : testResult{[]int{1, 2}, 0}, // Bad create
+		testCase{dNormal, false, false} : testResult{[]int{1, 3}, 1}, // Bad delete
 		testCase{dNormal, false, false} : testResult{[]int{1, 3, 4, 2}, 2}, // Bad rename
-		// testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, 3}, // Bad start
+		testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, 3}, // Bad start
 	}
 
 	for c, res := range tests {

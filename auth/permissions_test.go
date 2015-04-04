@@ -96,38 +96,70 @@ func Test_CanModifyUser(t *testing.T) {
 	assert.False(t, middle.CanModifyUser(high))
 }
 
-func Test_CanAccessBeacon(t *testing.T) {
+func Test_CanModifyAndAccessResource(t *testing.T) {
 	user := &User{}
 	user.Permissions = NewPermission()
 
-	beaconPerms := map[string]interface{}{
+	perms := map[string]interface{}{
 		"access" : AccessAuthLevel,
 		"modify" : ModifyAuthLevel,
 		"owner" : OwnerAuthLevel,
 	}
 
-	user.Permissions["Beacons"] = beaconPerms
+	type testFuncs struct {
+		Access func(name string) bool
+		Modify func(name string) bool
+	}
 
-	assert.False(t, user.CanAccessBeacon("none"))
-	assert.True(t, user.CanAccessBeacon("access"))
-	assert.True(t, user.CanAccessBeacon("modify"))
-	assert.True(t, user.CanAccessBeacon("owner"))
+	tests := map[string]testFuncs {
+		"Beacons" : testFuncs{user.CanAccessBeacon, user.CanModifyBeacon},
+		"Applications" : testFuncs{user.CanAccessApplication, user.CanModifyApplication},
+	}
+
+	for res, funcs := range tests {
+		user.Permissions[res] = perms
+
+		assert.False(t, funcs.Access("none"))
+		assert.True(t, funcs.Access("access"))
+		assert.True(t, funcs.Access("modify"))
+		assert.True(t, funcs.Access("owner"))
+
+		assert.False(t, funcs.Modify("none"))
+		assert.False(t, funcs.Modify("access"))
+		assert.True(t, funcs.Modify("modify"))
+		assert.True(t, funcs.Modify("owner"))
+	}
 }
 
-func Test_CanModifyBeacon(t *testing.T) {
-	user := &User{}
-	user.Permissions = NewPermission()
+func Test_SetUserResourceAuthLevel(t *testing.T) {
+	setup()
+    defer teardown()
 
-	beaconPerms := map[string]interface{}{
-		"access" : AccessAuthLevel,
-		"modify" : ModifyAuthLevel,
-		"owner" : OwnerAuthLevel,
-	}
+    perms := NewPermission()
+    perms["Beacons"] = map[string]interface{}{"OVERWRITE" : 0}
 
-	user.Permissions["Beacons"] = beaconPerms
+    keyPerms := map[string]interface{}{
+        "OVERWRITE" : 1, "NEW": 2,
+    }
 
-	assert.False(t, user.CanModifyBeacon("none"))
-	assert.False(t, user.CanModifyBeacon("access"))
-	assert.True(t, user.CanModifyBeacon("modify"))
-	assert.True(t, user.CanModifyBeacon("owner"))
+    user := &User{Email: "EMAIL", Permissions: perms,}
+
+    addUsers(*user)
+
+    tests := map[string]func(user *User, name string, level int)error {
+    	"Beacons" : SetUserBeaconAuthLevel,
+    	"Applications" : SetUserApplicationAuthLevel,
+    }
+
+    for res, f := range tests {
+    	perms[res] = map[string]interface{}{"OVERWRITE" : 0}
+
+    	f(user, "OVERWRITE", 1)
+	    f(user, "NEW", 2)
+
+	    cols := []string{"Permissions"}
+	    users.SelectRow(cols, nil, nil, user)
+
+	    assert.Equal(t, keyPerms, user.Permissions[res])
+    }
 }

@@ -113,7 +113,7 @@ func (this *User) CanAccessApplication(name string) bool {
 	return level >= AccessAuthLevel
 }
 
-func (this *User) CanModifyApplcation(name string) bool {
+func (this *User) CanModifyApplication(name string) bool {
 	level := this.GetAuthLevel("Applications", name)
 	return level >= ModifyAuthLevel
 }
