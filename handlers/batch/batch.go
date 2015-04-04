@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"sync"
 	"bytes"
+	"errors"
 	"runtime"
 	"net/http"
 	"encoding/json"
@@ -26,6 +27,7 @@ import (
 type Processor struct {
 	writer http.ResponseWriter
 	instances []string
+	failures []string
 }
 
 type Result struct {
@@ -43,10 +45,10 @@ type progressUpdate struct {
     Total int
 }
 
-type ResponseInterpreter func(resp *http.Response, err error)(Result, bool)
+type ResponseInterpreter func(resp *http.Response, err error)(Result, error)
 
 func NewProcessor(writer http.ResponseWriter, instances []string) *Processor {
-	return &Processor{writer, instances}
+	return &Processor{writer, instances, []string{}}
 }
 
 func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
@@ -55,6 +57,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	var total int = len(this.instances)
 	var wg sync.WaitGroup
 	var queue chan string = make(chan string, 1)
+	var failQueue chan string = make(chan string, 1)
 
 	if interpret == nil {
 		interpret = interpretResponseDefault
@@ -69,16 +72,17 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 
 			dest := fmt.Sprintf("%s/%s", inst, endpoint)
 			resp, err := runBatchRequest(method, dest, body)
-			result, ok := interpret(resp, err)
+			result, err := interpret(resp, err)
 
 			this.writeUpdate(result, dest, itemNumber, total)
 
 			// Yield to other goroutines
 			runtime.Gosched()
 
-			if ok {
+			if err == nil {
 				queue <- inst
 			} else {
+				failQueue <- inst
 				errorToReport = err
 			}
 		}(inst, i)
@@ -88,6 +92,13 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 		defer wg.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for inst := range failQueue {
+			this.failures = append(this.failures, inst)
 		}
 	}()
 
@@ -108,6 +119,10 @@ func (this *Processor) writeUpdate(res Result, endpoint string, progress, total 
 	this.writer.Write(jsonBody)
 }
 
+func (this *Processor) Failures() []string {
+	return this.failures;
+}
+
 func runBatchRequest(method, dest string, body interface{}) (*http.Response, error) {
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest(method, dest, bytes.NewBuffer(jsonBody))
@@ -119,21 +134,21 @@ func runBatchRequest(method, dest string, body interface{}) (*http.Response, err
 	return http.DefaultClient.Do(req)
 }
 
-func interpretResponseDefault(resp *http.Response, err error) (Result, bool) {
+func interpretResponseDefault(resp *http.Response, err error) (Result, error) {
 	if err != nil {
-		return Result{"Error", err.Error(), 500}, false
+		return Result{"Error", err.Error(), 500}, err
 	}
 
 	code := resp.StatusCode
 
 	switch {
 	case 200 <= code && code <= 299: 
-		return Result{"OK", "", code}, true
+		return Result{"OK", "", code}, nil
 
 	case 300 <= code && code <= 399: 
-		return Result{"Warning", "", code}, true
+		return Result{"Warning", "", code}, nil
 
 	default:
-		return Result{"Error", "", code}, false
+		return Result{"Error", "", code}, errors.New(fmt.Sprintf("Batch request returned code %d", code))
 	}
 }

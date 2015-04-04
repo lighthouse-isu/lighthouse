@@ -18,6 +18,7 @@ import (
     "testing"
 
     "fmt"
+    "sort"
     "strings"
     "net/http"
     "net/http/httptest"
@@ -32,10 +33,14 @@ func handlerFactory(code int) func(http.ResponseWriter, *http.Request) {
 	}
 }
 
-func getUpdates(w *httptest.ResponseRecorder) []progressUpdate {
+func getUpdates(w *httptest.ResponseRecorder, includeStartAndEnd bool) []progressUpdate {
 	body := w.Body.String()
 	lines := strings.SplitAfter(body, "}")
 	lines = lines[:len(lines) - 1] // Remove trailing "" entry
+
+	if !includeStartAndEnd {
+		lines = lines[1:len(lines) - 1]
+	}
 
 	updates := make([]progressUpdate, len(lines))
 
@@ -63,47 +68,124 @@ func Test_Do_Nothing(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 200, w.Code)
 
-	updates := getUpdates(w)
+	updates := getUpdates(w, true)
 	
 	assert.Equal(t, "Starting", updates[0].Status)
 	assert.Equal(t, "Complete", updates[1].Status)
 }
 
 func Test_Do_SingleInstance(t *testing.T) {
-	insts, servers := setupServers(handlerFactory(200))
-	defer shutdownServers(servers)
+	insts, servers := SetupServers(handlerFactory(200))
+	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.Nil(t, err)
-	assert.Equal(t, 200, w.Code)
 	assert.Equal(t, insts, proc.instances)
 
-	updates := getUpdates(w)
+	updates := getUpdates(w, false)
 
 	keyUpdate := progressUpdate{"OK", "", 200, insts[0] + "/", 0, 1}
 	
-	assert.Equal(t, keyUpdate, updates[1])
+	assert.Equal(t, keyUpdate, updates[0])
+}
+
+func Test_Do_SingleInstance_Fail(t *testing.T) {
+	insts, servers := SetupServers(handlerFactory(400))
+	defer ShutdownServers(servers)
+
+	w := httptest.NewRecorder()
+	proc := NewProcessor(w, insts)
+	err := proc.Do("GET", nil, "", nil)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, 0, len(proc.instances))
+
+	updates := getUpdates(w, false)
+
+	keyUpdate := progressUpdate{"Error", "", 400, insts[0] + "/", 0, 1}
+	assert.Equal(t, keyUpdate, updates[0])
 }
 
 func Test_Do_Multiple(t *testing.T) {
 	h := handlerFactory(200)
-	insts, servers := setupServers(h, h, h)
-	defer shutdownServers(servers)
+	insts, servers := SetupServers(h, h, h)
+	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.Nil(t, err)
-	assert.Equal(t, 200, w.Code)
+
+	updates := getUpdates(w, false)
+
+	for _, update := range updates {
+		assert.Equal(t, "OK", update.Status)
+		assert.Equal(t, insts[update.Item] + "/", update.Endpoint)
+		assert.Equal(t, 200, update.Code)
+	}
+
+	sort.Strings(proc.instances)
 	assert.Equal(t, insts, proc.instances)
+}
 
-	updates := getUpdates(w)
-
-	keyUpdate := progressUpdate{"OK", "", 200, insts[0] + "/", 0, 1}
+func Test_Do_Multiple_Mixed(t *testing.T) {
+	insts, servers := SetupServers(
+		handlerFactory(200), 
+		handlerFactory(500),
+		handlerFactory(300),
+	)
 	
-	assert.Equal(t, keyUpdate, updates[1])
+	defer ShutdownServers(servers)
+
+	w := httptest.NewRecorder()
+	proc := NewProcessor(w, insts)
+	err := proc.Do("GET", nil, "", nil)
+
+	assert.NotNil(t, err)
+	assert.Equal(t, 2, len(proc.instances))
+
+	updates := getUpdates(w, false)
+
+	for _, update := range updates {
+		if update.Item == 0 {
+			assert.Equal(t, "OK", update.Status)
+			assert.Equal(t, 200, update.Code)
+		} else if update.Item == 1 {
+			assert.Equal(t, "Error", update.Status)
+			assert.Equal(t, 500, update.Code)
+		} else {
+			assert.Equal(t, "Warning", update.Status)
+			assert.Equal(t, 300, update.Code)
+		}
+
+		assert.Equal(t, insts[update.Item] + "/", update.Endpoint)
+	}
+
+	sort.Strings(proc.instances)
+	assert.Equal(t, insts[0], proc.instances[0])
+	assert.Equal(t, insts[2], proc.instances[1])
+}
+
+func Test_Failures(t *testing.T) {
+	p := handlerFactory(200)
+	f := handlerFactory(500)
+	insts, servers := SetupServers(p, f, f, p, f)
+	defer ShutdownServers(servers)
+
+	w := httptest.NewRecorder()
+	proc := NewProcessor(w, insts)
+	proc.Do("GET", nil, "", nil)
+
+	failures := proc.Failures()
+
+	assert.Equal(t, 3, len(failures))
+
+	sort.Strings(failures)
+	assert.Equal(t, insts[1], failures[0])
+	assert.Equal(t, insts[2], failures[1])
+	assert.Equal(t, insts[4], failures[2])
 }

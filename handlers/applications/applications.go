@@ -24,6 +24,8 @@ import (
 
 var (
     UnknownApplicationError = errors.New("applications: unknown application ID")
+    UnknownDeploymentError = errors.New("applications: unknown deployment ID")
+    DeploymentMismatchError = errors.New("applications: deployment does not belong to given application")
     NotEnoughDeploymentsError = errors.New("applications: no previous deployment to rollback to")
     StateNotChangedError = errors.New("applications: application already in requested state")
     ImageNotPulledError = errors.New("applications: deployment failed to pull an image")
@@ -69,7 +71,7 @@ func Init(reload bool) {
         applications = databases.NewLockingTable(nil, "applications", appSchema)
     }
 
-    if applications == nil {
+    if deployments == nil {
         deployments = databases.NewLockingTable(nil, "deployments", deploySchema)
     }
 

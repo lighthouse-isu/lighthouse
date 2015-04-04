@@ -28,13 +28,13 @@ func addApplication(name string, instances []string) (applicationData, error) {
         "Name" : name,
         "Instances" : instances,
         "Active" : false,
-        "CurrentDeployment" : -1,
+        "CurrentDeployment" : int64(-1),
     }
 
     opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
 
     var app applicationData
-    err := applications.InsertReturn(values, []string{"Id"}, &opts, &app)
+    err := applications.InsertReturn(values, nil, &opts, &app)
 
     return app, err
 }
@@ -49,7 +49,7 @@ func addDeployment(app int64, cmd interface{}, email string) (deploymentData, er
     opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
 
     var deploy deploymentData
-    err := deployments.InsertReturn(values, []string{"Id"}, &opts, &deploy)
+    err := deployments.InsertReturn(values, nil, &opts, &deploy)
 
     return deploy, err
 }
@@ -64,55 +64,37 @@ func removeDeployment(deploy int64) error {
     return deployments.Delete(where)
 }
 
-func createApplication(user *auth.User, name string, cmd interface{}, instances []string, startApp, pullImages bool, w http.ResponseWriter) error {
-	application, err := addApplication(name, instances)
-    if err != nil {
-    	return err
-    }
+// func createApplication(user *auth.User, name string, cmd interface{}, instances []string, startApp, pullImages bool, w http.ResponseWriter) error {
+// 	application, err := addApplication(name, instances)
+//     if err != nil {
+//     	return err
+//     }
 
-    deployment, err := addDeployment(application.Id, cmd, user.Email)
-    if err != nil {
-    	removeApplication(application.Id)
-        return err
-    }
+//     deployment, err := addDeployment(application.Id, cmd, user.Email)
+//     if err != nil {
+//     	removeApplication(application.Id)
+//         return err
+//     }
 
-    err = doDeployment(application, deployment, startApp, pullImages, w)
+//     err = doDeployment(application, deployment, startApp, pullImages, w)
 
-    if err != nil {
-        removeDeployment(deployment.Id)
-        removeApplication(application.Id)
-        return err
-    }
+//     if err != nil {
+//         removeDeployment(deployment.Id)
+//         removeApplication(application.Id)
+//         return err
+//     }
 
-    auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
+//     auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
 
-    return nil
-}
+//     return nil
+// }
 
 func startApplication(app int64, w http.ResponseWriter) error {
-	application, err := GetApplicationById(app)
-	if err != nil {
-		return err
-	}
-
-	if application.Active {
-		return StateNotChangedError
-	}
-
-	return toggleApplicationState(application, w)
+	return setApplicationStateTo(app, true, w)
 }
 
 func stopApplication(app int64, w http.ResponseWriter) error {
-	application, err := GetApplicationById(app)
-	if err != nil {
-		return err
-	}
-
-	if !application.Active {
-		return StateNotChangedError
-	}
-
-	return toggleApplicationState(application, w)
+	return setApplicationStateTo(app, false, w)
 }
 
 func doDeployment(app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) error {
@@ -125,7 +107,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 
 		jsonCmd, err := json.Marshal(deployment.Command)
 		if err == nil {
-			json.Unmarshal(jsonCmd, &image)
+			err = json.Unmarshal(jsonCmd, &image)
 		}
 		
 		if err != nil {
@@ -140,7 +122,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 		}
 	}
 
-	tmpName := fmt.Sprint("%s_tmp", app.Name)
+	tmpName := fmt.Sprintf("%s_tmp", app.Name)
 
 	createTarget := fmt.Sprintf("containers/create?name=%s", tmpName)
 	err := deploy.Do("POST", deployment.Command, createTarget, nil)
@@ -161,8 +143,14 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 	err = deploy.Do("POST", nil, renameTarget, nil)
 
 	if err != nil {
-		deleteTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
-		deploy.Do("DELETE", nil, deleteTarget, nil)
+		// In a weird case where some containers have the temp name and some have the real
+		// name. Have to rollback each case individually.
+		
+		deleteAppTarget := fmt.Sprintf("containers/%s?force=true", app.Name)
+		deploy.Do("DELETE", nil, deleteAppTarget, nil)
+
+		deleteTmpTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
+		batch.NewProcessor(w, deploy.Failures()).Do("DELETE", nil, deleteTmpTarget, nil)
 		return err
 	}
 
@@ -183,8 +171,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 }
 
 func getApplicationList(user *auth.User) ([]applicationData, error) {
-	cols := []string{"Id", "CurrentDeployment", "Name", "Active"}
-    scanner, err := applications.Select(cols, nil, nil)
+    scanner, err := applications.Select(nil, nil, nil)
 
     if err != nil {
         return nil, err
@@ -213,7 +200,8 @@ func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]i
 	}
 
 	cols := []string{"Id", "User", "Date"}
-    scanner, err := deployments.Select(cols, nil, nil)
+	where := databases.Filter{"AppId" : app.Id}
+    scanner, err := deployments.Select(cols, where, nil)
 
     if err != nil {
         return nil, err
@@ -238,10 +226,19 @@ func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]i
     return deploys, nil
 }
 
-func toggleApplicationState(app applicationData, w http.ResponseWriter) error {
+func setApplicationStateTo(id int64, state bool, w http.ResponseWriter) error {
+	app, err := GetApplicationById(id)
+	if err != nil {
+		return err
+	}
+
+	if app.Active == state {
+		return StateNotChangedError
+	}
+
 	var target, rollback string
 
-	if app.Active {
+	if state == false {
 		target = fmt.Sprintf("containers/%s/stop", app.Name)
 		rollback = fmt.Sprintf("containers/%s/start", app.Name)
 	} else {
@@ -251,11 +248,11 @@ func toggleApplicationState(app applicationData, w http.ResponseWriter) error {
 
 	toggle := batch.NewProcessor(w, app.Instances)
 
-	err := toggle.Do("POST", nil, target, nil)
+	err = toggle.Do("POST", nil, target, nil)
 
 	if err == nil {
-		to := map[string]interface{} {"Active" : !app.Active}
-		where := databases.Filter{"Id" : app.Id}
+		to := map[string]interface{} {"Active" : state}
+		where := databases.Filter{"Id" : id}
 		err = applications.Update(to, where)
 	}
 
@@ -272,13 +269,21 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	var err error
 
 	if target >= 0 {
-		where := databases.Filter{"Id" : target, "AppId" : app}
+		where := databases.Filter{"Id" : target}
 		err = deployments.SelectRow(nil, where, nil, &deployment)
+
+		if err == databases.NoRowsError {
+			err = UnknownDeploymentError
+		} else if deployment.AppId != app {
+			err = DeploymentMismatchError
+			deployment = deploymentData{}
+		}
+
 	} else {
 		priorCnt := int(-1 * target)
 		where := databases.Filter{"AppId" : app}
-			opts := &databases.SelectOptions {
-			OrderBy : []string{"Date"},
+		opts := &databases.SelectOptions {
+			OrderBy : []string{"Id"},
 			Top : priorCnt + 1,
 			Desc : true,
 		}
@@ -301,9 +306,5 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 		err = scan.Scan(&deployment)
 	}
 
-	if err != nil {
-		return deployment, err
-	}
-
-	return deployment, nil
+	return deployment, err
 }

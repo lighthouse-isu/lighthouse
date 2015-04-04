@@ -15,7 +15,9 @@
 package databases
 
 import (
+    "fmt"
     "sort"
+    "time"
     "reflect"
     "strings"
 )
@@ -79,13 +81,23 @@ func CommonTestingTable(schema Schema) *MockTable {
     table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
 
     uniqueCols := []int{}
+    serialCols := []int{}
+    dateCols := []int{}
 
     i := 0
     for k, t := range schema {
         table.Schema[k] = i
 
-        if strings.Contains(strings.ToLower(t), "unique") {
+        colType := strings.ToLower(t)
+
+        if strings.Contains(colType, "unique") {
             uniqueCols = append(uniqueCols, i)
+        }
+        if strings.Contains(colType, "serial") {
+            serialCols = append(serialCols, i)
+        }
+        if strings.Contains(colType, "datetime") {
+            dateCols = append(dateCols, i)
         }
 
         i += 1
@@ -98,11 +110,12 @@ func CommonTestingTable(schema Schema) *MockTable {
             addition[table.Schema[k]] = orig
         }
 
-        //because "DEFAULT" doesn't work with pq, need to add left-out columns
-        for k, v := range table.Schema {
-            if _, ok := values[k]; !ok {
-                addition[v] = table.lastUpdateRow
-            }
+        for _, col := range serialCols {
+            addition[col] = table.lastUpdateRow
+        }
+
+        for _, col := range dateCols {
+            addition[col] = fmt.Sprint(time.Now().Unix())
         }
 
         for _, row := range table.Database {
@@ -232,7 +245,7 @@ func CommonTestingTable(schema Schema) *MockTable {
 
             applies := true
             for col, val := range where {
-                if row[table.Schema[col]] != val {
+                if !reflect.DeepEqual(row[table.Schema[col]], val) {
                     applies = false
                     break
                 }
@@ -243,13 +256,11 @@ func CommonTestingTable(schema Schema) *MockTable {
                 newEntry[i] = row[table.Schema[col]]
             }
 
-            if opts != nil {
-                if applies && opts.Distinct {
-                    for _, oldEntry := range entries {
-                        if reflect.DeepEqual(newEntry, oldEntry) {
-                            applies = false
-                            break
-                        }
+            if applies && opts.Distinct {
+                for _, oldEntry := range entries {
+                    if reflect.DeepEqual(newEntry, oldEntry) {
+                        applies = false
+                        break
                     }
                 }
             }
@@ -260,13 +271,13 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         if opts.OrderBy != nil {
-            sort.Sort(rowSorter{entries, table.Schema, cols})
+            if opts.Desc {
+                sort.Sort(sort.Reverse(rowSorter{entries, table.Schema, opts.OrderBy}))
+            } else {
+                sort.Sort(rowSorter{entries, table.Schema, opts.OrderBy})
+            }
         }
-
-        if opts.Desc {
-            sort.Reverse(rowSorter{entries, table.Schema, cols})
-        }
-
+        
         if opts.Top > 0 && len(entries) >= opts.Top {
             entries = entries[0 : opts.Top]
         }
@@ -305,7 +316,7 @@ func (this rowSorter) Less(i, j int) bool {
 }
 
 func less(left, right interface{}) bool {
-    switch left.(type) {
+    switch t := left.(type) {
     case int:
         return left.(int) < right.(int)
     case int32:
@@ -319,6 +330,6 @@ func less(left, right interface{}) bool {
     case string:
         return left.(string) < right.(string)
     default:
-        panic("Tried to sort with an unsupported type")
+        panic(fmt.Sprintf("Tried to sort with unsupported type %T", t))
     }
 }

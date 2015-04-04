@@ -15,8 +15,115 @@
 package applications
 
 import (
-    // "testing"
-    // "github.com/stretchr/testify/assert"
-    // "github.com/lighthouse/lighthouse/databases"
+    "testing"
+    "github.com/stretchr/testify/assert"
+
+    "bytes"
+    "net/http"
+    "net/http/httptest"
+
+    "github.com/gorilla/mux"
+
+    "github.com/lighthouse/lighthouse/databases"
 )
 
+func Test_Init(t *testing.T) {
+    databases.SetupTestingDefaultConnection()
+    defer databases.TeardownTestingDefaultConnection()
+
+    // Basically just making sure this doesn't panic...
+    Init(true)
+}
+
+func Test_GetApplicationById_Known(t *testing.T) {
+	SetupTestingTable()
+	defer TeardownTestingTable()
+
+	keyApp := applicationData {
+		Id : 0,
+		CurrentDeployment : 314,
+		Name : "TestApp",
+	    Active : true,
+	    Instances : []string{"instance1"},
+	}
+
+	applications.Insert(makeDatabaseEntryFor(keyApp))
+
+	app, err := GetApplicationById(0)
+
+	assert.Nil(t, err)
+	assert.Equal(t, keyApp, app)
+}
+
+func Test_GetApplicationById_Unknown(t *testing.T) {
+	SetupTestingTable()
+	defer TeardownTestingTable()
+
+	app, err := GetApplicationById(0)
+
+	assert.Equal(t, UnknownApplicationError, err)
+	assert.Equal(t, applicationData{}, app)
+}
+
+func Test_GetApplicationByName_Known(t *testing.T) {
+	SetupTestingTable()
+	defer TeardownTestingTable()
+
+	keyApp := applicationData {
+		Id : 0,
+		CurrentDeployment : 314,
+		Name : "TestApp",
+	    Active : true,
+	    Instances : []string{"instance1"},
+	}
+
+	applications.Insert(makeDatabaseEntryFor(keyApp))
+
+	app, err := GetApplicationByName("TestApp")
+
+	assert.Nil(t, err)
+	assert.Equal(t, keyApp, app)
+}
+
+func Test_GetApplicationByName_Unknown(t *testing.T) {
+	SetupTestingTable()
+	defer TeardownTestingTable()
+
+	app, err := GetApplicationByName("TestApp")
+
+	assert.Equal(t, UnknownApplicationError, err)
+	assert.Equal(t, applicationData{}, app)
+}
+
+func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {
+    defer func() { recover() }()
+
+    w := httptest.NewRecorder()
+    m.ServeHTTP(w, r)
+
+    // This won't run during a panic(), but we can't panic during a 404
+    if http.StatusNotFound == w.Code {
+        t.Log(r.URL.Path)
+        t.Fail()
+    }
+}
+
+func Test_Handle(t *testing.T) {
+    r := mux.NewRouter()
+    Handle(r)
+
+    routes := []struct {
+        Method string
+        Endpoint string
+    } {
+    	// TODO - Add handlers
+    }
+
+    for _, route := range routes {
+        m := route.Method
+        e := route.Endpoint
+
+        req, _ := http.NewRequest(m, e, bytes.NewBuffer([]byte("")))
+        tryHandleTest(t, req, r)
+    }
+}

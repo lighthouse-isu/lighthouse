@@ -27,3 +27,13 @@ func TeardownTestingTable() {
     applications = nil
     deployments = nil
 }
+
+func makeDatabaseEntryFor(app applicationData) map[string]interface{} {
+	return map[string]interface{} {
+		"Id" : app.Id,
+		"CurrentDeployment" : app.CurrentDeployment,
+		"Name" : app.Name,
+	    "Active" : app.Active,
+	    "Instances" : app.Instances,
+	}
+}

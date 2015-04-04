@@ -16,7 +16,6 @@ package databases
 
 import (
     "testing"
-    "database/sql"
 
     "github.com/stretchr/testify/assert"
 
@@ -33,53 +32,6 @@ type testObject struct {
     Name string
     Age int
     Phone string
-}
-
-type testDatabase struct {
-    sql.DB
-}
-
-func (this *testDatabase) Compiler(schema Schema) Compiler {
-    return &testCompiler{}
-}
-
-type testCompiler struct {}
-
-func (t *testCompiler) ConvertInput(o interface{}, c string) (interface{}) { 
-    return o 
-}
-
-func (t *testCompiler) ConvertOutput(o interface{}, c string) (interface{}) { 
-    return o 
-}
-
-func (t *testCompiler) CompileCreate(tab string) (string) {
-    return "CREATE"
-}
-
-func (t *testCompiler) CompileDrop(tab string) (string) {
-    return "DROP"
-}
-
-func (t *testCompiler) CompileInsert(tab string, val map[string]interface{}) (string, []interface{}) {
-    return "INSERT", []interface{}{}
-}
-
-func (t *testCompiler) CompileDelete(tab string, f Filter) (string, []interface{}) {
-    return "DELETE", []interface{}{}
-}
-
-func (t *testCompiler) CompileUpdate(tab string, to map[string]interface{}, w Filter) (string, []interface{}) {
-    return "UPDATE", []interface{}{}
-}
-
-func (t *testCompiler) CompileSelect(tab string, c []string, f Filter, o *SelectOptions) (string, []interface{}) {
-    return "SELECT", []interface{}{}
-}
-
-func testDB() DBInterface {
-    db, _ := sqlmock.New()
-    return &testDatabase{*db}
 }
 
 func Test_SetAndGetDefaultConnection(t *testing.T) {

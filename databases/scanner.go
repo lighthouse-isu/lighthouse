@@ -33,7 +33,10 @@ func (this *Scanner) Scan(dest interface{}) error {
         rowPtrs[i] = &row[i]
     }
 
-	this.Rows.Scan(rowPtrs...)
+	err := this.Rows.Scan(rowPtrs...)
+    if err != nil {
+        return err
+    }
 
     rv := reflect.ValueOf(dest).Elem()
     for i, colName := range this.columns {

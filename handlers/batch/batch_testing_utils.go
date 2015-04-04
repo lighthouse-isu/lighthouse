@@ -21,13 +21,15 @@ import (
     "net/http/httptest"
 )
 
-func shutdownServers(servers []*httptest.Server) {
+var nextPortNumber = 8080
+
+func ShutdownServers(servers []*httptest.Server) {
 	for _, s := range servers {
 		s.Close()
 	}
 }
 
-func setupServers(handlers ...func(http.ResponseWriter, *http.Request)) ([]string, []*httptest.Server) {
+func SetupServers(handlers ...func(http.ResponseWriter, *http.Request)) ([]string, []*httptest.Server) {
     addresses := make([]string, len(handlers))
     servers := make([]*httptest.Server, len(handlers))
 
@@ -38,11 +40,12 @@ func setupServers(handlers ...func(http.ResponseWriter, *http.Request)) ([]strin
 
 	    // Start a new test server to listen for requests from the tests
 	    server := httptest.NewUnstartedServer(http.HandlerFunc(f))
-	    server.Listener, _= net.Listen("tcp", fmt.Sprintf(":%d", 8080+i))
+	    server.Listener, _ = net.Listen("tcp", fmt.Sprintf(":%d", nextPortNumber))
 	    server.Start()
 
 	    addresses[i] = server.URL
 	    servers[i] = server
+	    nextPortNumber++
     }
 
 	return addresses, servers
