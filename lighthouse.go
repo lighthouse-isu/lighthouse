@@ -106,6 +106,7 @@ func main() {
     docker.Handle(versionRouter.PathPrefix("/d").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     aliases.Handle(versionRouter.PathPrefix("/aliases").Subrouter())
+    applications.Handle(versionRouter.PathPrefix("/applications").Subrouter())
     auth.Handle(versionRouter)
 
     ignoreURLs := []string{
