@@ -180,12 +180,12 @@ func Test_Failures(t *testing.T) {
 	proc := NewProcessor(w, insts)
 	proc.Do("GET", nil, "", nil)
 
-	failures := proc.Failures()
+	failures := proc.FailureProcessor()
 
-	assert.Equal(t, 3, len(failures))
+	assert.Equal(t, 3, len(failures.instances))
 
-	sort.Strings(failures)
-	assert.Equal(t, insts[1], failures[0])
-	assert.Equal(t, insts[2], failures[1])
-	assert.Equal(t, insts[4], failures[2])
+	sort.Strings(failures.instances)
+	assert.Equal(t, insts[1], failures.instances[0])
+	assert.Equal(t, insts[2], failures.instances[1])
+	assert.Equal(t, insts[4], failures.instances[2])
 }

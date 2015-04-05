@@ -116,7 +116,13 @@ func Test_Handle(t *testing.T) {
         Method string
         Endpoint string
     } {
-    	// TODO - Add handlers
+    	{"POST", "/create"},
+    	{"GET",  "/list"},
+    	{"GET",  "/list/1234"},
+    	{"POST", "/start/1234"},
+    	{"POST", "/stop/1234"},
+    	{"PUT",  "/revert/1234"},
+    	{"PUT",  "/update/1234"},
     }
 
     for _, route := range routes {

@@ -119,8 +119,8 @@ func (this *Processor) writeUpdate(res Result, endpoint string, progress, total 
 	this.writer.Write(jsonBody)
 }
 
-func (this *Processor) Failures() []string {
-	return this.failures;
+func (this *Processor) FailureProcessor() *Processor {
+	return NewProcessor(this.writer, this.failures);
 }
 
 func runBatchRequest(method, dest string, body interface{}) (*http.Response, error) {

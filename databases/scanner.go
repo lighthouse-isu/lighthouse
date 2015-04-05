@@ -25,6 +25,15 @@ type Scanner struct {
     columns []string
 }
 
+func (this *Scanner) Next() bool {
+    if !this.Rows.Next() {
+        this.Rows.Close()
+        return false
+    }
+
+    return true
+}
+
 func (this *Scanner) Scan(dest interface{}) error {
 	row := make([]interface{}, len(this.columns))
     rowPtrs := make([]interface{}, len(this.columns))

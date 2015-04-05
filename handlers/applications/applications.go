@@ -29,6 +29,8 @@ var (
     NotEnoughDeploymentsError = errors.New("applications: no previous deployment to rollback to")
     StateNotChangedError = errors.New("applications: application already in requested state")
     ImageNotPulledError = errors.New("applications: deployment failed to pull an image")
+    NotEnoughParametersError = errors.New("applications: not enough or invalid parameters given")
+    ApplicationPermissionError = errors.New("applications: user not permitted to modify application")
 )
 
 var applications databases.TableInterface
@@ -61,7 +63,7 @@ type applicationData struct {
 type deploymentData struct {
     Id int64
     AppId int64
-    Command interface{}
+    Command map[string]interface{}
     User string
     Date string
 }
@@ -108,15 +110,17 @@ func GetApplicationByName(Name string) (applicationData, error) {
 }
 
 func Handle(r *mux.Router) {
-    // r.HandleFunc("/create", handleCreateApplication).Methods("POST")
+    r.HandleFunc("/create", handleCreateApplication).Methods("POST")
 
-    // r.HandleFunc("/list", handleListApplications).Methods("GET")
+    r.HandleFunc("/list", handleListApplications).Methods("GET")
 
-    // r.HandleFunc("/list/{Id:.*}", handleGetApplicationHistory).Methods("GET")
+    r.HandleFunc("/list/{Id:.*}", handleGetApplicationHistory).Methods("GET")
 
-    // r.HandleFunc("/start/{Id:.*}", handleStartApplication).Methods("POST")
+    r.HandleFunc("/start/{Id:.*}", handleStartApplication).Methods("POST")
 
-    // r.HandleFunc("/stop/{Id:.*}", handleStopApplication).Methods("POST")
+    r.HandleFunc("/stop/{Id:.*}", handleStopApplication).Methods("POST")
 
-    // r.HandleFunc("/revert/{Id:.*}", handleRevertApplication).Methods("PUT")
+    r.HandleFunc("/revert/{Id:.*}", handleRevertApplication).Methods("PUT")
+
+    r.HandleFunc("/update/{Id:.*}", handleUpdateApplication).Methods("PUT")
 }

@@ -130,46 +130,67 @@ func Test_RemoveDeployment(t *testing.T) {
 	TeardownTestingTable()
 }
 
-func Test_StartApplication_Normal(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
-
-	h := func(w http.ResponseWriter, r *http.Request) {
-		assert.True(t, strings.HasSuffix(r.URL.Path, "start"))
+func Test_StartStopApplication_Normal(t *testing.T) {
+	type testCase struct {
+		Id int64 // Valid app is Id 0
+		Active bool
+		ControlStatus int
+		TestFunc func(app int64, w http.ResponseWriter)error
 	}
 
-	insts, servers := batch.SetupServers(h)
-	defer batch.ShutdownServers(servers)
-
-	app := applicationData{Id : 0, Active : false, Instances : insts}
-	applications.Insert(makeDatabaseEntryFor(app))
-
-	err := startApplication(0, httptest.NewRecorder())
-	assert.Nil(t, err)
-
-	applications.SelectRow(nil, nil, nil, &app)
-	assert.True(t, app.Active)
-}
-
-func Test_StopApplication_Normal(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
-
-	h := func(w http.ResponseWriter, r *http.Request) {
-		assert.True(t, strings.HasSuffix(r.URL.Path, "stop"))
+	type testResult struct {
+		FinalState bool
+		AppError error // Only if applications make the error, not batch
+		Requests []string
 	}
 
-	insts, servers := batch.SetupServers(h)
-	defer batch.ShutdownServers(servers)
+	tests := map[*testCase]testResult {
+		&testCase{0, false, 200, startApplication} : testResult{true,  nil, []string{"start"}},
+		&testCase{1, false, -1,  startApplication} : testResult{false, UnknownApplicationError, []string{}},
+		&testCase{0, true,  -1,  startApplication} : testResult{true,  StateNotChangedError, []string{}},
+		&testCase{0, false, 500, startApplication} : testResult{false, nil, []string{"start", "stop"}},
 
-	app := applicationData{Id : 0, Active : true, Instances : insts}
-	applications.Insert(makeDatabaseEntryFor(app))
+		&testCase{0, true,  200, stopApplication}  : testResult{false, nil, []string{"stop"}},
+		&testCase{1, true,  -1,  stopApplication}  : testResult{true,  UnknownApplicationError, []string{}},
+		&testCase{0, false, -1,  stopApplication}  : testResult{false, StateNotChangedError, []string{}},
+		&testCase{0, true,  500, stopApplication}  : testResult{true,  nil, []string{"stop", "start"}},
+	}
 
-	err := stopApplication(0, httptest.NewRecorder())
-	assert.Nil(t, err)
+	for c, res := range tests {
+		i := 0
+		testInst := func(w http.ResponseWriter, r *http.Request) {
+			assert.True(t, strings.HasSuffix(r.URL.Path, res.Requests[i]))
+			i += 1
+		}
 
-	applications.SelectRow(nil, nil, nil, &app)
-	assert.False(t, app.Active)
+		controlInst := func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(c.ControlStatus)
+		}
+
+		SetupTestingTable()
+		insts, servers := batch.SetupServers(testInst, controlInst)
+		app := applicationData{Id : 0, Active : c.Active, Instances : insts}
+		applications.Insert(makeDatabaseEntryFor(app))
+
+		err := c.TestFunc(c.Id, httptest.NewRecorder())
+
+		assert.Equal(t, len(res.Requests), i)
+
+		if c.ControlStatus == 200 {
+			assert.Nil(t, err)
+		} else if res.AppError != nil {
+			assert.Equal(t, res.AppError, err)
+		} else {
+			assert.NotNil(t, err)
+		}
+
+		var resApp applicationData
+		applications.SelectRow(nil, nil, nil, &resApp)
+		assert.Equal(t, res.FinalState, resApp.Active)
+
+		TeardownTestingTable()
+		batch.ShutdownServers(servers)
+	}
 }
 
 func Test_SetApplicationStateTo_Unknown(t *testing.T) {
@@ -195,82 +216,6 @@ func Test_SetApplicationStateTo_NoChange(t *testing.T) {
 
 	err := setApplicationStateTo(0, true, httptest.NewRecorder())
 	assert.Equal(t, StateNotChangedError, err)
-}
-
-func Test_StartApplication_Rollback(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
-
-	startComplete := false
-	stopComplete := false
-
-	passing := func(w http.ResponseWriter, r *http.Request) {
-		if startComplete == false {
-			assert.True(t, strings.HasSuffix(r.URL.Path, "start"))
-			startComplete = true
-		} else if stopComplete == false {
-			assert.True(t, strings.HasSuffix(r.URL.Path, "stop"))
-			stopComplete = true
-		} else {
-			t.Error("Too many requests")
-		}
-		w.WriteHeader(200)
-	}
-
-	failing := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(400)
-	}
-
-	insts, servers := batch.SetupServers(passing, failing)
-	defer batch.ShutdownServers(servers)
-
-	app := applicationData{Id : 0, Active : false, Instances : insts}
-	applications.Insert(makeDatabaseEntryFor(app))
-
-	err := startApplication(0, httptest.NewRecorder())
-	assert.NotNil(t, err)
-	assert.True(t, startComplete && stopComplete)
-
-	applications.SelectRow(nil, nil, nil, &app)
-	assert.False(t, app.Active)
-}
-
-func Test_StopApplication_Rollback(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
-
-	startComplete := false
-	stopComplete := false
-
-	passing := func(w http.ResponseWriter, r *http.Request) {
-		if stopComplete == false {
-			assert.True(t, strings.HasSuffix(r.URL.Path, "stop"))
-			stopComplete = true
-		} else if startComplete == false {
-			assert.True(t, strings.HasSuffix(r.URL.Path, "start"))
-			startComplete = true
-		} else {
-			t.Error("Too many requests")
-		}
-		w.WriteHeader(200)
-	}
-
-	failing := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(400)
-	}
-
-	insts, servers := batch.SetupServers(passing, failing)
-	defer batch.ShutdownServers(servers)
-
-	app := applicationData{Id : 0, Active : true, Instances : insts}
-	applications.Insert(makeDatabaseEntryFor(app))
-
-	err := stopApplication(0, httptest.NewRecorder())
-	assert.NotNil(t, err)
-	assert.True(t, startComplete && stopComplete)
-
-	applications.SelectRow(nil, nil, nil, &app)
-	assert.True(t, app.Active)
 }
 
 func Test_GetApplicationList(t *testing.T) {
@@ -318,40 +263,26 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 	ds[2], _ = addDeployment(0, cmd, "otheruser")
 	addDeployment(1, cmd, "email")
 
-	user.SetAuthLevel("Applications", "APP", auth.AccessAuthLevel)
-
-	list, _ := getApplicationHistory(user, app)
-
-	assert.Equal(t, 3, len(list))
-
-	for i, deploy := range ds {
-		assert.Equal(t, deploy.Id, list[i]["Id"])
-		assert.Equal(t, deploy.User, list[i]["Creator"])
-		assert.Equal(t, deploy.Date, list[i]["Date"])
+	tests := map[int][]deploymentData {
+		-1 : []deploymentData{},
+		auth.AccessAuthLevel : ds,
+		auth.ModifyAuthLevel : ds,
+		auth.OwnerAuthLevel : ds,
 	}
-}
 
-func Test_GetApplicationHistory_Unauthorized(t *testing.T) {
-	SetupTestingTable()
-	auth.SetupTestingTable()
-	defer TeardownTestingTable()
-	defer auth.SetupTestingTable()
+	for level, key := range tests {
+		user.SetAuthLevel("Applications", "APP", level)
+		list, err := getApplicationHistory(user, app)
 
-	auth.CreateUser("email", "", "")
-	user, _ := auth.GetUser("email")
+		assert.Nil(t, err)
+		assert.Equal(t, len(key), len(list))
 
-	app, _ := addApplication("APP", nil)
-
-	cmd := map[string]interface{}{"Image" : "test"}
-	ds := make([]deploymentData, 3)
-
-	ds[0], _ = addDeployment(0, cmd, "otheruser")
-	ds[1], _ = addDeployment(0, cmd, "email")
-	ds[2], _ = addDeployment(0, cmd, "otheruser")
-	addDeployment(1, cmd, "email")
-
-	list, _ := getApplicationHistory(user, app)
-	assert.Equal(t, 0, len(list))
+		for i, deploy := range key {
+			assert.Equal(t, deploy.Id, list[i]["Id"])
+			assert.Equal(t, deploy.User, list[i]["Creator"])
+			assert.Equal(t, deploy.Date, list[i]["Date"])
+		}
+	}
 }
 
 func Test_GetRevertDeployment(t *testing.T) {
@@ -424,7 +355,7 @@ func Test_DoDeployment(t *testing.T) {
 
 	cmd := map[string]interface{}{"Image" : "test"}
 	dNormal := &deploymentData{42, 0, cmd, "email", "12345"}
-	dNoImage := &deploymentData{42, 0, "BAD", "email", "12345"}
+	dNoImage := &deploymentData{42, 0, map[string]interface{}{}, "email", "12345"}
 
 	tests := map[testCase]testResult{
 		// Success cases

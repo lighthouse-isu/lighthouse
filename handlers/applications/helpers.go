@@ -17,7 +17,7 @@ package applications
 import (
 	"fmt"
 	"net/http"
-	"encoding/json"
+
 	"github.com/lighthouse/lighthouse/auth"
 	"github.com/lighthouse/lighthouse/handlers/batch"
     "github.com/lighthouse/lighthouse/databases"
@@ -64,31 +64,6 @@ func removeDeployment(deploy int64) error {
     return deployments.Delete(where)
 }
 
-// func createApplication(user *auth.User, name string, cmd interface{}, instances []string, startApp, pullImages bool, w http.ResponseWriter) error {
-// 	application, err := addApplication(name, instances)
-//     if err != nil {
-//     	return err
-//     }
-
-//     deployment, err := addDeployment(application.Id, cmd, user.Email)
-//     if err != nil {
-//     	removeApplication(application.Id)
-//         return err
-//     }
-
-//     err = doDeployment(application, deployment, startApp, pullImages, w)
-
-//     if err != nil {
-//         removeDeployment(deployment.Id)
-//         removeApplication(application.Id)
-//         return err
-//     }
-
-//     auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
-
-//     return nil
-// }
-
 func startApplication(app int64, w http.ResponseWriter) error {
 	return setApplicationStateTo(app, true, w)
 }
@@ -101,21 +76,14 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 	deploy := batch.NewProcessor(w, app.Instances)
 
 	if pullImages {
-		image := struct {
-			Image string
-		}{}
+		image, ok := deployment.Command["Image"]
 
-		jsonCmd, err := json.Marshal(deployment.Command)
-		if err == nil {
-			err = json.Unmarshal(jsonCmd, &image)
-		}
-		
-		if err != nil {
-			return err
+		if !ok || image == "" {
+			return NotEnoughParametersError
 		}
 
-		pullTarget := fmt.Sprintf("images/create?fromImage?%s", image.Image)
-		err = deploy.Do("POST", nil, pullTarget, nil)
+		pullTarget := fmt.Sprintf("images/create?fromImage?%s", image)
+		err := deploy.Do("POST", nil, pullTarget, nil)
 
 		if err != nil {
 			return err
@@ -128,13 +96,11 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 	err := deploy.Do("POST", deployment.Command, createTarget, nil)
 
 	if err != nil {
-		deleteTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
-		deploy.Do("DELETE", nil, deleteTarget, nil)
+		batchDeleteContainersByName(deploy, tmpName)
 		return err
 	}
 
-	deleteTarget := fmt.Sprintf("containers/%s?force=true", app.Name)
-	err = deploy.Do("DELETE", nil, deleteTarget, nil)
+	err = batchDeleteContainersByName(deploy, app.Name)
 	if err != nil {
 		return err
 	}
@@ -143,14 +109,10 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 	err = deploy.Do("POST", nil, renameTarget, nil)
 
 	if err != nil {
-		// In a weird case where some containers have the temp name and some have the real
-		// name. Have to rollback each case individually.
+		// In a weird state where some containers have the temp name and some have the real name
+		batchDeleteContainersByName(deploy, app.Name)
+		batchDeleteContainersByName(deploy.FailureProcessor(), tmpName)
 		
-		deleteAppTarget := fmt.Sprintf("containers/%s?force=true", app.Name)
-		deploy.Do("DELETE", nil, deleteAppTarget, nil)
-
-		deleteTmpTarget := fmt.Sprintf("containers/%s?force=true", tmpName)
-		batch.NewProcessor(w, deploy.Failures()).Do("DELETE", nil, deleteTmpTarget, nil)
 		return err
 	}
 
@@ -172,7 +134,6 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 
 func getApplicationList(user *auth.User) ([]applicationData, error) {
     scanner, err := applications.Select(nil, nil, nil)
-
     if err != nil {
         return nil, err
     }
@@ -307,4 +268,9 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	}
 
 	return deployment, err
+}
+
+func batchDeleteContainersByName(proc *batch.Processor, name string) error {
+	deleteTarget := fmt.Sprintf("containers/%s?force=true", name)
+	return proc.Do("DELETE", nil, deleteTarget, nil)
 }
