@@ -16,8 +16,8 @@ package docker
 
 import (
     "fmt"
+    "io"
     "net/http"
-    "io/ioutil"
     "bytes"
     "encoding/json"
 
@@ -92,13 +92,21 @@ func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *han
         return &handlers.HandlerError{resp.StatusCode, "docker", resp.Status}
     }
 
-    body, err := ioutil.ReadAll(resp.Body)
-    if err != nil {
-        return &handlers.HandlerError{500, "control", "Failed reading response body"}
+    w.WriteHeader(resp.StatusCode)
+    var bodyBuffer = make([]byte, 16)
+
+    for {
+        n, err := resp.Body.Read(bodyBuffer)
+        w.Write(bodyBuffer[:n])
+
+        if err != nil {
+            if err != io.EOF {
+                logging.Info("An unexpected error occured while reading the docker stream")
+            }
+            break
+        }
     }
 
-    w.WriteHeader(resp.StatusCode)
-    w.Write(body)
     return nil
 }
 
