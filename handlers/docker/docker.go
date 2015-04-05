@@ -27,6 +27,8 @@ import (
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
     "github.com/lighthouse/lighthouse/beacons/aliases"
+
+    "github.com/lighthouse/lighthouse/logging"
 )
 
 /*
