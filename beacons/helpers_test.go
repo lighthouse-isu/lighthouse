@@ -108,15 +108,15 @@ func Test_RemoveBeacon(t *testing.T) {
     setup()
     defer teardown()
 
-    beacons.InsertSchema(map[string]interface{}{
+    beacons.Insert(map[string]interface{}{
         "Address" : "ADDR",
         "Token" : "TOKEN",
-    }, "")
+    })
 
     removeBeacon("ADDR")
 
     var values beaconData
-    err := beacons.SelectRowSchema(nil, nil, &values)
+    err := beacons.SelectRow(nil, nil, nil, &values)
 
     assert.Equal(t, databases.NoRowsError, err)
 }

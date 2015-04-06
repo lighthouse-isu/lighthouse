@@ -63,7 +63,7 @@ func AddAlias(alias, address string) error {
 
 func RemoveAlias(address string) error {
     where := databases.Filter{"Address" : address}
-    return aliases.DeleteRowsSchema(where)
+    return aliases.Delete(where)
 }
 
 func UpdateAlias(alias, address string) error {
