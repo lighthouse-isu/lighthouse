@@ -37,7 +37,7 @@ func (this *Scanner) Scan(dest interface{}) error {
 
     rv := reflect.ValueOf(dest).Elem()
     for i, colName := range this.columns {
-        setVal := this.table.convertOutput(row[i], colName)
+        setVal := this.table.compiler.ConvertOutput(row[i], colName)
         if setVal != nil {
             rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
         }

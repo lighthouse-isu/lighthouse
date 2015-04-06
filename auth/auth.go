@@ -39,7 +39,7 @@ var SECRET_HASH_KEY string
 
 func Init(reload bool) {
     if users == nil { // defined in users.go
-        users = databases.NewSchemaTable(databases.DefaultConnection(), "users", schema)
+        users = databases.NewTable(databases.DefaultConnection(), "users", schema)
     }
 
     config := LoadAuthConfig()

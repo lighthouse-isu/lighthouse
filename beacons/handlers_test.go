@@ -83,9 +83,9 @@ func Test_HandleUpdateBeaconToken(t *testing.T) {
 	setup()
 	defer teardown()
 
-	beacons.InsertSchema(map[string]interface{}{
+	beacons.Insert(map[string]interface{}{
 		"Address" : "ADDR", "Token" : "TOKEN",
-	}, "")
+	})
 
 	setupBeaconPermissions("ADDR", 2)
 	w := runHandlerTest("PUT", "/ADDR", "TOKEN_PASS", "/{Endpoint}", handleUpdateBeaconToken)
@@ -93,7 +93,7 @@ func Test_HandleUpdateBeaconToken(t *testing.T) {
     assert.Equal(t, 200, w.Code)
 
     var data beaconData
-    beacons.SelectRowSchema(nil, nil, &data)
+    beacons.SelectRow(nil, nil, nil, &data)
     assert.Equal(t, "TOKEN_PASS", data.Token)
 }
 
@@ -143,7 +143,7 @@ func Test_HandleBeaconCreate(t *testing.T) {
     assert.Equal(t, "ALIAS_PASS", alias)
 
     var beacon beaconData
-    beacons.SelectRowSchema(nil, nil, &beacon)
+    beacons.SelectRow(nil, nil, nil, &beacon)
     assert.Equal(t, "localhost:8080", beacon.Address)
 	assert.Equal(t, "TOKEN_PASS", beacon.Token)
 }
@@ -176,7 +176,7 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 
 	// Duplicate beacon
 	body = map[string]interface{} {"Address" : "localhost:8080", "Token" : ""}
-	beacons.InsertSchema(body, "")
+	beacons.Insert(body)
 	body["Alias"] = "ALIAS"
 
     defer setupServer(nil).Close()

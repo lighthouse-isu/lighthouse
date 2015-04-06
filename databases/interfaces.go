@@ -29,17 +29,17 @@ type DBInterface interface {
     Query(string, ...interface{}) (*sql.Rows, error)
     QueryRow(string, ...interface{}) *sql.Row
     SetMaxIdleConns(int)
+
+    Compiler(Schema) Compiler
 }
 
 type TableInterface interface {
-    Insert(string, interface{})(error)
-    Update(string, interface{})(error)
-    SelectRow(string, interface{})(error)
-    InsertSchema(map[string]interface{}, string)(interface{}, error)
-    DeleteRowsSchema(Filter) (error)
-    UpdateSchema(map[string]interface{}, map[string]interface{})(error)
-    SelectRowSchema([]string, Filter, interface{})(error)
-    SelectSchema([]string, Filter, SelectOptions)(ScannerInterface, error)
+    Insert(map[string]interface{})(error)
+    InsertReturn(map[string]interface{}, []string, *SelectOptions, interface{})(error)
+    Delete(Filter) (error)
+    Update(map[string]interface{}, Filter)(error)
+    SelectRow([]string, Filter, *SelectOptions, interface{})(error)
+    Select([]string, Filter, *SelectOptions)(ScannerInterface, error)
     Reload()
 }
 
@@ -49,4 +49,16 @@ type ScannerInterface interface {
     Err()(error)
     Next()(bool)
     Scan(dest interface{})(error)
+}
+
+type Compiler interface {
+    ConvertInput(interface{}, string) interface{}
+    ConvertOutput(interface{}, string) interface{}
+
+    CompileCreate(string) (string)
+    CompileDrop(string) (string)
+    CompileInsert(string, map[string]interface{}) (string, []interface{})
+    CompileDelete(string, Filter) (string, []interface{})
+    CompileUpdate(string, map[string]interface{}, Filter) (string, []interface{})
+    CompileSelect(string, []string, Filter, *SelectOptions) (string, []interface{})
 }

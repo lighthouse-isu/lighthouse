@@ -42,13 +42,13 @@ func teardown() {
 func addUsers(list ...User) {
 	for _, user := range list {
 
-		users.InsertSchema(map[string]interface{}{
+		users.Insert(map[string]interface{}{
 	        "Email" : user.Email,
 	        "Salt" : user.Salt,
 	        "Password" : user.Password,
             "AuthLevel" : user.AuthLevel,
 	        "Permissions" : user.Permissions,
-	    }, "")
+	    })
 	}
 }
 
@@ -81,7 +81,7 @@ func Test_CreateUser(t *testing.T) {
     }
 
     var actual User
-    users.SelectRowSchema(nil, nil, &actual)
+    users.SelectRow(nil, nil, nil, &actual)
 
 	assert.Equal(t, keyUser, actual)
 }
@@ -102,7 +102,7 @@ func Test_CreateUserWithAuthLevel(t *testing.T) {
     }
 
     var actual User
-    users.SelectRowSchema(nil, nil, &actual)
+    users.SelectRow(nil, nil, nil, &actual)
 
 	assert.Equal(t, keyUser, actual)
 }
@@ -184,7 +184,7 @@ func Test_SetUserBeaconAuthLevel(t *testing.T) {
     SetUserBeaconAuthLevel(user, "NEW", 2)
 
     cols := []string{"Permissions"}
-    users.SelectRowSchema(cols, nil, user)
+    users.SelectRow(cols, nil, nil, user)
 
     assert.Equal(t, keyPerms, user.Permissions["Beacons"])
 }
@@ -459,7 +459,7 @@ func Test_HandleUpdateUser_Valid(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    users.SelectRowSchema(nil, nil, &user)
+    users.SelectRow(nil, nil, nil, &user)
 
     assert.Equal(t, http.StatusOK, w.Code)
     assert.Equal(t, keyUser, user)
@@ -491,7 +491,7 @@ func Test_HandleUpdateUser_NotAuthorized(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    users.SelectRowSchema(nil, nil, &user)
+    users.SelectRow(nil, nil, nil, &user)
 
     assert.Equal(t, http.StatusForbidden, w.Code)
     assert.Equal(t, keyUser, user)
@@ -518,7 +518,7 @@ func Test_HandleUpdateUser_CantView(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    users.SelectRowSchema(nil, nil, &user)
+    users.SelectRow(nil, nil, nil, &user)
 
     assert.Equal(t, http.StatusNotFound, w.Code)
 }
@@ -540,7 +540,7 @@ func Test_HandleUpdateUser_UnknownUser(t *testing.T) {
     w := handleAndServe("/{Email}", handleUpdateUser, r)
 
     var user User
-    users.SelectRowSchema(nil, nil, &user)
+    users.SelectRow(nil, nil, nil, &user)
 
     assert.Equal(t, http.StatusNotFound, w.Code)
 }
@@ -562,7 +562,7 @@ func Test_HandleCreateUser_Valid(t *testing.T) {
 
     var user User
     where := databases.Filter{"Email" : "USER"}
-    users.SelectRowSchema(nil, where, &user)
+    users.SelectRow(nil, where, nil, &user)
 
     assert.Equal(t, http.StatusOK, w.Code)
     assert.Equal(t, "USER", user.Email)

@@ -29,7 +29,7 @@ import (
 
 var aliases databases.TableInterface
 
-var schema = databases.Schema{
+var schema = databases.Schema {
     "Alias" : "text",
     "Address" : "text UNIQUE PRIMARY KEY",
 }
@@ -41,7 +41,7 @@ type Alias struct {
 
 func Init(reload bool) {
     if aliases == nil {
-        aliases = databases.NewSchemaTable(nil, "aliases", schema)
+        aliases = databases.NewTable(nil, "aliases", schema)
     }
 
     if reload {
@@ -56,7 +56,7 @@ func AddAlias(alias, address string) error {
         "Address" : address,
     }
 
-    _, err := aliases.InsertSchema(entry, "")
+    err := aliases.Insert(entry)
 
     return err
 }
@@ -65,7 +65,7 @@ func UpdateAlias(alias, address string) error {
     to := databases.Filter{"Alias": alias}
     where := databases.Filter{"Address" : address}
 
-    return aliases.UpdateSchema(to, where)
+    return aliases.Update(to, where)
 }
 
 func SetAlias(alias, address string) error {
@@ -84,7 +84,7 @@ func GetAddressOf(alias string) (string, error) {
     
     var val Alias
 
-    err := aliases.SelectRowSchema(cols, where, &val)
+    err := aliases.SelectRow(cols, where, nil, &val)
     
     if err != nil {
         return "", err
@@ -99,7 +99,7 @@ func GetAliasOf(address string) (string, error) {
     
     var val Alias
 
-    err := aliases.SelectRowSchema(cols, where, &val)
+    err := aliases.SelectRow(cols, where, nil, &val)
     
     if err != nil {
         return "", err

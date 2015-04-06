@@ -93,7 +93,7 @@ func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
 
     to := map[string]interface{}{"Token" : token}
     where := map[string]interface{}{"Address" : beacon}
-    err = beacons.UpdateSchema(to, where)
+    err = beacons.Update(to, where)
 
     return
 }

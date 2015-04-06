@@ -36,7 +36,7 @@ type Container struct {
 
 func Init(reload bool) {
     if containers == nil {
-        containers = databases.NewSchemaTable(nil, "containers", schema)
+        containers = databases.NewLockingTable(nil, "containers", schema)
     }
 
     if reload {
@@ -51,17 +51,22 @@ func CreateContainer(AppId int64, DockerInstance string, Name string) (int64, er
     values["DockerInstance"] = DockerInstance
     values["Name"] = Name
 
-    containerId, err := containers.InsertSchema(values, "Id")
+    cols := []string{"Id"}
+    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
+
+    var container Container
+
+    err := containers.InsertReturn(values, cols, &opts, &container)
     if err != nil {
         return -1, err
     }
 
-    return containerId.(int64), err
+    return container.Id, err
 }
 
 func DeleteContainer(Id int64) (err error) {
     where := databases.Filter{"Id" : Id}
-    return containers.DeleteRowsSchema(where)
+    return containers.Delete(where)
 }
 
 func GetContainerById(Id int64, container *Container) (err error) {
@@ -72,7 +77,7 @@ func GetContainerById(Id int64, container *Container) (err error) {
         columns = append(columns, k)
     }
 
-    err = containers.SelectRowSchema(columns, where, container)
+    err = containers.SelectRow(columns, where, nil, container)
 
     return
 }
