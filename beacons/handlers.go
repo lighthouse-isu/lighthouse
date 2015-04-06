@@ -129,14 +129,6 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     currentUser := auth.GetCurrentUser(r)
     auth.SetUserBeaconAuthLevel(currentUser, beacon.Address, auth.OwnerAuthLevel)
 
-    // _, err = net.DialTimeout("ip", "http://" + beacon.Address, 
-    //     time.Duration(3) * time.Second)
-    // if err != nil {
-    //     return
-    // }
-
-    // TODO - rollback on error
-
     err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
     if err != nil {
         return
@@ -148,10 +140,17 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     }
 
     if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
         return
     }
 
     err = refreshVMListOf(beacon)
+    if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
+        removeBeacon(beacon.Address)
+        return
+    }
+
     return
 }
 

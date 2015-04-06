@@ -29,6 +29,7 @@ import (
 
     "github.com/lighthouse/lighthouse/auth"
     "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
@@ -173,6 +174,9 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 	body = map[string]interface{} {"Address" : "ADDR", "Alias" : "ALIAS", "Token" : ""}
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 500, w.Code)
+	var beacon beaconData
+	err := beacons.SelectRowSchema(nil, nil, &beacon)
+	assert.Equal(t, databases.NoRowsError, err)
 
 	// Duplicate beacon
 	body = map[string]interface{} {"Address" : "localhost:8080", "Token" : ""}
