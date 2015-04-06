@@ -56,7 +56,7 @@ func addBeacon(beacon beaconData) error {
 
 func removeBeacon(address string) error {
     where := databases.Filter{"Address" : address}
-    return beacons.DeleteRowsSchema(where)
+    return beacons.Delete(where)
 }
 
 func addInstance(instance instanceData) error {

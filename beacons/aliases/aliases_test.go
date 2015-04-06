@@ -113,15 +113,15 @@ func Test_RemoveAlias(t *testing.T) {
 	table, teardown := setup()
 	defer teardown()
 
-	table.InsertSchema(map[string]interface{}{
+	table.Insert(map[string]interface{}{
 		"Alias" : "ALIAS",
 		"Address" : "ADDRESS",
-	}, "")
+	})
 
 	RemoveAlias("ADDRESS")
 
 	var res Alias
-	err := table.SelectRowSchema([]string{"Address"}, nil, &res)
+	err := table.SelectRow([]string{"Address"}, nil, nil, &res)
 
 	assert.Equal(t, databases.NoRowsError, err)
 }

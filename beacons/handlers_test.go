@@ -175,7 +175,7 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 500, w.Code)
 	var beacon beaconData
-	err := beacons.SelectRowSchema(nil, nil, &beacon)
+	err := beacons.SelectRow(nil, nil, nil, &beacon)
 	assert.Equal(t, databases.NoRowsError, err)
 
 	// Duplicate beacon
