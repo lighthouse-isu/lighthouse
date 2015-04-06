@@ -15,6 +15,8 @@
 package session
 
 import (
+    "os"
+    "io/ioutil"
     "testing"
     "net/http"
 
@@ -89,4 +91,25 @@ func Test_SetValue_Overwrite(t *testing.T) {
     value := s.Values["key"]
 
     assert.Equal(t, "right_value", value)
+}
+
+func Test_LoadSessionKey_Cold(t *testing.T) {
+    os.Remove("test_session_cold.key")
+
+    sessionKey, _ := loadSessionKey("test_session_cold.key")
+    assert.Len(t, sessionKey, 64)
+
+    os.Remove("test_session_cold.key")
+}
+
+func Test_LoadSessionKey_Warm(t *testing.T) {
+    os.Remove("test_session_warm.key")
+
+    expectedKey := []byte{'d', 'e', 'a', 'd', 'b', 'e', 'e', 'f'}
+    ioutil.WriteFile("test_session_warm.key", expectedKey, 0644)
+
+    actualKey, _ := loadSessionKey("test_session_warm.key")
+    assert.Equal(t, expectedKey, actualKey)
+
+    os.Remove("test_session_warm.key")
 }

@@ -15,13 +15,41 @@
 package session
 
 import (
+    "os"
+    "path"
+    "io/ioutil"
     "net/http"
 
     "github.com/gorilla/sessions"
     "github.com/gorilla/securecookie"
 )
 
-var cookieStore = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
+var cookieStore *sessions.CookieStore
+
+func init() {
+    sessionKey, err := loadSessionKey(
+        path.Join(os.TempDir(), "lighthouse_session.key"))
+
+    if err != nil {
+        panic(err.Error())
+    }
+
+    cookieStore = sessions.NewCookieStore(sessionKey)
+}
+
+func loadSessionKey(sessionFile string) ([]byte, error) {
+    var sessionKey []byte
+    _, err := os.Stat(sessionFile)
+
+    if os.IsNotExist(err) {
+        sessionKey = securecookie.GenerateRandomKey(64)
+        err = ioutil.WriteFile(sessionFile, sessionKey, 0640)
+    } else {
+        sessionKey, err = ioutil.ReadFile(sessionFile)
+    }
+
+    return sessionKey, err
+}
 
 func GetValueOK(r *http.Request, sessionKey string, key interface{}) (interface{}, bool) {
     session := GetSession(r, sessionKey)
