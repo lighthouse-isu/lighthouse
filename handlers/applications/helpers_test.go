@@ -402,16 +402,21 @@ func Test_DoDeployment(t *testing.T) {
 		insts, servers := batch.SetupServers(h)
 		app, _ := addApplication("TestApp", insts)
 
-		err := doDeployment(app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
+		err, ok := doDeployment(app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
 
 		assert.Equal(t, len(res.Requests), i, errorMsg)
 
 		if res.FailureStep == -1 { // Passes
 			assert.Nil(t, err, errorMsg)
+			assert.True(t, ok)
 			app, _ = GetApplicationById(app.Id)
 			assert.Equal(t, c.Deploy.Id, app.CurrentDeployment, errorMsg)
 		} else {
-			assert.NotNil(t, err, errorMsg)
+			assert.False(t, ok)
+
+			if len(res.Requests) == 0 {
+				assert.NotNil(t, err, errorMsg)
+			}
 		}
 
 		TeardownTestingTable()

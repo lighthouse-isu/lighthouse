@@ -145,13 +145,10 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    err = doDeployment(application, deployment, start, pull, w)
-    if err != nil {
+    _, ok := doDeployment(application, deployment, start, pull, w)
+    if !ok {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
-
-        // Error already reported in stream
-        err = nil
         return
     }
 

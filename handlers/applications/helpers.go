@@ -72,21 +72,21 @@ func stopApplication(app int64, w http.ResponseWriter) error {
 	return setApplicationStateTo(app, false, w)
 }
 
-func doDeployment(app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) error {
+func doDeployment(app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) (error, bool) {
 	deploy := batch.NewProcessor(w, app.Instances)
 
 	if pullImages {
 		image, ok := deployment.Command["Image"]
 
 		if !ok || image == "" {
-			return NotEnoughParametersError
+			return NotEnoughParametersError, false
 		}
 
 		pullTarget := fmt.Sprintf("images/create?fromImage?%s", image)
 		err := deploy.Do("POST", nil, pullTarget, nil)
 
 		if err != nil {
-			return err
+			return nil, false
 		}
 	}
 
@@ -97,12 +97,12 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 
 	if err != nil {
 		batchDeleteContainersByName(deploy, tmpName)
-		return err
+		return nil, false
 	}
 
 	err = batchDeleteContainersByName(deploy, app.Name)
 	if err != nil {
-		return err
+		return nil, false
 	}
 
 	renameTarget := fmt.Sprintf("containers/%s/rename?name=%s", tmpName, app.Name)
@@ -113,7 +113,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 		batchDeleteContainersByName(deploy, app.Name)
 		batchDeleteContainersByName(deploy.FailureProcessor(), tmpName)
 		
-		return err
+		return nil, false
 	}
 
 	if app.Active || startApp {
@@ -121,7 +121,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 		err = deploy.Do("POST", nil, startTarget, nil)
 
 		if err != nil {
-			return err
+			return nil, false
 		}
 	}
 
@@ -129,7 +129,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 	where := databases.Filter{"Id" : app.Id}
 	applications.Update(to, where)
 
-	return nil
+	return nil, true
 }
 
 func getApplicationList(user *auth.User) ([]applicationData, error) {
@@ -242,6 +242,7 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 
 	} else {
 		priorCnt := int(-1 * target)
+
 		where := databases.Filter{"AppId" : app}
 		opts := &databases.SelectOptions {
 			OrderBy : []string{"Id"},

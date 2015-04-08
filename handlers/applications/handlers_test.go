@@ -75,8 +75,8 @@ func Test_HandleCreateApplication(t *testing.T) {
         &testCase{validCommand, false, false} : testResult{200, true},
         
         // Missing image - fails at pull
-        &testCase{noImageCommand, true, true} : testResult{400, false},
-        &testCase{noImageCommand, false, true} : testResult{400, false},
+        &testCase{noImageCommand, true, true} : testResult{200, false},
+        &testCase{noImageCommand, false, true} : testResult{200, false},
         &testCase{noImageCommand, true, false} : testResult{200, true},
         &testCase{noImageCommand, false, false} : testResult{200, true},
 
@@ -261,7 +261,7 @@ func Test_HandleGetApplicationHistory_Errors(t *testing.T) {
         w := httptest.NewRecorder()
         req, _ := http.NewRequest("GET", dest, nil)
         m.ServeHTTP(w, req)
-        assert.Equal(t, 400, w.Code)
+        assert.Equal(t, 404, w.Code)
     }
 }
 
@@ -299,10 +299,10 @@ func Test_HandleStartAndStopApplication(t *testing.T) {
         testCase{auth.OwnerAuthLevel, "/start/TestApp", false} : testResult{200, true, true},
 
         // Bad identifiers
-        testCase{auth.OwnerAuthLevel, "/stop/-1", true}       : testResult{400, false, false},
-        testCase{auth.OwnerAuthLevel, "/stop/BadApp", true}   : testResult{400, false, false},
-        testCase{auth.OwnerAuthLevel, "/start/-1", false}     : testResult{400, false, true},
-        testCase{auth.OwnerAuthLevel, "/start/BadApp", false} : testResult{400, false, true},
+        testCase{auth.OwnerAuthLevel, "/stop/-1", true}       : testResult{404, false, false},
+        testCase{auth.OwnerAuthLevel, "/stop/BadApp", true}   : testResult{404, false, false},
+        testCase{auth.OwnerAuthLevel, "/start/-1", false}     : testResult{404, false, true},
+        testCase{auth.OwnerAuthLevel, "/start/BadApp", false} : testResult{404, false, true},
 
         // State not changed
         testCase{auth.OwnerAuthLevel, "/stop/0", false} : testResult{304, false, false},
@@ -368,6 +368,7 @@ func Test_HandleRevertApplication_Errors(t *testing.T) {
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
     app, _ := addApplication("TestApp", []string{})
+    addDeployment(app.Id, map[string]interface{}{}, user.Email)
 
     m := mux.NewRouter()
     m.HandleFunc("/revert/{Id}", handleRevertApplication)
@@ -379,16 +380,16 @@ func Test_HandleRevertApplication_Errors(t *testing.T) {
 
     tests := map[testCase]int {
         // Bad ID
-        testCase{"/revert/-1", auth.OwnerAuthLevel}      : 400,
-        testCase{"/revert/100", auth.OwnerAuthLevel}     : 400,
-        testCase{"/revert/BadName", auth.OwnerAuthLevel} : 400,
+        testCase{"/revert/-1", auth.OwnerAuthLevel}      : 404,
+        testCase{"/revert/100", auth.OwnerAuthLevel}     : 404,
+        testCase{"/revert/BadName", auth.OwnerAuthLevel} : 404,
 
         // Unauthorized
         testCase{"/revert/TestApp", auth.AccessAuthLevel} : 403,
 
         // Bad target
         testCase{"/revert/TestApp?target=-100", auth.OwnerAuthLevel} : 400,
-        testCase{"/revert/TestApp?target=100", auth.OwnerAuthLevel}  : 400,
+        testCase{"/revert/TestApp?target=100", auth.OwnerAuthLevel}  : 404,
         testCase{"/revert/TestApp", auth.OwnerAuthLevel}             : 400,
     }
 
@@ -400,6 +401,7 @@ func Test_HandleRevertApplication_Errors(t *testing.T) {
 
         m.ServeHTTP(w, req)
         assert.Equal(t, res, w.Code)
+        t.Log(w.Body)
     }
 }
 
@@ -423,9 +425,9 @@ func Test_HandleUpdateApplication_Errors(t *testing.T) {
 
     tests := map[testCase]int {
         // Bad ID
-        testCase{"/update/-1", auth.OwnerAuthLevel}      : 400,
-        testCase{"/update/100", auth.OwnerAuthLevel}     : 400,
-        testCase{"/update/BadName", auth.OwnerAuthLevel} : 400,
+        testCase{"/update/-1", auth.OwnerAuthLevel}      : 404,
+        testCase{"/update/100", auth.OwnerAuthLevel}     : 404,
+        testCase{"/update/BadName", auth.OwnerAuthLevel} : 404,
 
         // Unauthorized
         testCase{"/update/TestApp", auth.AccessAuthLevel} : 403,
