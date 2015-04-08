@@ -66,13 +66,14 @@ func writeError(w http.ResponseWriter, err error) {
 	}
 
 	code, ok := map[error]int {
-		UnknownApplicationError : 400,
-		UnknownDeploymentError : 400,
+		UnknownApplicationError : 404,
+		UnknownDeploymentError : 404,
 		DeploymentMismatchError : 400,
 		NotEnoughDeploymentsError : 400,
 		NotEnoughParametersError : 400,
 		ApplicationPermissionError : 403,
 		StateNotChangedError : 304,
+		databases.NoUpdateError : 400,
 	}[err]
 
 	if !ok {
@@ -148,6 +149,9 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
     if err != nil {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
+
+        // Error already reported in stream
+        err = nil
         return
     }
 
@@ -374,5 +378,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	
 	if willDeploy {
 		doDeployment(appToDeploy, deployment, false, true, w)
+	} else {
+		w.WriteHeader(204)
 	}
 }
