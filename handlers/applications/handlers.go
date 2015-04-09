@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"strconv"
 	"sort"
+	"math"
 	"fmt"
 
 	"github.com/gorilla/mux"
@@ -72,7 +73,6 @@ func writeError(w http.ResponseWriter, err error) {
 		NotEnoughDeploymentsError : 400,
 		NotEnoughParametersError : 400,
 		ApplicationPermissionError : 403,
-		StateNotChangedError : 304,
 		databases.NoUpdateError : 400,
 	}[err]
 
@@ -121,7 +121,7 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
 	create := struct {
 		Name string
 		Command map[string]interface{}
-		Instances []string
+		Instances []interface{}
 	}{}
 
 	err = json.Unmarshal(body, &create)
@@ -129,12 +129,18 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if create.Name == "" || len(create.Command) == 0 || len(create.Instances) == 0 {
+	instanceList, ok := convertInstanceList(create.Instances)
+	if !ok {
 		err = NotEnoughParametersError
 		return
 	}
 
-	application, err := addApplication(create.Name, create.Instances)
+	if create.Name == "" || len(create.Command) == 0 || len(instanceList) == 0 {
+		err = NotEnoughParametersError
+		return
+	}
+
+	application, err := addApplication(create.Name, instanceList)
     if err != nil {
     	return
     }
@@ -145,7 +151,7 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    _, ok := doDeployment(application, deployment, start, pull, w)
+    _, ok = doDeployment(application, deployment, start, pull, w)
     if !ok {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
@@ -178,6 +184,14 @@ func handleGetApplicationHistory(w http.ResponseWriter, r *http.Request) {
    	var err error
 	defer func() { writeError(w, err) }()
 
+	countParam := getInt64ParamOrDefault(r, "count", math.MaxInt32)
+	if countParam < 0 {
+		err = NotEnoughParametersError
+		return
+	}
+
+	count := int(countParam)
+
     id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
 	if err != nil {
 		return
@@ -191,6 +205,10 @@ func handleGetApplicationHistory(w http.ResponseWriter, r *http.Request) {
 	hist, err := getApplicationHistory(auth.GetCurrentUser(r), app)
 	if err != nil {
 		return
+	}
+
+	if count < len(hist) {
+		hist = hist[:count]
 	}
 
 	jsonHist, err := json.Marshal(hist)
@@ -222,10 +240,7 @@ func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := startApplication(app.Id, w)
-	if res == StateNotChangedError {
-		err = res
-	}
+	startApplication(app.Id, w)
 }
 
 func handleStopApplication(w http.ResponseWriter, r *http.Request) {
@@ -249,10 +264,7 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := stopApplication(app.Id, w)
-	if res == StateNotChangedError {
-		err = res
-	}
+	stopApplication(app.Id, w)
 }
 
 func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
@@ -315,12 +327,19 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 
 	update := struct {
 		Command map[string]interface{}
-		Add []string
-		Remove []string
+		Add []interface{}
+		Remove []interface{}
 	}{}
 
 	err = json.Unmarshal(body, &update)
 	if err != nil {
+		return
+	}
+
+	addList, addOK := convertInstanceList(update.Add)
+	removeList, removeOK := convertInstanceList(update.Remove)
+	if !addOK || !removeOK {
+		err = NotEnoughParametersError
 		return
 	}
 
@@ -335,26 +354,26 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	willDeploy := restart || len(update.Command) > 0 
-	instanceUpdate := len(update.Add) > 0 || len(update.Remove) > 0
+	instanceUpdate := len(addList) > 0 || len(removeList) > 0
 
-	if len(update.Add) > 0 {
+	if len(addList) > 0 {
 		if !willDeploy {
 			// A temporary app that only contains the added instances
 			appToDeploy = applicationData {
-				app.Id, app.CurrentDeployment, app.Name, app.Active, update.Add,
+				app.Id, app.CurrentDeployment, app.Name, addList,
 			}
 
 			willDeploy = true
 		}
 
-		app.Instances = append(app.Instances, update.Add...)
+		app.Instances = append(app.Instances.([]string), addList...)
 	}
 
-	if len(update.Remove) > 0 {
-		proc := batch.NewProcessor(w, update.Remove)
+	if len(removeList) > 0 {
+		proc := batch.NewProcessor(w, removeList)
 		batchDeleteContainersByName(proc, app.Name)
 
-		app.Instances = getDifferenceOf(app.Instances, update.Remove)
+		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
 	}
 
 	if instanceUpdate {

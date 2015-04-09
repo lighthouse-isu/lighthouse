@@ -115,7 +115,7 @@ func CommonTestingTable(schema Schema) *MockTable {
         }
 
         for _, col := range dateCols {
-            addition[col] = fmt.Sprint(time.Now().Unix())
+            addition[col] = time.Now()
         }
 
         for _, row := range table.Database {
@@ -272,14 +272,14 @@ func CommonTestingTable(schema Schema) *MockTable {
 
         if opts.OrderBy != nil {
             if opts.Desc {
-                sort.Sort(sort.Reverse(rowSorter{entries, table.Schema, opts.OrderBy}))
+                sort.Sort(sort.Reverse(rowSorter{entries, cols, opts.OrderBy}))
             } else {
-                sort.Sort(rowSorter{entries, table.Schema, opts.OrderBy})
+                sort.Sort(rowSorter{entries, cols, opts.OrderBy})
             }
         }
         
         if opts.Top > 0 && len(entries) >= opts.Top {
-            entries = entries[0 : opts.Top]
+            entries = entries[:opts.Top]
         }
 
         return CommonTestingScanner(entries, cols), nil
@@ -290,8 +290,8 @@ func CommonTestingTable(schema Schema) *MockTable {
 
 type rowSorter struct {
     arr [][]interface{}
-    schema map[string]int
-    columns []string
+    rowCols []string
+    sortBy []string
 } 
 
 func (this rowSorter) Len() int { 
@@ -305,8 +305,12 @@ func (this rowSorter) Swap(i, j int) {
 func (this rowSorter) Less(i, j int) bool {
     row1, row2 := this.arr[i], this.arr[j]
 
-    for _, col := range this.columns {
-        idx := this.schema[col]
+    for _, col := range this.sortBy {
+        idx := 0
+        for this.rowCols[idx] != col {
+            idx++
+        }
+
         if less(row1[idx], row2[idx]) {
             return true
         }

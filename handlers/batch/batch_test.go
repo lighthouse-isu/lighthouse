@@ -87,7 +87,7 @@ func Test_Do_SingleInstance(t *testing.T) {
 
 	updates := getUpdates(w, false)
 
-	keyUpdate := progressUpdate{"OK", "", 200, insts[0] + "/", 0, 1}
+	keyUpdate := progressUpdate{"OK", "", 200, fmt.Sprintf("http://%s/", insts[0]), 0, 1}
 	
 	assert.Equal(t, keyUpdate, updates[0])
 }
@@ -105,7 +105,7 @@ func Test_Do_SingleInstance_Fail(t *testing.T) {
 
 	updates := getUpdates(w, false)
 
-	keyUpdate := progressUpdate{"Error", "", 400, insts[0] + "/", 0, 1}
+	keyUpdate := progressUpdate{"Error", "", 400, fmt.Sprintf("http://%s/", insts[0]), 0, 1}
 	assert.Equal(t, keyUpdate, updates[0])
 }
 
@@ -124,7 +124,7 @@ func Test_Do_Multiple(t *testing.T) {
 
 	for _, update := range updates {
 		assert.Equal(t, "OK", update.Status)
-		assert.Equal(t, insts[update.Item] + "/", update.Endpoint)
+		assert.Equal(t, fmt.Sprintf("http://%s/", insts[update.Item]), update.Endpoint)
 		assert.Equal(t, 200, update.Code)
 	}
 
@@ -162,7 +162,7 @@ func Test_Do_Multiple_Mixed(t *testing.T) {
 			assert.Equal(t, 300, update.Code)
 		}
 
-		assert.Equal(t, insts[update.Item] + "/", update.Endpoint)
+		assert.Equal(t, fmt.Sprintf("http://%s/", insts[update.Item]), update.Endpoint)
 	}
 
 	sort.Strings(proc.instances)

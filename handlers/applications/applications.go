@@ -15,6 +15,7 @@
 package applications
 
 import (
+    "time"
     "errors"
 
     "github.com/gorilla/mux"
@@ -27,7 +28,6 @@ var (
     UnknownDeploymentError = errors.New("applications: unknown deployment ID")
     DeploymentMismatchError = errors.New("applications: deployment does not belong to given application")
     NotEnoughDeploymentsError = errors.New("applications: no previous deployment to rollback to")
-    StateNotChangedError = errors.New("applications: application already in requested state")
     ImageNotPulledError = errors.New("applications: deployment failed to pull an image")
     NotEnoughParametersError = errors.New("applications: not enough or invalid parameters given")
     ApplicationPermissionError = errors.New("applications: user not permitted to modify application")
@@ -38,17 +38,16 @@ var deployments databases.TableInterface
 
 var appSchema = databases.Schema {
     "Id" : "serial primary key",
-    "CurrentDeployment" : "integer",
+    "CurrentDeployment" : "bigint",
     "Name" : "text UNIQUE",
-    "Active" : "boolean",
     "Instances" : "json",
 }
 
 var deploySchema = databases.Schema {
     "Id" : "serial primary key",
-    "AppId" : "integer",
+    "AppId" : "bigint",
     "Command" : "json",
-    "User" : "text",
+    "Creator" : "text",
     "Date" : "datetime DEFAULT current_timestamp",
 }
 
@@ -56,16 +55,15 @@ type applicationData struct {
     Id int64
     CurrentDeployment int64
     Name string
-    Active bool
-    Instances []string
+    Instances interface{}
 }
 
 type deploymentData struct {
     Id int64
     AppId int64
     Command map[string]interface{}
-    User string
-    Date string
+    Creator string
+    Date time.Time
 }
 
 func Init(reload bool) {
@@ -84,29 +82,33 @@ func Init(reload bool) {
 }
 
 func GetApplicationById(Id int64) (applicationData, error) {
-    var application applicationData
+    var app applicationData
     where := databases.Filter{"Id" : Id}
 
-    err := applications.SelectRow(nil, where, nil, &application)
+    err := applications.SelectRow(nil, where, nil, &app)
 
     if err == databases.NoRowsError {
         err = UnknownApplicationError
     }
 
-    return application, err
+    app.Instances, _ = convertInstanceList(app.Instances)
+
+    return app, err
 }
 
 func GetApplicationByName(Name string) (applicationData, error) {
-    var application applicationData
+    var app applicationData
     where := databases.Filter{"Name" : Name}
 
-    err := applications.SelectRow(nil, where, nil, &application)
+    err := applications.SelectRow(nil, where, nil, &app)
 
     if err == databases.NoRowsError {
         err = UnknownApplicationError
     }
 
-    return application, err
+    app.Instances, _ = convertInstanceList(app.Instances)
+
+    return app, err
 }
 
 func Handle(r *mux.Router) {

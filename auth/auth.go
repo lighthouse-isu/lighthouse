@@ -44,6 +44,7 @@ func Init(reload bool) {
 
     config := LoadAuthConfig()
     SECRET_HASH_KEY = config.SecretKey
+    allPerms := NewPermission()
 
     if reload {
         users.Reload()
@@ -52,6 +53,14 @@ func Init(reload bool) {
 
             admin.Salt = GenerateSalt()
             admin.Password = SaltPassword(admin.Password, admin.Salt)
+
+            // Fill in ommited permission types
+            for field, val := range allPerms {
+                _, ok := admin.Permissions[field]
+                if !ok {
+                    admin.Permissions[field] = val
+                }
+            }
 
             addUser(admin)
         }

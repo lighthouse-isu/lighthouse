@@ -51,7 +51,7 @@ var schema = databases.Schema {
     "Email" : "text UNIQUE PRIMARY KEY",
     "Salt" : "text",
     "Password" : "text",
-    "AuthLevel" : "int",
+    "AuthLevel" : "integer",
     "Permissions" : "json",
 }
 

@@ -16,6 +16,7 @@ package batch
 
 import (
 	"fmt"
+	"strings"
 	"net"
 	"net/http"
     "net/http/httptest"
@@ -40,10 +41,10 @@ func SetupServers(handlers ...func(http.ResponseWriter, *http.Request)) ([]strin
 
 	    // Start a new test server to listen for requests from the tests
 	    server := httptest.NewUnstartedServer(http.HandlerFunc(f))
-	    server.Listener, _ = net.Listen("tcp", fmt.Sprintf(":%d", nextPortNumber))
+	    server.Listener, _ = net.Listen("tcp", fmt.Sprintf("localhost:%d", nextPortNumber))
 	    server.Start()
 
-	    addresses[i] = server.URL
+	    addresses[i] = strings.Replace(server.URL, "http://", "", 1)
 	    servers[i] = server
 	    nextPortNumber++
     }

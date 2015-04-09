@@ -18,6 +18,7 @@ import (
     "testing"
 
     "fmt"
+    "time"
     "strings"
     "bytes"
     "io/ioutil"
@@ -60,7 +61,7 @@ func Test_HandleCreateApplication(t *testing.T) {
     type requestObj struct {
         Name string
         Command map[string]interface{}
-        Instances []string
+        Instances interface{}
     }
 
     validCommand := map[string]interface{}{"Image" : "image"}
@@ -99,7 +100,7 @@ func Test_HandleCreateApplication(t *testing.T) {
         SetupTestingTable()
         insts, servers := batch.SetupServers(h)
 
-        endpoint := fmt.Sprintf("%s/create?start=%v&forcePull=%v", insts[0], c.Start, c.Pull)
+        endpoint := fmt.Sprintf("http://%s/create?start=%v&forcePull=%v", insts[0], c.Start, c.Pull)
         dataObj := requestObj{"TestApp", c.Command, insts}
         data, _ := json.Marshal(dataObj)
 
@@ -175,6 +176,7 @@ func Test_HandleListApplications(t *testing.T) {
     assert.Equal(t, len(keyList), len(list))
 
     for i, _ := range keyList {
+        list[i].Instances, _ = convertInstanceList(list[i].Instances)
         if !reflect.DeepEqual(keyList[i], list[i]) {
             t.Errorf(
                 "At least one wrong application.\nExpected %v\nWas %v",
@@ -199,48 +201,80 @@ func Test_HandleGetApplicationHistory(t *testing.T) {
     app, _ := addApplication("TestApp",  []string{})
               addApplication("OtherApp", []string{})
 
-    type keyType struct {
+    type testCase struct {
+        AuthLevel int
+        Count int
+    }
+
+    type testResult struct {
         Id int64
         Creator string
-        Date string
+        Date time.Time
     }
 
     deployCnt := 100
     deploys := make([]deploymentData, deployCnt)
-    keyList := make([]keyType, 0)
+    keyList := make([]testResult, deployCnt / 2)
     cmd := map[string]interface{}{}
 
     for i := 0; i < deployCnt; i++ {
         appId := int64(i % 2)
-        deploys[i], _ = addDeployment(appId, cmd, user.Email)
+        dep, _ := addDeployment(appId, cmd, user.Email)
 
         if appId == app.Id {
-            keyList = append(keyList, keyType{
-                deploys[i].Id, user.Email, deploys[i].Date,
-            })
+            keyIdx := (deployCnt - i - 1) / 2
+            keyList[keyIdx] = testResult{dep.Id, user.Email, dep.Date}
         }
+
+        // The returned list is sorted by ID descending
+        deploys[deployCnt - i - 1] = dep
     }
 
-    tests := map[int][]keyType {
-        -1 : []keyType{},
-         0 : keyList,
-         1 : keyList,
-         2 : keyList,
+    tests := map[testCase][]testResult {
+        // Auth Level tests
+        testCase{-1, -1} : []testResult{},
+        testCase{ 0, -1} : keyList,
+        testCase{ 1, -1} : keyList,
+        testCase{ 2, -1} : keyList,
+
+        // Count tests
+        testCase{2, -10} : nil,
+        testCase{2,   0} : []testResult{},
+        testCase{2, deployCnt / 2} : keyList[:deployCnt / 2],
+        testCase{2, deployCnt}     : keyList,
+        testCase{2, deployCnt * 2} : keyList,
     }
 
-    for level, key := range tests {
-        auth.SetUserApplicationAuthLevel(user, app.Name, level)
+    for c, key := range tests {
+        auth.SetUserApplicationAuthLevel(user, app.Name, c.AuthLevel)
+
+        var endpoint string
+        if c.Count == -1 {
+            endpoint = "/list/0"
+        } else {
+            endpoint = fmt.Sprintf("/list/0?count=%d", c.Count)
+        }
 
         w := httptest.NewRecorder()
-        req, _ := http.NewRequest("GET", "/list/0", nil)
+        req, _ := http.NewRequest("GET", endpoint, nil)
         session.SetValue(req, "auth", "email", user.Email)
         m.ServeHTTP(w, req)
 
-        var list []keyType
+        var list []testResult
         body, _ := ioutil.ReadAll(w.Body)
         json.Unmarshal(body, &list)
 
-        assert.Equal(t, key, list)
+        if len(key) != len(list) {
+            t.Errorf("Sizes differed\nExpected %d\nWas%d", len(key), len(list))
+            continue
+        }
+
+        for i, _ := range key {
+            if key[i] != list[i] {
+                t.Errorf("Lists differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
+                break
+            }
+        }
     }
 }
 
@@ -285,35 +319,25 @@ func Test_HandleStartAndStopApplication(t *testing.T) {
         InitialState bool
     }
 
-    type testResult struct {
-        Code int
-        Succeeds bool
-        FinalState bool
-    }
-
-    tests := map[testCase]testResult {
+    tests := map[testCase]int {
         // Normal cases
-        testCase{auth.OwnerAuthLevel, "/stop/0", true}         : testResult{200, true, false},
-        testCase{auth.OwnerAuthLevel, "/stop/TestApp", true}   : testResult{200, true, false},
-        testCase{auth.OwnerAuthLevel, "/start/0", false}       : testResult{200, true, true},
-        testCase{auth.OwnerAuthLevel, "/start/TestApp", false} : testResult{200, true, true},
+        testCase{auth.OwnerAuthLevel, "/stop/0", true}         : 200,
+        testCase{auth.OwnerAuthLevel, "/stop/TestApp", true}   : 200,
+        testCase{auth.OwnerAuthLevel, "/start/0", false}       : 200,
+        testCase{auth.OwnerAuthLevel, "/start/TestApp", false} : 200,
 
         // Bad identifiers
-        testCase{auth.OwnerAuthLevel, "/stop/-1", true}       : testResult{404, false, false},
-        testCase{auth.OwnerAuthLevel, "/stop/BadApp", true}   : testResult{404, false, false},
-        testCase{auth.OwnerAuthLevel, "/start/-1", false}     : testResult{404, false, true},
-        testCase{auth.OwnerAuthLevel, "/start/BadApp", false} : testResult{404, false, true},
-
-        // State not changed
-        testCase{auth.OwnerAuthLevel, "/stop/0", false} : testResult{304, false, false},
-        testCase{auth.OwnerAuthLevel, "/start/0", true} : testResult{304, false, true},
+        testCase{auth.OwnerAuthLevel, "/stop/-1", true}       : 404,
+        testCase{auth.OwnerAuthLevel, "/stop/BadApp", true}   : 404,
+        testCase{auth.OwnerAuthLevel, "/start/-1", false}     : 404,
+        testCase{auth.OwnerAuthLevel, "/start/BadApp", false} : 404,
 
         // Not authorized
-        testCase{auth.AccessAuthLevel, "/stop/0", true}   : testResult{403, false, true},
-        testCase{auth.AccessAuthLevel, "/start/0", false} : testResult{403, false, false},
+        testCase{auth.AccessAuthLevel, "/stop/0", true}   : 403,
+        testCase{auth.AccessAuthLevel, "/start/0", false} : 403,
     }
 
-    for c, res := range tests {
+    for c, code := range tests {
         auth.SetUserApplicationAuthLevel(user, app.Name, c.AuthLevel)
         req, _ := http.NewRequest("POST", c.Endpoint, nil)
         session.SetValue(req, "auth", "email", user.Email)
@@ -322,11 +346,7 @@ func Test_HandleStartAndStopApplication(t *testing.T) {
         w := httptest.NewRecorder()
         m.ServeHTTP(w, req)
 
-        assert.Equal(t, res.Code, w.Code)
-        if res.Succeeds {
-            testApp, _ := GetApplicationById(app.Id)
-            assert.Equal(t, res.FinalState, testApp.Active)
-        }
+        assert.Equal(t, code, w.Code)
     }
 }
 

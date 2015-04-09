@@ -43,11 +43,12 @@ func Test_GetApplicationById_Known(t *testing.T) {
 		Id : 0,
 		CurrentDeployment : 314,
 		Name : "TestApp",
-	    Active : true,
-	    Instances : []string{"instance1"},
+	    Instances : []interface{}{"instance1"},
 	}
 
 	applications.Insert(makeDatabaseEntryFor(keyApp))
+
+    keyApp.Instances, _ = convertInstanceList(keyApp.Instances)
 
 	app, err := GetApplicationById(0)
 
@@ -59,10 +60,9 @@ func Test_GetApplicationById_Unknown(t *testing.T) {
 	SetupTestingTable()
 	defer TeardownTestingTable()
 
-	app, err := GetApplicationById(0)
+	_, err := GetApplicationById(0)
 
 	assert.Equal(t, UnknownApplicationError, err)
-	assert.Equal(t, applicationData{}, app)
 }
 
 func Test_GetApplicationByName_Known(t *testing.T) {
@@ -73,11 +73,12 @@ func Test_GetApplicationByName_Known(t *testing.T) {
 		Id : 0,
 		CurrentDeployment : 314,
 		Name : "TestApp",
-	    Active : true,
-	    Instances : []string{"instance1"},
+	    Instances : []interface{}{"instance1"},
 	}
 
 	applications.Insert(makeDatabaseEntryFor(keyApp))
+
+    keyApp.Instances, _ = convertInstanceList(keyApp.Instances)
 
 	app, err := GetApplicationByName("TestApp")
 
@@ -89,10 +90,9 @@ func Test_GetApplicationByName_Unknown(t *testing.T) {
 	SetupTestingTable()
 	defer TeardownTestingTable()
 
-	app, err := GetApplicationByName("TestApp")
+	_, err := GetApplicationByName("TestApp")
 
 	assert.Equal(t, UnknownApplicationError, err)
-	assert.Equal(t, applicationData{}, app)
 }
 
 func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {

@@ -47,8 +47,22 @@ type SelectOptions struct {
     Desc bool
 }
 
-type Schema map[string]string
 type Filter map[string]interface{}
+
+/*
+    All compilers must support the following types:
+
+    Schema Type | Go Type
+    ------------+-----------------------
+    text        | string
+    integer     | int
+    bigint      | int64
+    boolean     | bool
+    datetime    | time.Time
+    json        | map[string]interface{}
+    serial      | int64
+*/
+type Schema map[string]string
 
 var (
     defaultConnection DBInterface

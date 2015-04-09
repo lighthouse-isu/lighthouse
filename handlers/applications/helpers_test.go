@@ -18,6 +18,7 @@ import (
     "testing"
 
     "fmt"
+    "time"
     "errors"
     "strings"
     "net/http"
@@ -37,7 +38,6 @@ func Test_AddApplication_New(t *testing.T) {
 	keyApp := applicationData {
 		Id : 0,
 		Name : "TestApp", 
-		Active : false,
 		CurrentDeployment : -1,
 		Instances : []string{"instance"},
 	}
@@ -59,18 +59,16 @@ func Test_AddApplication_Dup(t *testing.T) {
 
 	app := applicationData {
 		Id : 0,
-		Name : "TestApp", 
-		Active : false,
+		Name : "TestApp",
 		CurrentDeployment : -1,
 		Instances : []string{"instance"},
 	}
 
 	applications.Insert(makeDatabaseEntryFor(app))
 
-	retApp, err := addApplication("TestApp", []string{"instance"})
+	_, err := addApplication("TestApp", []string{"instance"})
 
 	assert.NotNil(t, err)
-	assert.Equal(t, applicationData{}, retApp)
 }
 
 func Test_AddDeployment(t *testing.T) {
@@ -81,10 +79,10 @@ func Test_AddDeployment(t *testing.T) {
 		Id : 0,
 		AppId : 314, 
 		Command : map[string]interface{}{"Image" : "image"},
-		User : "user",
+		Creator : "user",
 	}
 
-	retDeploy, err := addDeployment(key.AppId, key.Command, key.User)
+	retDeploy, err := addDeployment(key.AppId, key.Command, key.Creator)
 
 	// The time might have changed during insert
 	key.Date = retDeploy.Date
@@ -133,7 +131,6 @@ func Test_RemoveDeployment(t *testing.T) {
 func Test_StartStopApplication_Normal(t *testing.T) {
 	type testCase struct {
 		Id int64 // Valid app is Id 0
-		Active bool
 		ControlStatus int
 		TestFunc func(app int64, w http.ResponseWriter)error
 	}
@@ -145,15 +142,13 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 	}
 
 	tests := map[*testCase]testResult {
-		&testCase{0, false, 200, startApplication} : testResult{true,  nil, []string{"start"}},
-		&testCase{1, false, -1,  startApplication} : testResult{false, UnknownApplicationError, []string{}},
-		&testCase{0, true,  -1,  startApplication} : testResult{true,  StateNotChangedError, []string{}},
-		&testCase{0, false, 500, startApplication} : testResult{false, nil, []string{"start", "stop"}},
+		&testCase{0, 200, startApplication} : testResult{true,  nil, []string{"start"}},
+		&testCase{1, -1,  startApplication} : testResult{false, UnknownApplicationError, []string{}},
+		&testCase{0, 500, startApplication} : testResult{false, nil, []string{"start", "stop"}},
 
-		&testCase{0, true,  200, stopApplication}  : testResult{false, nil, []string{"stop"}},
-		&testCase{1, true,  -1,  stopApplication}  : testResult{true,  UnknownApplicationError, []string{}},
-		&testCase{0, false, -1,  stopApplication}  : testResult{false, StateNotChangedError, []string{}},
-		&testCase{0, true,  500, stopApplication}  : testResult{true,  nil, []string{"stop", "start"}},
+		&testCase{0, 200, stopApplication}  : testResult{false, nil, []string{"stop"}},
+		&testCase{1, -1,  stopApplication}  : testResult{true,  UnknownApplicationError, []string{}},
+		&testCase{0, 500, stopApplication}  : testResult{true,  nil, []string{"stop", "start"}},
 	}
 
 	for c, res := range tests {
@@ -169,7 +164,7 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 
 		SetupTestingTable()
 		insts, servers := batch.SetupServers(testInst, controlInst)
-		app := applicationData{Id : 0, Active : c.Active, Instances : insts}
+		app := applicationData{Id : 0, Instances : insts}
 		applications.Insert(makeDatabaseEntryFor(app))
 
 		err := c.TestFunc(c.Id, httptest.NewRecorder())
@@ -183,10 +178,6 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 		} else {
 			assert.NotNil(t, err)
 		}
-
-		var resApp applicationData
-		applications.SelectRow(nil, nil, nil, &resApp)
-		assert.Equal(t, res.FinalState, resApp.Active)
 
 		TeardownTestingTable()
 		batch.ShutdownServers(servers)
@@ -202,20 +193,6 @@ func Test_SetApplicationStateTo_Unknown(t *testing.T) {
 
 	err := setApplicationStateTo(0, true, httptest.NewRecorder())
 	assert.Equal(t, UnknownApplicationError, err)
-}
-
-func Test_SetApplicationStateTo_NoChange(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
-
-	insts, servers := batch.SetupServers(nil)
-	defer batch.ShutdownServers(servers)
-
-	app := applicationData{Id : 0, Active : true, Instances : insts}
-	applications.Insert(makeDatabaseEntryFor(app))
-
-	err := setApplicationStateTo(0, true, httptest.NewRecorder())
-	assert.Equal(t, StateNotChangedError, err)
 }
 
 func Test_GetApplicationList(t *testing.T) {
@@ -278,9 +255,9 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 		assert.Equal(t, len(key), len(list))
 
 		for i, deploy := range key {
-			assert.Equal(t, deploy.Id, list[i]["Id"])
-			assert.Equal(t, deploy.User, list[i]["Creator"])
-			assert.Equal(t, deploy.Date, list[i]["Date"])
+			assert.Equal(t, deploy.Id, list[2 - i]["Id"])
+			assert.Equal(t, deploy.Creator, list[2 - i]["Creator"])
+			assert.Equal(t, deploy.Date, list[2 - i]["Date"])
 		}
 	}
 }
@@ -354,8 +331,8 @@ func Test_DoDeployment(t *testing.T) {
 	}
 
 	cmd := map[string]interface{}{"Image" : "test"}
-	dNormal := &deploymentData{42, 0, cmd, "email", "12345"}
-	dNoImage := &deploymentData{42, 0, map[string]interface{}{}, "email", "12345"}
+	dNormal := &deploymentData{42, 0, cmd, "email", time.Now()}
+	dNoImage := &deploymentData{42, 0, map[string]interface{}{}, "email", time.Now()}
 
 	tests := map[testCase]testResult{
 		// Success cases
@@ -402,6 +379,8 @@ func Test_DoDeployment(t *testing.T) {
 		insts, servers := batch.SetupServers(h)
 		app, _ := addApplication("TestApp", insts)
 
+		t.Log(insts)
+
 		err, ok := doDeployment(app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
 
 		assert.Equal(t, len(res.Requests), i, errorMsg)
@@ -421,5 +400,59 @@ func Test_DoDeployment(t *testing.T) {
 
 		TeardownTestingTable()
 		batch.ShutdownServers(servers)
+	}
+}
+
+func Test_ConvertInstanceList(t *testing.T) {
+	type testCase struct {
+		List interface{}
+	}
+
+	tests := map[*testCase][]string {
+		&testCase{nil} : []string{},
+		&testCase{"WRONG TYPE"} : nil,
+		&testCase{[]string{"Test"}} : []string{"Test"},
+		&testCase{[]string{}} : []string{},
+		&testCase{[]interface{}{"Test"}} : []string{"Test"},
+		&testCase{[]interface{}{}} : []string{},
+		&testCase{[]interface{}{"OK", 2,}} : nil,
+	}
+
+	for test, key := range tests {
+		res, ok := convertInstanceList(test.List)
+
+		assert.Equal(t, key, res)
+		assert.Equal(t, key != nil, ok)
+	}
+}
+
+func Test_InterpretDeleteContainer(t *testing.T) {
+	type testCase struct {
+		Code int
+		Err error
+	}
+
+	type testResult struct {
+		Status string
+		Code int
+	}
+
+	tests := map[testCase]testResult {
+		testCase{-1, errors.New("")} : testResult{"Error", 500},
+		testCase{200, nil} : testResult{"OK", 200},
+		testCase{299, nil} : testResult{"OK", 299},
+		testCase{404, nil} : testResult{"Warning", 404},
+		testCase{300, nil} : testResult{"Error", 300},
+		testCase{400, nil} : testResult{"Error", 400},
+		testCase{500, nil} : testResult{"Error", 500},
+	}
+
+	for test, key := range tests {
+		resp := &http.Response{StatusCode : test.Code}
+		res, err := interpretDeleteContainer(resp, test.Err)
+
+		assert.Equal(t, key.Status, res.Status)
+		assert.Equal(t, key.Code, res.Code)
+		assert.Equal(t, key.Status != "Error", err == nil)
 	}
 }

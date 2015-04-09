@@ -70,7 +70,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 		go func(inst string, itemNumber int) {
 			defer wg.Done()
 
-			dest := fmt.Sprintf("%s/%s", inst, endpoint)
+			dest := fmt.Sprintf("http://%s/%s", inst, endpoint)
 			resp, err := runBatchRequest(method, dest, body)
 			result, err := interpret(resp, err)
 
@@ -89,20 +89,20 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	}
 
 	go func() {
-		defer wg.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
 		}
 	}()
 
 	go func() {
-		defer wg.Done()
 		for inst := range failQueue {
 			this.failures = append(this.failures, inst)
 		}
 	}()
 
 	wg.Wait()
+	close(queue)
+	close(failQueue)
 
 	this.writeUpdate(Result{"Complete", "", 0}, endpoint, total, total)
 
@@ -126,6 +126,7 @@ func (this *Processor) FailureProcessor() *Processor {
 func runBatchRequest(method, dest string, body interface{}) (*http.Response, error) {
 	jsonBody, _ := json.Marshal(body)
 	req, err := http.NewRequest(method, dest, bytes.NewBuffer(jsonBody))
+	req.Header.Set("Content-Type", "application/json")
 
 	if err != nil {
 		return nil, err
