@@ -379,8 +379,6 @@ func Test_DoDeployment(t *testing.T) {
 		insts, servers := batch.SetupServers(h)
 		app, _ := addApplication("TestApp", insts)
 
-		t.Log(insts)
-
 		err, ok := doDeployment(app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
 
 		assert.Equal(t, len(res.Requests), i, errorMsg)

@@ -270,8 +270,18 @@ func Test_HandleGetApplicationHistory(t *testing.T) {
         }
 
         for i, _ := range key {
-            if key[i] != list[i] {
-                t.Errorf("Lists differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
+            if key[i].Id != list[i].Id {
+                t.Errorf("IDs differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
+                break
+            }
+
+            if key[i].Creator != list[i].Creator {
+                t.Errorf("Creators differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
+                break
+            }
+
+            if key[i].Date != list[i].Date {
+                t.Errorf("Dates differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
                 break
             }
         }
@@ -421,7 +431,6 @@ func Test_HandleRevertApplication_Errors(t *testing.T) {
 
         m.ServeHTTP(w, req)
         assert.Equal(t, res, w.Code)
-        t.Log(w.Body)
     }
 }
 
@@ -521,8 +530,6 @@ func Test_HandleUpdateApplication(t *testing.T) {
     var testDep deploymentData
     opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
     deployments.SelectRow(nil, nil, &opts, &testDep)
-
-    t.Log(deployments)
 
     assert.Equal(t, dep.Id + 1, testDep.Id)
     assert.Equal(t, command, testDep.Command)
