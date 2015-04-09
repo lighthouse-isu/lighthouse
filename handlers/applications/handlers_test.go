@@ -280,7 +280,7 @@ func Test_HandleGetApplicationHistory(t *testing.T) {
                 break
             }
 
-            if key[i].Date != list[i].Date {
+            if !key[i].Date.Equal(list[i].Date) {
                 t.Errorf("Dates differed at index %d\nExpected %v\nWas%v", i, key[i], list[i])
                 break
             }
