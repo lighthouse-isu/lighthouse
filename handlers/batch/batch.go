@@ -40,7 +40,7 @@ type progressUpdate struct {
 	Status string
     Message string
     Code int
-    Endpoint string
+    Instance string
     Item int
     Total int
 }
@@ -63,7 +63,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 		interpret = interpretResponseDefault
 	}
 
-	this.writeUpdate(Result{"Starting", "", 0}, endpoint, 0, total)
+	this.writeUpdate(Result{"Starting", endpoint, 0}, "", 0, total)
 
 	wg.Add(total)
 	for i, inst := range this.instances {
@@ -74,7 +74,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 			resp, err := runBatchRequest(method, dest, body)
 			result, err := interpret(resp, err)
 
-			this.writeUpdate(result, dest, itemNumber, total)
+			this.writeUpdate(result, inst, itemNumber, total)
 
 			// Yield to other goroutines
 			runtime.Gosched()
@@ -104,15 +104,15 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	close(queue)
 	close(failQueue)
 
-	this.writeUpdate(Result{"Complete", "", 0}, endpoint, total, total)
+	this.writeUpdate(Result{"Complete", endpoint, 0}, "", total, total)
 
 	this.instances = completed
 	return errorToReport
 }
 
-func (this *Processor) writeUpdate(res Result, endpoint string, progress, total int) {
+func (this *Processor) writeUpdate(res Result, instance string, progress, total int) {
 	update := progressUpdate {
-		res.Status, res.Message, res.Code, endpoint, progress, total,
+		res.Status, res.Message, res.Code, instance, progress, total,
 	}
 
 	jsonBody, _ := json.Marshal(update)
