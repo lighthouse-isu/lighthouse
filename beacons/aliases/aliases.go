@@ -61,6 +61,11 @@ func AddAlias(alias, address string) error {
     return err
 }
 
+func RemoveAlias(address string) error {
+    where := databases.Filter{"Address" : address}
+    return aliases.Delete(where)
+}
+
 func UpdateAlias(alias, address string) error {
     to := databases.Filter{"Alias": alias}
     where := databases.Filter{"Address" : address}

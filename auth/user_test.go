@@ -382,6 +382,12 @@ func Test_HandleGetUsers_Valid(t *testing.T) {
     w := handleAndServe("/{Email}", handleGetUser, r)
 
     assert.Equal(t, http.StatusOK, w.Code)
+
+    resp := make(map[string]interface{})
+    json.Unmarshal(w.Body.Bytes(), &resp)
+
+    assert.Equal(t, "EMAIL", resp["Email"])
+    assert.Equal(t, 2, resp["AuthLevel"])
 }
 
 func Test_HandleGetUsers_NotFound(t *testing.T) {

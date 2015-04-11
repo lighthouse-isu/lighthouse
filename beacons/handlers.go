@@ -140,10 +140,17 @@ func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
     }
 
     if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
         return
     }
 
     err = refreshVMListOf(beacon)
+    if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
+        removeBeacon(beacon.Address)
+        return
+    }
+
     return
 }
 

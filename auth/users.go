@@ -139,10 +139,11 @@ func handleGetUser(w http.ResponseWriter, r *http.Request) {
     }
 
     userInfo := struct {
+        Email string
         AuthLevel int
         Permissions Permission
     }{
-        reqUser.AuthLevel, reqUser.Permissions,
+        reqUser.Email, reqUser.AuthLevel, reqUser.Permissions,
     }
     
     userJson, err := json.Marshal(userInfo)
