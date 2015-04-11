@@ -84,7 +84,7 @@ func doDeployment(app applicationData, deployment deploymentData, startApp, pull
 			return NotEnoughParametersError, false
 		}
 
-		pullTarget := fmt.Sprintf("images/create?fromImage?%s", image)
+		pullTarget := fmt.Sprintf("images/create?fromImage=%s", image)
 		err := deploy.Do("POST", nil, pullTarget, nil)
 
 		if err != nil {
