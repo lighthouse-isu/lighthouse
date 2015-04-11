@@ -21,6 +21,7 @@ import (
 	"errors"
 	"runtime"
 	"net/http"
+	"io/ioutil"
 	"encoding/json"
 )
 
@@ -72,6 +73,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 
 			dest := fmt.Sprintf("http://%s/%s", inst, endpoint)
 			resp, err := runBatchRequest(method, dest, body)
+			ioutil.ReadAll(resp.Body)
 			result, err := interpret(resp, err)
 
 			this.writeUpdate(result, inst, itemNumber, total)

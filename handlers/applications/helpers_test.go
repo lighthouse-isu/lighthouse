@@ -322,7 +322,7 @@ func Test_DoDeployment(t *testing.T) {
 	}
 
 	requestList := []Request {
-		Request{"POST",   "/images/create?fromImage?test"},               // 0
+		Request{"POST",   "/images/create?fromImage=test"},               // 0
 		Request{"POST",   "/containers/create?name=TestApp_tmp"},         // 1
 		Request{"DELETE", "/containers/TestApp_tmp?force=true"},          // 2
 		Request{"DELETE", "/containers/TestApp?force=true"},              // 3
