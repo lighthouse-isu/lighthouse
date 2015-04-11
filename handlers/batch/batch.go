@@ -59,15 +59,16 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	var completed []string
 	var errorToReport error = nil
 	var total int = len(this.instances)
-	var requests, channels sync.WaitGroup
+	var requests, managers sync.WaitGroup
 	var queue chan string = make(chan string, 1)
 	var failQueue chan string = make(chan string, 1)
+	var updateQueue chan progressUpdate = make(chan progressUpdate, 1)
 
 	if interpret == nil {
 		interpret = interpretResponseDefault
 	}
 
-	this.writeUpdate(Result{"Starting", endpoint, 0}, "", 0, total)
+	this.writeUpdate(progressUpdate{"Starting", endpoint, 0, "", 0, total})
 
 	requests.Add(total)
 	for i, inst := range this.instances {
@@ -78,7 +79,10 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 			ioutil.ReadAll(resp.Body)
 			result, err := interpret(resp, err)
 
-			this.writeUpdate(result, inst, itemNumber, total)
+			updateQueue <- progressUpdate {
+				result.Status, result.Message, result.Code, 
+				inst, itemNumber, total,
+			}
 
 			// Yield to other goroutines
 			runtime.Gosched()
@@ -93,43 +97,51 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	}
 
 	go func() {
-		channels.Add(1)
-		defer channels.Done()
+		managers.Add(1)
+		defer managers.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
 		}
 	}()
 
 	go func() {
-		channels.Add(1)
-		defer channels.Done()
+		managers.Add(1)
+		defer managers.Done()
 		for inst := range failQueue {
 			this.failures = append(this.failures, inst)
 		}
 	}()
 
+	go func() {
+		managers.Add(1)
+		defer managers.Done()
+	    for update := range updateQueue {
+	    	this.writeUpdate(update)
+    	}
+    }()
+
 	requests.Wait()
 	close(queue)
 	close(failQueue)
-	channels.Wait()
+	close(updateQueue)
+	managers.Wait()
 
-	this.writeUpdate(Result{"Complete", endpoint, 0}, "", total, total)
+	this.writeUpdate(progressUpdate{"Complete", endpoint, 0, "", total, total})
 
 	this.instances = completed
 	return errorToReport
 }
 
-func (this *Processor) writeUpdate(res Result, instance string, progress, total int) {
-	update := progressUpdate {
-		res.Status, res.Message, res.Code, instance, progress, total,
-	}
-
+func (this *Processor) writeUpdate(update progressUpdate) {
 	jsonBody, _ := json.Marshal(update)
-	this.writer.Write(jsonBody)
 
-	if f, ok := this.writer.(http.Flusher); ok {
-      f.Flush()
-    }
+	for i := 0; i < len(jsonBody); i += 16 {
+		j := i + 16
+		if j > len(jsonBody) {
+			j = len(jsonBody)
+		}
+		this.writer.Write(jsonBody[i:j])
+	}
 }
 
 func (this *Processor) FailureProcessor() *Processor {
