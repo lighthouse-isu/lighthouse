@@ -55,7 +55,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	var completed []string
 	var errorToReport error = nil
 	var total int = len(this.instances)
-	var wg sync.WaitGroup
+	var requests, channels sync.WaitGroup
 	var queue chan string = make(chan string, 1)
 	var failQueue chan string = make(chan string, 1)
 
@@ -65,10 +65,10 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 
 	this.writeUpdate(Result{"Starting", endpoint, 0}, "", 0, total)
 
-	wg.Add(total)
+	requests.Add(total)
 	for i, inst := range this.instances {
 		go func(inst string, itemNumber int) {
-			defer wg.Done()
+			defer requests.Done()
 
 			dest := fmt.Sprintf("http://%s/%s", inst, endpoint)
 			resp, err := runBatchRequest(method, dest, body)
@@ -89,20 +89,25 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	}
 
 	go func() {
+		channels.Add(1)
+		defer channels.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
 		}
 	}()
 
 	go func() {
+		channels.Add(1)
+		defer channels.Done()
 		for inst := range failQueue {
 			this.failures = append(this.failures, inst)
 		}
 	}()
 
-	wg.Wait()
+	requests.Wait()
 	close(queue)
 	close(failQueue)
+	channels.Wait()
 
 	this.writeUpdate(Result{"Complete", endpoint, 0}, "", total, total)
 
