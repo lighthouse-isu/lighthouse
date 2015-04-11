@@ -32,8 +32,8 @@ import (
 )
 
 func Test_AddApplication_New(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	keyApp := applicationData {
 		Id : 0,
@@ -54,8 +54,8 @@ func Test_AddApplication_New(t *testing.T) {
 }
 
 func Test_AddApplication_Dup(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	app := applicationData {
 		Id : 0,
@@ -72,8 +72,8 @@ func Test_AddApplication_Dup(t *testing.T) {
 }
 
 func Test_AddDeployment(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	key := deploymentData {
 		Id : 0,
@@ -129,10 +129,16 @@ func Test_RemoveDeployment(t *testing.T) {
 }
 
 func Test_StartStopApplication_Normal(t *testing.T) {
+    setup()
+    defer teardown()
+
+    auth.CreateUser("email", "", "")
+    user, _ := auth.GetUser("email")
+
 	type testCase struct {
 		Id int64 // Valid app is Id 0
 		ControlStatus int
-		TestFunc func(app int64, w http.ResponseWriter)error
+		TestFunc func(*auth.User, int64, http.ResponseWriter)error
 	}
 
 	type testResult struct {
@@ -167,7 +173,7 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 		app := applicationData{Id : 0, Instances : insts}
 		applications.Insert(makeDatabaseEntryFor(app))
 
-		err := c.TestFunc(c.Id, httptest.NewRecorder())
+		err := c.TestFunc(user, c.Id, httptest.NewRecorder())
 
 		assert.Equal(t, len(res.Requests), i)
 
@@ -185,21 +191,22 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 }
 
 func Test_SetApplicationStateTo_Unknown(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
+
+	auth.CreateUser("email", "", "")
+    user, _ := auth.GetUser("email")
 
 	_, servers := batch.SetupServers(nil)
 	defer batch.ShutdownServers(servers)
 
-	err := setApplicationStateTo(0, true, httptest.NewRecorder())
+	err := setApplicationStateTo(user, 0, true, httptest.NewRecorder())
 	assert.Equal(t, UnknownApplicationError, err)
 }
 
 func Test_GetApplicationList(t *testing.T) {
-	SetupTestingTable()
-	auth.SetupTestingTable()
-	defer TeardownTestingTable()
-	defer auth.SetupTestingTable()
+    setup()
+    defer teardown()
 
 	auth.CreateUser("email", "", "")
 	user, _ := auth.GetUser("email")
@@ -222,10 +229,8 @@ func Test_GetApplicationList(t *testing.T) {
 }
 
 func Test_GetApplicationHistory_OK(t *testing.T) {
-	SetupTestingTable()
-	auth.SetupTestingTable()
-	defer TeardownTestingTable()
-	defer auth.SetupTestingTable()
+    setup()
+    defer teardown()
 
 	auth.CreateUser("email", "", "")
 	user, _ := auth.GetUser("email")
@@ -305,6 +310,12 @@ func Test_GetRevertDeployment(t *testing.T) {
 }
 
 func Test_DoDeployment(t *testing.T) {
+    setup()
+    defer teardown()
+
+	auth.CreateUser("email", "", "")
+	user, _ := auth.GetUser("email")
+	
 	type testCase struct {
 		Deploy *deploymentData
 		Start bool
@@ -379,7 +390,7 @@ func Test_DoDeployment(t *testing.T) {
 		insts, servers := batch.SetupServers(h)
 		app, _ := addApplication("TestApp", insts)
 
-		err, ok := doDeployment(app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
+		err, ok := doDeployment(user, app, *c.Deploy, c.Start, c.Pull, httptest.NewRecorder())
 
 		assert.Equal(t, len(res.Requests), i, errorMsg)
 

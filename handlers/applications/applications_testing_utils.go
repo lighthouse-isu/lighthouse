@@ -16,6 +16,9 @@ package applications
 
 import (
     "github.com/lighthouse/lighthouse/databases"
+
+    "github.com/lighthouse/lighthouse/beacons"
+    "github.com/lighthouse/lighthouse/auth"
 )
 
 func SetupTestingTable() {
@@ -35,4 +38,16 @@ func makeDatabaseEntryFor(app applicationData) map[string]interface{} {
 		"Name" : app.Name,
 	    "Instances" : app.Instances,
 	}
+}
+
+func setup() {
+	SetupTestingTable()
+	auth.SetupTestingTable()
+	beacons.SetupTestingTable()
+}
+
+func teardown() {
+	TeardownTestingTable()
+	auth.TeardownTestingTable()
+	beacons.TeardownTestingTable()
 }

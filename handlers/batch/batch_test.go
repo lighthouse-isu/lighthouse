@@ -25,7 +25,23 @@ import (
     "encoding/json"
 
     "github.com/stretchr/testify/assert"
+
+    "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/beacons"
 )
+
+func setup() *auth.User {
+	beacons.SetupTestingTable()
+	auth.SetupTestingTable()
+	auth.CreateUser("email", "", "")
+	user, _ := auth.GetUser("email")
+	return user
+}
+
+func teardown() {
+	beacons.TeardownTestingTable()
+	auth.TeardownTestingTable()
+}
 
 func handlerFactory(code int) func(http.ResponseWriter, *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -51,18 +67,24 @@ func getUpdates(w *httptest.ResponseRecorder, includeStartAndEnd bool) []progres
 }
 
 func Test_NewProcessor(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	writer := httptest.NewRecorder()
 	instances := []string{"Inst1", "Inst2", "Inst3"}
 
-	proc := NewProcessor(writer, instances)
+	proc := NewProcessor(user, writer, instances)
 
 	assert.Equal(t, writer, proc.writer)
 	assert.Equal(t, instances, proc.instances)
 }
 
 func Test_Do_Nothing(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, []string{})
+	proc := NewProcessor(user, w, []string{})
 	err := proc.Do("JUNK", nil, "", nil)
 
 	assert.Nil(t, err)
@@ -75,11 +97,14 @@ func Test_Do_Nothing(t *testing.T) {
 }
 
 func Test_Do_SingleInstance(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	insts, servers := SetupServers(handlerFactory(200))
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, insts)
+	proc := NewProcessor(user, w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.Nil(t, err)
@@ -93,11 +118,14 @@ func Test_Do_SingleInstance(t *testing.T) {
 }
 
 func Test_Do_SingleInstance_Fail(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	insts, servers := SetupServers(handlerFactory(400))
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, insts)
+	proc := NewProcessor(user, w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.NotNil(t, err)
@@ -110,12 +138,15 @@ func Test_Do_SingleInstance_Fail(t *testing.T) {
 }
 
 func Test_Do_Multiple(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	h := handlerFactory(200)
 	insts, servers := SetupServers(h, h, h)
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, insts)
+	proc := NewProcessor(user, w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.Nil(t, err)
@@ -133,6 +164,9 @@ func Test_Do_Multiple(t *testing.T) {
 }
 
 func Test_Do_Multiple_Mixed(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	insts, servers := SetupServers(
 		handlerFactory(200), 
 		handlerFactory(500),
@@ -142,7 +176,7 @@ func Test_Do_Multiple_Mixed(t *testing.T) {
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, insts)
+	proc := NewProcessor(user, w, insts)
 	err := proc.Do("GET", nil, "", nil)
 
 	assert.NotNil(t, err)
@@ -171,13 +205,16 @@ func Test_Do_Multiple_Mixed(t *testing.T) {
 }
 
 func Test_Failures(t *testing.T) {
+	user := setup()
+	defer teardown()
+
 	p := handlerFactory(200)
 	f := handlerFactory(500)
 	insts, servers := SetupServers(p, f, f, p, f)
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
-	proc := NewProcessor(w, insts)
+	proc := NewProcessor(user, w, insts)
 	proc.Do("GET", nil, "", nil)
 
 	failures := proc.FailureProcessor()

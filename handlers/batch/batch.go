@@ -17,18 +17,21 @@ package batch
 import (
 	"fmt"
 	"sync"
-	"bytes"
 	"errors"
 	"runtime"
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
+
+	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/handlers/docker"
 )
 
 type Processor struct {
 	writer http.ResponseWriter
 	instances []string
 	failures []string
+	user *auth.User
 }
 
 type Result struct {
@@ -48,8 +51,8 @@ type progressUpdate struct {
 
 type ResponseInterpreter func(resp *http.Response, err error)(Result, error)
 
-func NewProcessor(writer http.ResponseWriter, instances []string) *Processor {
-	return &Processor{writer, instances, []string{}}
+func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
+	return &Processor{writer, instances, []string{}, user}
 }
 
 func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
@@ -71,8 +74,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 		go func(inst string, itemNumber int) {
 			defer requests.Done()
 
-			dest := fmt.Sprintf("http://%s/%s", inst, endpoint)
-			resp, err := runBatchRequest(method, dest, body)
+			resp, err := runBatchRequest(this.user, method, inst, endpoint, body)
 			ioutil.ReadAll(resp.Body)
 			result, err := interpret(resp, err)
 
@@ -124,20 +126,22 @@ func (this *Processor) writeUpdate(res Result, instance string, progress, total 
 
 	jsonBody, _ := json.Marshal(update)
 	this.writer.Write(jsonBody)
+
+	if f, ok := this.writer.(http.Flusher); ok {
+      f.Flush()
+    }
 }
 
 func (this *Processor) FailureProcessor() *Processor {
-	return NewProcessor(this.writer, this.failures);
+	return NewProcessor(this.user, this.writer, this.failures);
 }
 
-func runBatchRequest(method, dest string, body interface{}) (*http.Response, error) {
-	jsonBody, _ := json.Marshal(body)
-	req, err := http.NewRequest(method, dest, bytes.NewBuffer(jsonBody))
-	req.Header.Set("Content-Type", "application/json")
-
-	if err != nil {
-		return nil, err
-	}
+func runBatchRequest(user *auth.User, method, instance, endpoint string, body interface{}) (*http.Response, error) {
+	payload, _ := json.Marshal(body)
+	req, err := docker.MakeDockerRequest(user, method, instance, endpoint, payload)
+    if err != nil {
+        return nil, err
+    }
 
 	return http.DefaultClient.Do(req)
 }

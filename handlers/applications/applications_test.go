@@ -36,8 +36,8 @@ func Test_Init(t *testing.T) {
 }
 
 func Test_GetApplicationById_Known(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+	setup()
+	defer teardown()
 
 	keyApp := applicationData {
 		Id : 0,
@@ -57,8 +57,8 @@ func Test_GetApplicationById_Known(t *testing.T) {
 }
 
 func Test_GetApplicationById_Unknown(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	_, err := GetApplicationById(0)
 
@@ -66,8 +66,8 @@ func Test_GetApplicationById_Unknown(t *testing.T) {
 }
 
 func Test_GetApplicationByName_Known(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	keyApp := applicationData {
 		Id : 0,
@@ -87,8 +87,8 @@ func Test_GetApplicationByName_Known(t *testing.T) {
 }
 
 func Test_GetApplicationByName_Unknown(t *testing.T) {
-	SetupTestingTable()
-	defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
 	_, err := GetApplicationByName("TestApp")
 

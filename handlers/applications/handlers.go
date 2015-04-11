@@ -151,7 +151,7 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    _, ok = doDeployment(application, deployment, start, pull, w)
+    _, ok = doDeployment(user, application, deployment, start, pull, w)
     if !ok {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
@@ -240,7 +240,7 @@ func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	startApplication(app.Id, w)
+	startApplication(user, app.Id, w)
 }
 
 func handleStopApplication(w http.ResponseWriter, r *http.Request) {
@@ -264,7 +264,7 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stopApplication(app.Id, w)
+	stopApplication(user, app.Id, w)
 }
 
 func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
@@ -295,7 +295,7 @@ func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	doDeployment(app, deploy, false, pull, w)
+	doDeployment(user, app, deploy, false, pull, w)
 }
 
 func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +304,8 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 
 	restart := getBoolParamOrDefault(r, "restart", false)
 	user := auth.GetCurrentUser(r)
+
+	fmt.Println(user)
 
 	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
 	if err != nil {
@@ -370,7 +372,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(removeList) > 0 {
-		proc := batch.NewProcessor(w, removeList)
+		proc := batch.NewProcessor(user, w, removeList)
 		batchDeleteContainersByName(proc, app.Name)
 
 		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
@@ -393,7 +395,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	if willDeploy {
-		doDeployment(appToDeploy, deployment, false, true, w)
+		doDeployment(user, appToDeploy, deployment, false, true, w)
 	} else {
 		w.WriteHeader(204)
 	}

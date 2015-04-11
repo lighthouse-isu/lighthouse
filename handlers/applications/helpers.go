@@ -66,16 +66,16 @@ func removeDeployment(deploy int64) error {
     return deployments.Delete(where)
 }
 
-func startApplication(app int64, w http.ResponseWriter) error {
-	return setApplicationStateTo(app, true, w)
+func startApplication(user *auth.User, app int64, w http.ResponseWriter) error {
+	return setApplicationStateTo(user, app, true, w)
 }
 
-func stopApplication(app int64, w http.ResponseWriter) error {
-	return setApplicationStateTo(app, false, w)
+func stopApplication(user *auth.User, app int64, w http.ResponseWriter) error {
+	return setApplicationStateTo(user, app, false, w)
 }
 
-func doDeployment(app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) (error, bool) {
-	deploy := batch.NewProcessor(w, app.Instances.([]string))
+func doDeployment(user *auth.User, app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) (error, bool) {
+	deploy := batch.NewProcessor(user, w, app.Instances.([]string))
 
 	if pullImages {
 		image, ok := deployment.Command["Image"]
@@ -191,7 +191,7 @@ func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]i
     return deploys, nil
 }
 
-func setApplicationStateTo(id int64, state bool, w http.ResponseWriter) error {
+func setApplicationStateTo(user *auth.User, id int64, state bool, w http.ResponseWriter) error {
 	app, err := GetApplicationById(id)
 	if err != nil {
 		return err
@@ -207,7 +207,7 @@ func setApplicationStateTo(id int64, state bool, w http.ResponseWriter) error {
 		rollback = fmt.Sprintf("containers/%s/stop", app.Name)
 	}
 
-	toggle := batch.NewProcessor(w, app.Instances.([]string))
+	toggle := batch.NewProcessor(user, w, app.Instances.([]string))
 
 	err = toggle.Do("POST", nil, target, nil)
 	if err != nil {

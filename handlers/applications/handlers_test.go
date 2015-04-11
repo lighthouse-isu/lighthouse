@@ -38,8 +38,8 @@ import (
 )
 
 func Test_HandleCreateApplication(t *testing.T) {
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
@@ -133,10 +133,8 @@ func Test_HandleCreateApplication(t *testing.T) {
 }
 
 func Test_HandleListApplications(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
@@ -188,10 +186,8 @@ func Test_HandleListApplications(t *testing.T) {
 }
 
 func Test_HandleGetApplicationHistory(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     m := mux.NewRouter()
     m.HandleFunc("/list/{Id}", handleGetApplicationHistory)
@@ -289,8 +285,8 @@ func Test_HandleGetApplicationHistory(t *testing.T) {
 }
 
 func Test_HandleGetApplicationHistory_Errors(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
+    setup()
+    defer teardown()
 
     m := mux.NewRouter()
     m.HandleFunc("/list/{Id}", handleGetApplicationHistory)
@@ -310,10 +306,8 @@ func Test_HandleGetApplicationHistory_Errors(t *testing.T) {
 }
 
 func Test_HandleStartAndStopApplication(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
@@ -351,7 +345,7 @@ func Test_HandleStartAndStopApplication(t *testing.T) {
         auth.SetUserApplicationAuthLevel(user, app.Name, c.AuthLevel)
         req, _ := http.NewRequest("POST", c.Endpoint, nil)
         session.SetValue(req, "auth", "email", user.Email)
-        setApplicationStateTo(app.Id, c.InitialState, httptest.NewRecorder())
+        setApplicationStateTo(user, app.Id, c.InitialState, httptest.NewRecorder())
 
         w := httptest.NewRecorder()
         m.ServeHTTP(w, req)
@@ -361,11 +355,9 @@ func Test_HandleStartAndStopApplication(t *testing.T) {
 }
 
 func Test_HandleRevertApplication(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
-
+    setup()
+    defer teardown()
+    
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
 
@@ -390,10 +382,8 @@ func Test_HandleRevertApplication(t *testing.T) {
 }
 
 func Test_HandleRevertApplication_Errors(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
@@ -435,10 +425,8 @@ func Test_HandleRevertApplication_Errors(t *testing.T) {
 }
 
 func Test_HandleUpdateApplication_Errors(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     auth.CreateUser("email", "", "")
     user, _ := auth.GetUser("email")
@@ -474,10 +462,8 @@ func Test_HandleUpdateApplication_Errors(t *testing.T) {
 }
 
 func Test_HandleUpdateApplication(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
-    auth.SetupTestingTable()
-    defer auth.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     h := func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(200)
@@ -498,7 +484,7 @@ func Test_HandleUpdateApplication(t *testing.T) {
 
     app, _ := addApplication("TestApp", initialInsts)
     dep, _ := addDeployment(app.Id, map[string]interface{}{}, user.Email)
-    doDeployment(app, dep, false, false, httptest.NewRecorder())
+    doDeployment(user, app, dep, false, false, httptest.NewRecorder())
 
     auth.SetUserApplicationAuthLevel(user, app.Name, auth.OwnerAuthLevel)
 

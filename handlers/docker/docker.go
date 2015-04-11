@@ -24,8 +24,8 @@ import (
     "github.com/gorilla/mux"
 
     "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
 
     "github.com/lighthouse/lighthouse/logging"
@@ -40,51 +40,20 @@ import (
     RETURN: nil on succes.  A non-nil *handlers.HandlerError on failure
 */
 func DockerRequestHandler(w http.ResponseWriter, info handlers.HandlerInfo) *handlers.HandlerError {
-    beaconAddress, err := beacons.GetBeaconAddress(info.Host)
-
-    requestIsToBeacon := err == nil
-
-    var targetAddress, targetEndpoint string
-
-    if requestIsToBeacon {
-        targetAddress = beaconAddress
-        targetEndpoint = fmt.Sprintf("d/%s/%s", info.Host, info.DockerEndpoint)
-    } else {
-        targetAddress = info.Host
-        targetEndpoint = info.DockerEndpoint
-    }
-
-    url := fmt.Sprintf("http://%s/%s", targetAddress, targetEndpoint)
-
     payload := []byte(nil)
     if info.Body != nil {
         payload, _ = json.Marshal(info.Body.Payload)
     }
 
-    method := info.Request.Method
-
-    req, err := http.NewRequest(method, url, bytes.NewBuffer(payload))
+    user := auth.GetCurrentUser(info.Request)
+    req, err := MakeDockerRequest(user, info.Request.Method, info.Host, info.DockerEndpoint, payload)
     if err != nil {
-        return &handlers.HandlerError{500, "control", "Failed to create " + method + " request"}
-    }
-
-    if requestIsToBeacon {
-        user := auth.GetCurrentUser(info.Request)
-        token, _ := beacons.TryGetBeaconToken(beaconAddress, user)
-        req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
-    }
-
-    // Ensure Content-Type
-    contentType := info.Request.Header.Get("Content-Type")
-    if contentType != "" {
-        req.Header.Set("Content-Type", contentType)
-    } else {
-        req.Header.Set("Content-Type", "application/json")
+        return &handlers.HandlerError{500, "control", "Failed to create " + info.Request.Method + " request"}
     }
     
     resp, err := http.DefaultClient.Do(req)
     if err != nil {
-        return &handlers.HandlerError{500, "control", method + " request failed"}
+        return &handlers.HandlerError{500, "control", info.Request.Method + " request failed"}
     }
 
     // Close body after return
@@ -178,6 +147,38 @@ func GetHandlerInfo(r *http.Request) (handlers.HandlerInfo, bool) {
     info.Request = r
 
     return info, true
+}
+
+func MakeDockerRequest(user *auth.User, method, host, endpoint string, body []byte) (*http.Request, error) {
+    beaconAddress, err := beacons.GetBeaconAddress(host)
+
+    requestIsToBeacon := err == nil
+
+    var targetAddress, targetEndpoint string
+
+    if requestIsToBeacon {
+        targetAddress = beaconAddress
+        targetEndpoint = fmt.Sprintf("d/%s/%s", host, endpoint)
+    } else {
+        targetAddress = host
+        targetEndpoint = endpoint
+    }
+
+    url := fmt.Sprintf("http://%s/%s", targetAddress, targetEndpoint)
+
+    req, err := http.NewRequest(method, url, bytes.NewBuffer(body))
+    if err != nil {
+        return nil, err
+    }
+
+    if requestIsToBeacon {
+        token, _ := beacons.TryGetBeaconToken(beaconAddress, user)
+        req.Header.Set(beacons.HEADER_TOKEN_KEY, token)
+    }
+
+    req.Header.Set("Content-Type", "application/json")
+
+    return req, nil
 }
 
 func Handle(r *mux.Router) {
