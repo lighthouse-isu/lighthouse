@@ -28,7 +28,7 @@ import (
 )
 
 type Processor struct {
-	writer http.ResponseWriter
+	encoder *json.Encoder
 	instances []string
 	failures []string
 	user *auth.User
@@ -52,7 +52,7 @@ type progressUpdate struct {
 type ResponseInterpreter func(int, []byte, error)(Result, error)
 
 func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
-	return &Processor{writer, instances, []string{}, user}
+	return &Processor{json.NewEncoder(writer), instances, []string{}, user}
 }
 
 func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
@@ -130,16 +130,11 @@ func (this *Processor) writeUpdate(res Result, instance string, progress, total 
 		res.Status, res.Message, res.Code, instance, progress, total,
 	}
 
-	jsonBody, _ := json.Marshal(update)
-	this.writer.Write(jsonBody)
-	this.writer.Write([]byte("\n"))
-	if f, ok := this.writer.(http.Flusher); ok {
-		f.Flush()
-	}
+	this.encoder.Encode(update)
 }
 
 func (this *Processor) FailureProcessor() *Processor {
-	return NewProcessor(this.user, this.writer, this.failures);
+	return &Processor{this.encoder, this.failures, []string{}, this.user};
 }
 
 func runBatchRequest(user *auth.User, method, instance, endpoint string, body interface{}) (*http.Response, error) {
