@@ -75,14 +75,18 @@ func stopApplication(user *auth.User, app int64, w http.ResponseWriter) error {
 }
 
 func doDeployment(user *auth.User, app applicationData, deployment deploymentData, startApp, pullImages bool, w http.ResponseWriter) (error, bool) {
+	image, ok := deployment.Command["Image"]
+
+	if pullImages && (!ok || image == "") {
+		return NotEnoughParametersError, false
+	} else {
+		w.WriteHeader(200)
+	}
+
 	deploy := batch.NewProcessor(user, w, app.Instances.([]string))
 
 	if pullImages {
-		image, ok := deployment.Command["Image"]
 
-		if !ok || image == "" {
-			return NotEnoughParametersError, false
-		}
 
 		pullTarget := fmt.Sprintf("images/create?fromImage=%s", image)
 		err := deploy.Do("POST", nil, pullTarget, nil)
@@ -206,6 +210,8 @@ func setApplicationStateTo(user *auth.User, id int64, state bool, w http.Respons
 		target = fmt.Sprintf("containers/%s/start", app.Name)
 		rollback = fmt.Sprintf("containers/%s/stop", app.Name)
 	}
+
+	w.WriteHeader(200)
 
 	toggle := batch.NewProcessor(user, w, app.Instances.([]string))
 
