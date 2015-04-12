@@ -49,7 +49,7 @@ type progressUpdate struct {
     Total int
 }
 
-type ResponseInterpreter func(resp *http.Response, err error)(Result, error)
+type ResponseInterpreter func(int, []byte, error)(Result, error)
 
 func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
 	return &Processor{writer, instances, []string{}, user}
@@ -59,30 +59,32 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	var completed []string
 	var errorToReport error = nil
 	var total int = len(this.instances)
-	var requests, managers sync.WaitGroup
+	var requests, channels sync.WaitGroup
 	var queue chan string = make(chan string, 1)
 	var failQueue chan string = make(chan string, 1)
-	var updateQueue chan progressUpdate = make(chan progressUpdate, 1)
 
 	if interpret == nil {
 		interpret = interpretResponseDefault
 	}
 
-	this.writeUpdate(progressUpdate{"Starting", endpoint, 0, "", 0, total})
+	this.writeUpdate(Result{"Starting", endpoint, 0}, "", 0, total)
 
 	requests.Add(total)
 	for i, inst := range this.instances {
 		go func(inst string, itemNumber int) {
 			defer requests.Done()
 
+			var respBody []byte = nil
 			resp, err := runBatchRequest(this.user, method, inst, endpoint, body)
-			ioutil.ReadAll(resp.Body)
-			result, err := interpret(resp, err)
-
-			updateQueue <- progressUpdate {
-				result.Status, result.Message, result.Code, 
-				inst, itemNumber, total,
+			if err == nil {
+				respBody, err = ioutil.ReadAll(resp.Body)
+				resp.Body.Close()
 			}
+			result, err := interpret(resp.StatusCode, respBody, err)
+
+			resp.Body.Close()
+
+			this.writeUpdate(result, inst, itemNumber, total)
 
 			// Yield to other goroutines
 			runtime.Gosched()
@@ -97,50 +99,42 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	}
 
 	go func() {
-		managers.Add(1)
-		defer managers.Done()
+		channels.Add(1)
+		defer channels.Done()
 		for inst := range queue {
 			completed = append(completed, inst)
 		}
 	}()
 
 	go func() {
-		managers.Add(1)
-		defer managers.Done()
+		channels.Add(1)
+		defer channels.Done()
 		for inst := range failQueue {
 			this.failures = append(this.failures, inst)
 		}
 	}()
 
-	go func() {
-		managers.Add(1)
-		defer managers.Done()
-	    for update := range updateQueue {
-	    	this.writeUpdate(update)
-    	}
-    }()
-
 	requests.Wait()
 	close(queue)
 	close(failQueue)
-	close(updateQueue)
-	managers.Wait()
+	channels.Wait()
 
-	this.writeUpdate(progressUpdate{"Complete", endpoint, 0, "", total, total})
+	this.writeUpdate(Result{"Complete", endpoint, 0}, "", total, total)
 
 	this.instances = completed
 	return errorToReport
 }
 
-func (this *Processor) writeUpdate(update progressUpdate) {
-	jsonBody, _ := json.Marshal(update)
+func (this *Processor) writeUpdate(res Result, instance string, progress, total int) {
+	update := progressUpdate {
+		res.Status, res.Message, res.Code, instance, progress, total,
+	}
 
-	for i := 0; i < len(jsonBody); i += 16 {
-		j := i + 16
-		if j > len(jsonBody) {
-			j = len(jsonBody)
-		}
-		this.writer.Write(jsonBody[i:j])
+	jsonBody, _ := json.Marshal(update)
+	this.writer.Write(jsonBody)
+	this.writer.Write([]byte("\n"))
+	if f, ok := this.writer.(http.Flusher); ok {
+		f.Flush()
 	}
 }
 
@@ -158,12 +152,10 @@ func runBatchRequest(user *auth.User, method, instance, endpoint string, body in
 	return http.DefaultClient.Do(req)
 }
 
-func interpretResponseDefault(resp *http.Response, err error) (Result, error) {
+func interpretResponseDefault(code int, body []byte, err error) (Result, error) {
 	if err != nil {
 		return Result{"Error", err.Error(), 500}, err
 	}
-
-	code := resp.StatusCode
 
 	switch {
 	case 200 <= code && code <= 299: 

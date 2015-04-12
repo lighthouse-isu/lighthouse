@@ -457,8 +457,7 @@ func Test_InterpretDeleteContainer(t *testing.T) {
 	}
 
 	for test, key := range tests {
-		resp := &http.Response{StatusCode : test.Code}
-		res, err := interpretDeleteContainer(resp, test.Err)
+		res, err := interpretDeleteContainer(test.Code, nil, test.Err)
 
 		assert.Equal(t, key.Status, res.Status)
 		assert.Equal(t, key.Code, res.Code)

@@ -299,12 +299,10 @@ func convertInstanceList(inter interface{}) ([]string, bool) {
 	return ret, true
 }
 
-func interpretDeleteContainer(resp *http.Response, err error) (batch.Result, error) {
+func interpretDeleteContainer(code int, body []byte, err error) (batch.Result, error) {
 	if err != nil {
 		return batch.Result{"Error", err.Error(), 500}, err
 	}
-
-	code := resp.StatusCode
 
 	switch {
 	case code == 404:
