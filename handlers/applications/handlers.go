@@ -153,10 +153,15 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    _, ok = doDeployment(user, application, deployment, start, pull, w)
+    deployErr, ok := doDeployment(user, application, deployment, start, pull, w)
     if !ok {
         removeDeployment(deployment.Id)
         removeApplication(application.Id)
+
+        if deployErr == NotEnoughParametersError {
+        	err = NotEnoughParametersError
+        }
+        
         return
     }
 

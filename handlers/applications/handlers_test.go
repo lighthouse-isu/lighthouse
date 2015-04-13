@@ -76,8 +76,8 @@ func Test_HandleCreateApplication(t *testing.T) {
         &testCase{validCommand, false, false} : testResult{200, true},
         
         // Missing image - fails at pull
-        &testCase{noImageCommand, true, true} : testResult{200, false},
-        &testCase{noImageCommand, false, true} : testResult{200, false},
+        &testCase{noImageCommand, true, true} : testResult{400, false},
+        &testCase{noImageCommand, false, true} : testResult{400, false},
         &testCase{noImageCommand, true, false} : testResult{200, true},
         &testCase{noImageCommand, false, false} : testResult{200, true},
 

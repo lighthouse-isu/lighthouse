@@ -121,8 +121,8 @@ func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
                 return
             }
         }
-session.SetValue(r, "auth", "email", "admin@gmail.com")
-        if true || session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
+
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
             h.ServeHTTP(w, r)
             return
         }
