@@ -56,12 +56,15 @@ func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []strin
 }
 
 func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
-	var completed []string
-	var errorToReport error = nil
-	var total int = len(this.instances)
-	var requests, channels sync.WaitGroup
-	var queue chan string = make(chan string, 1)
-	var failQueue chan string = make(chan string, 1)
+	var (
+		completed = []string{}
+		errorToReport error = nil
+		total = len(this.instances)
+		requests = sync.WaitGroup{}
+		channels = sync.WaitGroup{}
+		queue = make(chan string, 1)
+		failQueue = make(chan string, 1)
+	)
 
 	if interpret == nil {
 		interpret = interpretResponseDefault
@@ -81,8 +84,6 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 				resp.Body.Close()
 			}
 			result, err := interpret(resp.StatusCode, respBody, err)
-
-			resp.Body.Close()
 
 			this.writeUpdate(result, inst, itemNumber, total)
 

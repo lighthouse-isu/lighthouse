@@ -109,6 +109,8 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
    	var err error
 	defer func() { writeError(w, err) }()
 
+	w.Header().Set("Content-Type", "application/json")
+
     start := getBoolParamOrDefault(r, "start", false)
     pull := getBoolParamOrDefault(r, "forcePull", false)
     user := auth.GetCurrentUser(r)
@@ -223,6 +225,8 @@ func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() { writeError(w, err) }()
 	
+	w.Header().Set("Content-Type", "application/json")
+
 	user := auth.GetCurrentUser(r)
 
 	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
@@ -247,6 +251,8 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() { writeError(w, err) }()
 	
+	w.Header().Set("Content-Type", "application/json")
+
 	user := auth.GetCurrentUser(r)
 
 	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
@@ -270,6 +276,8 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
    	var err error
 	defer func() { writeError(w, err) }()
+
+	w.Header().Set("Content-Type", "application/json")
 
 	target := getInt64ParamOrDefault(r, "target", -1)
     pull := getBoolParamOrDefault(r, "forcePull", false)
@@ -301,6 +309,8 @@ func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
 func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
    	var err error
 	defer func() { writeError(w, err) }()
+
+	w.Header().Set("Content-Type", "application/json")
 
 	restart := getBoolParamOrDefault(r, "restart", false)
 	user := auth.GetCurrentUser(r)
