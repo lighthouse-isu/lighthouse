@@ -85,15 +85,18 @@ func Test_Do_Nothing(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, []string{})
-	err := proc.Do("JUNK", nil, "", nil)
+	err := proc.Do("TEST", "GET", nil, "ENDPOINT", nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, 200, w.Code)
 
 	updates := getUpdates(w, true)
 	
-	assert.Equal(t, "Starting", updates[0].Status)
-	assert.Equal(t, "Complete", updates[1].Status)
+	keyStart := progressUpdate{"Starting", "GET", "ENDPOINT", "TEST", 0, "", 0, 0}
+	keyComplete := progressUpdate{"Complete", "GET", "ENDPOINT", "TEST", 0, "", 0, 0}
+
+	assert.Equal(t, keyStart, updates[0])
+	assert.Equal(t, keyComplete, updates[1])
 }
 
 func Test_Do_SingleInstance(t *testing.T) {
@@ -105,14 +108,14 @@ func Test_Do_SingleInstance(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, insts)
-	err := proc.Do("GET", nil, "", nil)
+	err := proc.Do("TEST", "GET", nil, "", nil)
 
 	assert.Nil(t, err)
 	assert.Equal(t, insts, proc.instances)
 
 	updates := getUpdates(w, false)
 
-	keyUpdate := progressUpdate{"OK", "", 200, insts[0], 0, 1}
+	keyUpdate := progressUpdate{"OK", "GET", "", "", 200, insts[0], 0, 1}
 	
 	assert.Equal(t, keyUpdate, updates[0])
 }
@@ -126,14 +129,14 @@ func Test_Do_SingleInstance_Fail(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, insts)
-	err := proc.Do("GET", nil, "", nil)
+	err := proc.Do("TEST", "GET", nil, "", nil)
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 0, len(proc.instances))
 
 	updates := getUpdates(w, false)
 
-	keyUpdate := progressUpdate{"Error", "", 400, insts[0], 0, 1}
+	keyUpdate := progressUpdate{"Error", "GET", "", "", 400, insts[0], 0, 1}
 	assert.Equal(t, keyUpdate, updates[0])
 }
 
@@ -147,7 +150,7 @@ func Test_Do_Multiple(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, insts)
-	err := proc.Do("GET", nil, "", nil)
+	err := proc.Do("TEST", "GET", nil, "", nil)
 
 	assert.Nil(t, err)
 
@@ -177,7 +180,7 @@ func Test_Do_Multiple_Mixed(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, insts)
-	err := proc.Do("GET", nil, "", nil)
+	err := proc.Do("TEST", "GET", nil, "", nil)
 
 	assert.NotNil(t, err)
 	assert.Equal(t, 2, len(proc.instances))
@@ -215,7 +218,7 @@ func Test_Failures(t *testing.T) {
 
 	w := httptest.NewRecorder()
 	proc := NewProcessor(user, w, insts)
-	proc.Do("GET", nil, "", nil)
+	proc.Do("TEST", "GET", nil, "", nil)
 
 	failures := proc.FailureProcessor()
 

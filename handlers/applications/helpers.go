@@ -84,7 +84,7 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
         }
 
 		pullTarget := fmt.Sprintf("images/create?fromImage=%s", image)
-		err := deploy.Do("POST", nil, pullTarget, nil)
+		err := deploy.Do("Pulling required image", "POST", nil, pullTarget, nil)
 
 		if err != nil {
 			return nil, false
@@ -94,32 +94,32 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
 	tmpName := fmt.Sprintf("%s_tmp", app.Name)
 
 	createTarget := fmt.Sprintf("containers/create?name=%s", tmpName)
-	err := deploy.Do("POST", deployment.Command, createTarget, nil)
+	err := deploy.Do("Creating new container", "POST", deployment.Command, createTarget, nil)
 
 	if err != nil {
-		batchDeleteContainersByName(deploy, tmpName)
+		batchDeleteContainersByName(deploy, tmpName, true)
 		return nil, false
 	}
 
-	err = batchDeleteContainersByName(deploy, app.Name)
+	err = batchDeleteContainersByName(deploy, app.Name, false)
 	if err != nil {
 		return nil, false
 	}
 
 	renameTarget := fmt.Sprintf("containers/%s/rename?name=%s", tmpName, app.Name)
-	err = deploy.Do("POST", nil, renameTarget, nil)
+	err = deploy.Do("Setting up new container", "POST", nil, renameTarget, nil)
 
 	if err != nil {
 		// In a weird state where some containers have the temp name and some have the real name
-		batchDeleteContainersByName(deploy, app.Name)
-		batchDeleteContainersByName(deploy.FailureProcessor(), tmpName)
+		batchDeleteContainersByName(deploy, app.Name, true)
+		batchDeleteContainersByName(deploy.FailureProcessor(), tmpName, true)
 		
 		return nil, false
 	}
 
 	if startApp {
 		startTarget := fmt.Sprintf("containers/%s/start", app.Name)
-		err = deploy.Do("POST", nil, startTarget, nil)
+		err = deploy.Do("Starting application", "POST", nil, startTarget, nil)
 
 		if err != nil {
 			return nil, false
@@ -196,23 +196,25 @@ func setApplicationStateTo(user *auth.User, id int64, state bool, w http.Respons
 		return err
 	}
 
-	var target, rollback string
+	var target, rollback, msg string
 
 	if state == false {
 		target = fmt.Sprintf("containers/%s/stop", app.Name)
 		rollback = fmt.Sprintf("containers/%s/start", app.Name)
+        msg = "Stopping application"
 	} else {
 		target = fmt.Sprintf("containers/%s/start", app.Name)
 		rollback = fmt.Sprintf("containers/%s/stop", app.Name)
+        msg = "Starting application"
 	}
 
 	w.WriteHeader(200)
 
 	toggle := batch.NewProcessor(user, w, app.Instances.([]string))
 
-	err = toggle.Do("POST", nil, target, nil)
+	err = toggle.Do(msg, "POST", nil, target, nil)
 	if err != nil {
-		toggle.Do("POST", nil, rollback, nil)
+		toggle.Do("Rolling back", "POST", nil, rollback, nil)
 		return err
 	}
 
@@ -265,9 +267,16 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	return deployment, err
 }
 
-func batchDeleteContainersByName(proc *batch.Processor, name string) error {
+func batchDeleteContainersByName(proc *batch.Processor, name string, isRollback bool) error {
+    var msg string
+    if isRollback {
+        msg = "Rolling back"
+    } else {
+        msg = "Deleting old containers"
+    }
+
 	deleteTarget := fmt.Sprintf("containers/%s?force=true", name)
-	return proc.Do("DELETE", nil, deleteTarget, interpretDeleteContainer)
+	return proc.Do(msg, "DELETE", nil, deleteTarget, interpretDeleteContainer)
 }
 
 func convertInstanceList(inter interface{}) ([]string, bool) {

@@ -32,30 +32,33 @@ type Processor struct {
 	instances []string
 	failures []string
 	user *auth.User
+	writeLock sync.Mutex
 }
 
 type Result struct {
-    Status string
-    Message string
-    Code int
+	Status string
+	Message string
+	Code int
 }
 
 type progressUpdate struct {
 	Status string
-    Message string
-    Code int
-    Instance string
-    Item int
-    Total int
+	Method string
+	Endpoint string
+	Message string
+	Code int
+	Instance string
+	Item int
+	Total int
 }
 
 type ResponseInterpreter func(int, []byte, error)(Result, error)
 
 func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
-	return &Processor{writer, instances, []string{}, user}
+	return &Processor{writer, instances, []string{}, user, sync.Mutex{}}
 }
 
-func (this *Processor) Do(method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
+func (this *Processor) Do(action, method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
 	var (
 		completed = []string{}
 		errorToReport error = nil
@@ -70,7 +73,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 		interpret = interpretResponseDefault
 	}
 
-	this.writeUpdate(Result{"Starting", endpoint, 0}, "", 0, total)
+	this.writeUpdate(Result{"Starting", action, 0}, method, endpoint, "", 0, total)
 
 	requests.Add(total)
 	for i, inst := range this.instances {
@@ -85,7 +88,7 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 			}
 			result, err := interpret(resp.StatusCode, respBody, err)
 
-			this.writeUpdate(result, inst, itemNumber, total)
+			this.writeUpdate(result, method, endpoint, inst, itemNumber, total)
 
 			// Yield to other goroutines
 			runtime.Gosched()
@@ -120,16 +123,26 @@ func (this *Processor) Do(method string, body interface{}, endpoint string, inte
 	close(failQueue)
 	channels.Wait()
 
-	this.writeUpdate(Result{"Complete", endpoint, 0}, "", total, total)
+	this.writeUpdate(Result{"Complete", action, 0}, method, endpoint, "", total, total)
 
 	this.instances = completed
 	return errorToReport
 }
 
-func (this *Processor) writeUpdate(res Result, instance string, progress, total int) {
+func (this *Processor) writeUpdate(res Result, method, endpoint, instance string, progress, total int) {
 	update := progressUpdate {
-		res.Status, res.Message, res.Code, instance, progress, total,
+		Status : res.Status, 
+		Method : method,
+		Endpoint : endpoint,
+		Message : res.Message, 
+		Code : res.Code, 
+		Instance : instance, 
+		Item : progress, 
+		Total : total,
 	}
+
+	this.writeLock.Lock()
+	defer this.writeLock.Unlock()
 
 	json.NewEncoder(this.writer).Encode(update)
 	if f, ok := this.writer.(http.Flusher); ok {
@@ -144,9 +157,9 @@ func (this *Processor) FailureProcessor() *Processor {
 func runBatchRequest(user *auth.User, method, instance, endpoint string, body interface{}) (*http.Response, error) {
 	payload, _ := json.Marshal(body)
 	req, err := docker.MakeDockerRequest(user, method, instance, endpoint, payload)
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
 	return http.DefaultClient.Do(req)
 }

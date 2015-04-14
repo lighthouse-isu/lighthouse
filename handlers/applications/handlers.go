@@ -84,6 +84,10 @@ func writeError(w http.ResponseWriter, err error) {
 }
 
 func getDifferenceOf(orig, remove []string) []string {
+	if len(remove) == 0 {
+		return orig
+	}
+
 	ret := []string{}
 
 	sort.Strings(orig)
@@ -371,29 +375,14 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	willDeploy := restart || len(update.Command) > 0 
-	instanceUpdate := len(addList) > 0 || len(removeList) > 0
 
-	if len(addList) > 0 {
-		if !willDeploy {
-			// A temporary app that only contains the added instances
-			appToDeploy = applicationData {
-				app.Id, app.CurrentDeployment, app.Name, addList,
-			}
+	if len(addList) > 0 || len(removeList) > 0 {
+		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
 
-			willDeploy = true
+		if len(addList) > 0 {
+			app.Instances = append(app.Instances.([]string), addList...)
 		}
 
-		app.Instances = append(app.Instances.([]string), addList...)
-	}
-
-	if len(removeList) > 0 {
-		proc := batch.NewProcessor(user, w, removeList)
-		batchDeleteContainersByName(proc, app.Name)
-
-		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
-	}
-
-	if instanceUpdate {
 		to := map[string]interface{}{"Instances" : app.Instances}
 		where := databases.Filter{"Id" : app.Id}
 		err = applications.Update(to, where)
@@ -401,12 +390,26 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	
+
 	if len(update.Command) > 0 {
 		deployment, err = addDeployment(app.Id, update.Command, auth.GetCurrentUser(r).Email)
 		if err != nil {
 			return
 		}
+	}
+
+	if len(addList) > 0 && !willDeploy {
+		// A temporary app that only contains the added instances
+		appToDeploy = applicationData {
+			app.Id, app.CurrentDeployment, app.Name, addList,
+		}
+
+		willDeploy = true
+	}
+
+	if len(removeList) > 0 {
+		proc := batch.NewProcessor(user, w, removeList)
+		batchDeleteContainersByName(proc, app.Name, false)
 	}
 	
 	if willDeploy {
