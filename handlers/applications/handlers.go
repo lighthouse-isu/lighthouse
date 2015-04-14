@@ -170,8 +170,7 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
     }
 
     auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
-
-	return
+    batch.Finalize(w)
 }
 
 func handleListApplications(w http.ResponseWriter, r *http.Request) {
@@ -254,6 +253,7 @@ func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	startApplication(user, app.Id, w)
+	batch.Finalize(w)
 }
 
 func handleStopApplication(w http.ResponseWriter, r *http.Request) {
@@ -280,6 +280,7 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stopApplication(user, app.Id, w)
+	batch.Finalize(w)
 }
 
 func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
@@ -313,6 +314,7 @@ func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	doDeployment(user, app, deploy, false, pull, w)
+	batch.Finalize(w)
 }
 
 func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
@@ -414,7 +416,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	
 	if willDeploy {
 		doDeployment(user, appToDeploy, deployment, false, true, w)
-	} else {
-		w.WriteHeader(204)
 	}
+
+	batch.Finalize(w)
 }

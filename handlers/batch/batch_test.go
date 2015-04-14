@@ -99,6 +99,16 @@ func Test_Do_Nothing(t *testing.T) {
 	assert.Equal(t, keyComplete, updates[1])
 }
 
+func Test_Finalize(t *testing.T) {
+	w := httptest.NewRecorder()
+	Finalize(w)
+	
+	var update progressUpdate
+	json.Unmarshal(w.Body.Bytes(), &update)
+
+	assert.Equal(t, "Finalized", update.Status)
+}
+
 func Test_Do_SingleInstance(t *testing.T) {
 	user := setup()
 	defer teardown()

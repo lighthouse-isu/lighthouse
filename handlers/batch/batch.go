@@ -129,6 +129,17 @@ func (this *Processor) Do(action, method string, body interface{}, endpoint stri
 	return errorToReport
 }
 
+func (this *Processor) FailureProcessor() *Processor {
+	return NewProcessor(this.user, this.writer, this.failures);
+}
+
+func Finalize(w http.ResponseWriter) {
+	json.NewEncoder(w).Encode(progressUpdate{Status: "Finalized"})
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
 func (this *Processor) writeUpdate(res Result, method, endpoint, instance string, progress, total int) {
 	update := progressUpdate {
 		Status : res.Status, 
@@ -148,10 +159,6 @@ func (this *Processor) writeUpdate(res Result, method, endpoint, instance string
 	if f, ok := this.writer.(http.Flusher); ok {
 		f.Flush()
 	}
-}
-
-func (this *Processor) FailureProcessor() *Processor {
-	return NewProcessor(this.user, this.writer, this.failures);
 }
 
 func runBatchRequest(user *auth.User, method, instance, endpoint string, body interface{}) (*http.Response, error) {
