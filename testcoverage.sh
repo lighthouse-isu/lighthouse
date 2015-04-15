@@ -14,7 +14,7 @@ for d in $list; do
 	if [[ $last != $path ]]
 	then
 		go test $path -v -coverprofile=cover.out -covermode=count
-	    tail -n +2 cover.out >> profile.cov
+		tail -n +2 cover.out >> profile.cov
 	fi
 
 	last=$path
@@ -28,4 +28,15 @@ then
 	rm profile.cov cover.out no_utils.cov
 else
 	$HOME/gopath/bin/goveralls -coverprofile=no_utils.cov -service=travis-ci
+fi
+
+toFmt=$(gofmt -l .)
+if [[ $toFmt != "" ]]
+then
+	echo "Unformatted files:"
+	for file in $toFmt 
+	do
+		echo $file
+	done
+	exit 1
 fi
