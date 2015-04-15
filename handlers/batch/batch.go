@@ -15,7 +15,7 @@
 package batch
 
 import (
-	"fmt"
+	"io"
 	"sync"
 	"errors"
 	"runtime"
@@ -52,7 +52,7 @@ type progressUpdate struct {
 	Total int
 }
 
-type ResponseInterpreter func(int, []byte, error)(Result, error)
+type ResponseInterpreter func(int, io.Reader, error)(Result, error)
 
 func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
 	return &Processor{writer, instances, []string{}, user, sync.Mutex{}}
@@ -80,13 +80,14 @@ func (this *Processor) Do(action, method string, body interface{}, endpoint stri
 		go func(inst string, itemNumber int) {
 			defer requests.Done()
 
-			var respBody []byte = nil
 			resp, err := runBatchRequest(this.user, method, inst, endpoint, body)
+			result, err := interpret(resp.StatusCode, resp.Body, err)
+
+			// Make sure the response is complete before ending
 			if err == nil {
-				respBody, err = ioutil.ReadAll(resp.Body)
+				ioutil.ReadAll(resp.Body)
 				resp.Body.Close()
 			}
-			result, err := interpret(resp.StatusCode, respBody, err)
 
 			this.writeUpdate(result, method, endpoint, inst, itemNumber, total)
 
@@ -171,19 +172,28 @@ func runBatchRequest(user *auth.User, method, instance, endpoint string, body in
 	return http.DefaultClient.Do(req)
 }
 
-func interpretResponseDefault(code int, body []byte, err error) (Result, error) {
+func interpretResponseDefault(code int, body io.Reader, err error) (Result, error) {
 	if err != nil {
 		return Result{"Error", err.Error(), 500}, err
 	}
 
+	msg := make([]byte, 83)
+	cnt, err := io.ReadFull(body, msg)
+
+	if cnt > 80 {
+		msg = append(msg[:80], []byte("...")...)
+	} else {
+		msg = msg[:cnt]
+	}
+
 	switch {
 	case 200 <= code && code <= 299: 
-		return Result{"OK", "", code}, nil
+		return Result{"OK", string(msg), code}, nil
 
 	case 300 <= code && code <= 399: 
-		return Result{"Warning", "", code}, nil
+		return Result{"Warning", string(msg), code}, nil
 
 	default:
-		return Result{"Error", "", code}, errors.New(fmt.Sprintf("Batch request returned code %d", code))
+		return Result{"Error", string(msg), code}, errors.New(string(msg))
 	}
 }

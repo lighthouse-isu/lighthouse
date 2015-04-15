@@ -19,6 +19,7 @@ import (
 
     "fmt"
     "time"
+    "bytes"
     "errors"
     "strings"
     "net/http"
@@ -462,5 +463,47 @@ func Test_InterpretDeleteContainer(t *testing.T) {
 		assert.Equal(t, key.Status, res.Status)
 		assert.Equal(t, key.Code, res.Code)
 		assert.Equal(t, key.Status != "Error", err == nil)
+	}
+}
+
+func Test_InterpretPullImage(t *testing.T) {
+	type testCase struct {
+		Code int
+		Body []byte
+		Err error
+	}
+
+	type testResult struct {
+		Status string
+		Code int
+	}
+
+	noBody := []byte(``)
+	successBody := []byte(`{"status": "Pulling", "progress": "1 B/ 100 B", "progressDetail": {"current": 1, "total": 100}}`)
+	errorBody := []byte(`{"error": "An Error"}`)
+	mixedBody := append(successBody, errorBody...)
+
+	tests := map[*testCase]testResult {
+		// Basics
+		&testCase{-1, nil, errors.New("")} : testResult{"Error", 500},
+		&testCase{200, noBody, nil} : testResult{"OK", 200},
+		&testCase{500, noBody, nil} : testResult{"Error", 500},
+
+		// Parsing body
+		&testCase{200, successBody, nil} : testResult{"OK", 200},
+		&testCase{200, errorBody, nil} : testResult{"Error", 500},
+		&testCase{200, mixedBody, nil} : testResult{"Error", 500},
+	}
+
+	for test, key := range tests {
+		res, err := interpretPullImage(test.Code, bytes.NewBuffer(test.Body), test.Err)
+
+		assert.Equal(t, key.Status, res.Status)
+		assert.Equal(t, key.Code, res.Code)
+		assert.Equal(t, key.Status != "Error", err == nil)
+
+		if strings.Contains(string(test.Body), "error:") {
+			assert.Equal(t, "An Error", res.Message)
+		}
 	}
 }

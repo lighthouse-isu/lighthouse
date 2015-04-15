@@ -15,19 +15,20 @@
 package batch
 
 import (
-    "testing"
+	"testing"
 
-    "fmt"
-    "sort"
-    "strings"
-    "net/http"
-    "net/http/httptest"
-    "encoding/json"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"sort"
+	"strings"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 
-    "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/beacons"
+	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/beacons"
 )
 
 func setup() *auth.User {
@@ -52,10 +53,10 @@ func handlerFactory(code int) func(http.ResponseWriter, *http.Request) {
 func getUpdates(w *httptest.ResponseRecorder, includeStartAndEnd bool) []progressUpdate {
 	body := w.Body.String()
 	lines := strings.SplitAfter(body, "}")
-	lines = lines[:len(lines) - 1] // Remove trailing "" entry
+	lines = lines[:len(lines)-1] // Remove trailing "" entry
 
 	if !includeStartAndEnd {
-		lines = lines[1:len(lines) - 1]
+		lines = lines[1 : len(lines)-1]
 	}
 
 	updates := make([]progressUpdate, len(lines))
@@ -91,7 +92,7 @@ func Test_Do_Nothing(t *testing.T) {
 	assert.Equal(t, 200, w.Code)
 
 	updates := getUpdates(w, true)
-	
+
 	keyStart := progressUpdate{"Starting", "GET", "ENDPOINT", "TEST", 0, "", 0, 0}
 	keyComplete := progressUpdate{"Complete", "GET", "ENDPOINT", "TEST", 0, "", 0, 0}
 
@@ -102,7 +103,7 @@ func Test_Do_Nothing(t *testing.T) {
 func Test_Finalize(t *testing.T) {
 	w := httptest.NewRecorder()
 	Finalize(w)
-	
+
 	var update progressUpdate
 	json.Unmarshal(w.Body.Bytes(), &update)
 
@@ -126,7 +127,7 @@ func Test_Do_SingleInstance(t *testing.T) {
 	updates := getUpdates(w, false)
 
 	keyUpdate := progressUpdate{"OK", "GET", "", "", 200, insts[0], 0, 1}
-	
+
 	assert.Equal(t, keyUpdate, updates[0])
 }
 
@@ -181,11 +182,11 @@ func Test_Do_Multiple_Mixed(t *testing.T) {
 	defer teardown()
 
 	insts, servers := SetupServers(
-		handlerFactory(200), 
+		handlerFactory(200),
 		handlerFactory(500),
 		handlerFactory(300),
 	)
-	
+
 	defer ShutdownServers(servers)
 
 	w := httptest.NewRecorder()
@@ -238,4 +239,24 @@ func Test_Failures(t *testing.T) {
 	assert.Equal(t, insts[1], failures.instances[0])
 	assert.Equal(t, insts[2], failures.instances[1])
 	assert.Equal(t, insts[4], failures.instances[2])
+}
+
+func Test_DefaultInterpret_Long(t *testing.T) {
+	buf := make([]byte, 83)
+	for i := 0; i < 83; i += 1 {
+		buf[i] = byte('t')
+	}
+
+	key := make([]byte, 83)
+	for i := 0; i < 80; i += 1 {
+		key[i] = byte('t')
+	}
+	key[80] = byte('.')
+	key[81] = byte('.')
+	key[82] = byte('.')
+
+	res, err := interpretResponseDefault(200, bytes.NewBuffer(buf), nil)
+
+	assert.Nil(t, err)
+	assert.Equal(t, string(key), res.Message)
 }

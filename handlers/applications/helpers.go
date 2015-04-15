@@ -15,9 +15,11 @@
 package applications
 
 import (
+    "io"
 	"fmt"
 	"errors"
 	"net/http"
+    "encoding/json"
 
 	"github.com/lighthouse/lighthouse/auth"
 	"github.com/lighthouse/lighthouse/handlers/batch"
@@ -84,7 +86,7 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
         }
 
 		pullTarget := fmt.Sprintf("images/create?fromImage=%s", image)
-		err := deploy.Do("Pulling required image", "POST", nil, pullTarget, nil)
+		err := deploy.Do("Pulling required image", "POST", nil, pullTarget, interpretPullImage)
 
 		if err != nil {
 			return nil, false
@@ -309,7 +311,7 @@ func convertInstanceList(inter interface{}) ([]string, bool) {
 	return ret, true
 }
 
-func interpretDeleteContainer(code int, body []byte, err error) (batch.Result, error) {
+func interpretDeleteContainer(code int, body io.Reader, err error) (batch.Result, error) {
 	if err != nil {
 		return batch.Result{"Error", err.Error(), 500}, err
 	}
@@ -324,4 +326,34 @@ func interpretDeleteContainer(code int, body []byte, err error) (batch.Result, e
 	default:
 		return batch.Result{"Error", "", code}, errors.New(fmt.Sprintf("Instance request returned code %d", code))
 	}
+}
+
+func interpretPullImage(code int, body io.Reader, err error) (batch.Result, error) {
+    if err != nil {
+        return batch.Result{"Error", err.Error(), 500}, err
+    }
+
+    if code == 500 {
+        return batch.Result{"Error", "Docker internal error", 500}, errors.New("Image pull returned code 500")
+    }
+
+    var errorCheck = struct {
+        Error string `json:"error"`
+    }{}
+
+    decoder := json.NewDecoder(body)
+
+    for {
+        err := decoder.Decode(&errorCheck)
+
+        if err == io.EOF {
+            return batch.Result{"OK", "", code}, nil
+        } else if err != nil {
+            return batch.Result{"Error", err.Error(), 500}, err
+        }
+
+        if errorCheck.Error != "" {
+            return batch.Result{"Error", errorCheck.Error, 500}, errors.New(errorCheck.Error)
+        }
+    }
 }

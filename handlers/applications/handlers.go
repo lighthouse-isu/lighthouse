@@ -326,8 +326,6 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	restart := getBoolParamOrDefault(r, "restart", false)
 	user := auth.GetCurrentUser(r)
 
-	fmt.Println(user)
-
 	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
 	if err != nil {
 		return
@@ -401,11 +399,8 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(addList) > 0 && !willDeploy {
-		// A temporary app that only contains the added instances
-		appToDeploy = applicationData {
-			app.Id, app.CurrentDeployment, app.Name, addList,
-		}
-
+		// Only want to update the net instances
+		appToDeploy.Instances = addList
 		willDeploy = true
 	}
 
