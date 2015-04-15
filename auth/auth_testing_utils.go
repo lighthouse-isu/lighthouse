@@ -15,17 +15,17 @@
 package auth
 
 import (
-    "github.com/lighthouse/lighthouse/databases"
+	"github.com/lighthouse/lighthouse/databases"
 )
 
 func SetupCustomTestingTable(table *databases.MockTable) {
-    users = table
+	users = table
 }
 
 func SetupTestingTable() {
-    users = databases.CommonTestingTable(schema) // schema defined in users.go
+	users = databases.CommonTestingTable(schema) // schema defined in users.go
 }
 
 func TeardownTestingTable() {
-    users = nil
+	users = nil
 }

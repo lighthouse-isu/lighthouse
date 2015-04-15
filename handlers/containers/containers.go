@@ -15,69 +15,69 @@
 package containers
 
 import (
-    "github.com/lighthouse/lighthouse/databases"
+	"github.com/lighthouse/lighthouse/databases"
 )
 
 var containers databases.TableInterface
 
-var schema = databases.Schema {
-    "Id" : "serial primary key",
-    "AppId" : "integer REFERENCES applications (Id)",
-    "DockerInstance" : "text",
-    "Name" : "text",
+var schema = databases.Schema{
+	"Id":             "serial primary key",
+	"AppId":          "integer REFERENCES applications (Id)",
+	"DockerInstance": "text",
+	"Name":           "text",
 }
 
 type Container struct {
-    Id int64
-    AppId int64
-    DockerInstance string //TODO: normalize data (add IDs)
-    Name string
+	Id             int64
+	AppId          int64
+	DockerInstance string //TODO: normalize data (add IDs)
+	Name           string
 }
 
 func Init(reload bool) {
-    if containers == nil {
-        containers = databases.NewLockingTable(nil, "containers", schema)
-    }
+	if containers == nil {
+		containers = databases.NewLockingTable(nil, "containers", schema)
+	}
 
-    if reload {
-        containers.Reload()
-    }
+	if reload {
+		containers.Reload()
+	}
 }
 
 func CreateContainer(AppId int64, DockerInstance string, Name string) (int64, error) {
-    values := make(map[string]interface{}, len(schema)-1)
+	values := make(map[string]interface{}, len(schema)-1)
 
-    values["AppId"] = AppId
-    values["DockerInstance"] = DockerInstance
-    values["Name"] = Name
+	values["AppId"] = AppId
+	values["DockerInstance"] = DockerInstance
+	values["Name"] = Name
 
-    cols := []string{"Id"}
-    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
+	cols := []string{"Id"}
+	opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc: true}
 
-    var container Container
+	var container Container
 
-    err := containers.InsertReturn(values, cols, &opts, &container)
-    if err != nil {
-        return -1, err
-    }
+	err := containers.InsertReturn(values, cols, &opts, &container)
+	if err != nil {
+		return -1, err
+	}
 
-    return container.Id, err
+	return container.Id, err
 }
 
 func DeleteContainer(Id int64) (err error) {
-    where := databases.Filter{"Id" : Id}
-    return containers.Delete(where)
+	where := databases.Filter{"Id": Id}
+	return containers.Delete(where)
 }
 
 func GetContainerById(Id int64, container *Container) (err error) {
-    where := databases.Filter{"Id" : Id}
-    var columns []string
+	where := databases.Filter{"Id": Id}
+	var columns []string
 
-    for k, _ := range schema {
-        columns = append(columns, k)
-    }
+	for k, _ := range schema {
+		columns = append(columns, k)
+	}
 
-    err = containers.SelectRow(columns, where, nil, container)
+	err = containers.SelectRow(columns, where, nil, container)
 
-    return
+	return
 }
