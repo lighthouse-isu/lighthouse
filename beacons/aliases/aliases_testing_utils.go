@@ -15,13 +15,13 @@
 package aliases
 
 import (
-    "github.com/lighthouse/lighthouse/databases"
+	"github.com/lighthouse/lighthouse/databases"
 )
 
 func SetupTestingTable() {
-    aliases = databases.CommonTestingTable(schema)
+	aliases = databases.CommonTestingTable(schema)
 }
 
 func TeardownTestingTable() {
-    aliases = nil
+	aliases = nil
 }

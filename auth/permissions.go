@@ -24,7 +24,7 @@ const (
 
 func NewPermission() Permission {
 	return Permission{
-		"Beacons" : make(map[string]interface{}),
+		"Beacons": make(map[string]interface{}),
 	}
 }
 
@@ -40,7 +40,7 @@ func (this *User) convertPermissionsFromDB() {
 			} else {
 				permSet[perm] = level.(int)
 			}
-		} 
+		}
 	}
 }
 
@@ -79,13 +79,13 @@ func (this *User) SetAuthLevel(field, key string, level int) {
 }
 
 func (this *User) CanViewUser(otherUser *User) bool {
-    return this.Email == otherUser.Email || 
-    	this.AuthLevel > otherUser.AuthLevel
+	return this.Email == otherUser.Email ||
+		this.AuthLevel > otherUser.AuthLevel
 }
 
 func (this *User) CanModifyUser(otherUser *User) bool {
-    return this.Email == otherUser.Email || 
-    	this.AuthLevel > otherUser.AuthLevel
+	return this.Email == otherUser.Email ||
+		this.AuthLevel > otherUser.AuthLevel
 }
 
 func (this *User) CanAccessBeacon(beaconAddress string) bool {

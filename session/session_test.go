@@ -15,78 +15,78 @@
 package session
 
 import (
-    "testing"
-    "net/http"
+	"net/http"
+	"testing"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
-    sessionKey = "TEST_KEY"
+	sessionKey = "TEST_KEY"
 )
 
 func Test_GetValueOK_Found(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    s := GetSession(r, sessionKey)
-    s.Values["key"] = "right_value"
+	s := GetSession(r, sessionKey)
+	s.Values["key"] = "right_value"
 
-    value, ok := GetValueOK(r, sessionKey, "key")
+	value, ok := GetValueOK(r, sessionKey, "key")
 
-    assert.True(t, ok)
-    assert.Equal(t, "right_value", value.(string))
+	assert.True(t, ok)
+	assert.Equal(t, "right_value", value.(string))
 }
 
 func Test_GetValueOK_NotFound(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    _, ok := GetValueOK(r, sessionKey, "key")
+	_, ok := GetValueOK(r, sessionKey, "key")
 
-    assert.False(t, ok)
+	assert.False(t, ok)
 }
 
 func Test_GetValue_Valid(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    s := GetSession(r, sessionKey)
-    s.Values["key"] = "right_value"
+	s := GetSession(r, sessionKey)
+	s.Values["key"] = "right_value"
 
-    value := GetValueOrDefault(r, sessionKey, "key", "wrong_value").(string)
+	value := GetValueOrDefault(r, sessionKey, "key", "wrong_value").(string)
 
-    assert.Equal(t, "right_value", value)
+	assert.Equal(t, "right_value", value)
 }
 
 func Test_GetValue_Invalid(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    s := GetSession(r, sessionKey)
-    s.Values["key"] = "wrong_value"
+	s := GetSession(r, sessionKey)
+	s.Values["key"] = "wrong_value"
 
-    value := GetValueOrDefault(r, sessionKey, "unknown_key", "right_value").(string)
+	value := GetValueOrDefault(r, sessionKey, "unknown_key", "right_value").(string)
 
-    assert.Equal(t, "right_value", value)
+	assert.Equal(t, "right_value", value)
 }
 
 func Test_SetValue_New(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    SetValue(r, sessionKey, "key", "right_value")
+	SetValue(r, sessionKey, "key", "right_value")
 
-    s := GetSession(r, sessionKey)
-    value := s.Values["key"]
+	s := GetSession(r, sessionKey)
+	value := s.Values["key"]
 
-    assert.Equal(t, "right_value", value)
+	assert.Equal(t, "right_value", value)
 }
 
 func Test_SetValue_Overwrite(t *testing.T) {
-    r, _ := http.NewRequest("GET", "/", nil)
+	r, _ := http.NewRequest("GET", "/", nil)
 
-    s := GetSession(r, sessionKey)
-    s.Values["key"] = "wrong_value"
+	s := GetSession(r, sessionKey)
+	s.Values["key"] = "wrong_value"
 
-    SetValue(r, sessionKey, "key", "right_value")
+	SetValue(r, sessionKey, "key", "right_value")
 
-    value := s.Values["key"]
+	value := s.Values["key"]
 
-    assert.Equal(t, "right_value", value)
+	assert.Equal(t, "right_value", value)
 }

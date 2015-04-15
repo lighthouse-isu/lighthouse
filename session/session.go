@@ -15,39 +15,39 @@
 package session
 
 import (
-    "net/http"
+	"net/http"
 
-    "github.com/gorilla/sessions"
-    "github.com/gorilla/securecookie"
+	"github.com/gorilla/securecookie"
+	"github.com/gorilla/sessions"
 )
 
 var cookieStore = sessions.NewCookieStore(securecookie.GenerateRandomKey(32))
 
 func GetValueOK(r *http.Request, sessionKey string, key interface{}) (interface{}, bool) {
-    session := GetSession(r, sessionKey)
-    val, ok := session.Values[key]
-    return val, ok
+	session := GetSession(r, sessionKey)
+	val, ok := session.Values[key]
+	return val, ok
 }
 
 func GetValueOrDefault(r *http.Request, sessionKey string, key, def interface{}) interface{} {
-    session := GetSession(r, sessionKey)
-    val, ok := session.Values[key]
-    if ok {
-        return val
-    }
-    return def
+	session := GetSession(r, sessionKey)
+	val, ok := session.Values[key]
+	if ok {
+		return val
+	}
+	return def
 }
 
 func SetValue(r *http.Request, sessionKey string, key, value interface{}) {
-    session := GetSession(r, sessionKey)
-    session.Values[key] = value
+	session := GetSession(r, sessionKey)
+	session.Values[key] = value
 }
 
 func Save(sessionKey string, r *http.Request, w http.ResponseWriter) {
-    GetSession(r, sessionKey).Save(r, w)
+	GetSession(r, sessionKey).Save(r, w)
 }
 
 func GetSession(r *http.Request, sessionKey string) *sessions.Session {
-    session, _ := cookieStore.Get(r, sessionKey)
-    return session
+	session, _ := cookieStore.Get(r, sessionKey)
+	return session
 }
