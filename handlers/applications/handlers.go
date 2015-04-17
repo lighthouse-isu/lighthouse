@@ -164,12 +164,12 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
 
         if deployErr == NotEnoughParametersError {
         	err = NotEnoughParametersError
+        	return
         }
-        
-        return
+    } else {
+    	auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
     }
 
-    auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
     batch.Finalize(w)
 }
 
