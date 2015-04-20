@@ -15,17 +15,17 @@
 package containers
 
 import (
-	"github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 func SetupCustomTestingTable(table *databases.MockTable) {
-	containers = table
+    containers = table
 }
 
 func SetupTestingTable() {
-	containers = databases.CommonTestingTable(schema) // schema defined in containers.go
+    containers = databases.CommonTestingTable(schema) // schema defined in containers.go
 }
 
 func TeardownTestingTable() {
-	containers = nil
+    containers = nil
 }

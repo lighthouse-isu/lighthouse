@@ -15,82 +15,82 @@
 package applications
 
 import (
-	"github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 var applications databases.TableInterface
 
-var schema = databases.Schema{
-	"Id":   "serial primary key",
-	"Name": "text",
+var schema = databases.Schema {
+    "Id" : "serial primary key",
+    "Name" : "text",
 }
 
 type applicationData struct {
-	Id   int64
-	Name string
+    Id int64
+    Name string
 }
 
 func Init(reload bool) {
-	if applications == nil {
-		applications = databases.NewLockingTable(nil, "applications", schema)
-	}
+    if applications == nil {
+        applications = databases.NewLockingTable(nil, "applications", schema)
+    }
 
-	if reload {
-		applications.Reload()
-	}
+    if reload {
+        applications.Reload()
+    }
 }
 
 func CreateApplication(Name string) (int64, error) {
-	values := make(map[string]interface{}, len(schema)-1)
+    values := make(map[string]interface{}, len(schema)-1)
 
-	//    values["Id"] = "DEFAULT"
-	values["Name"] = Name
+//    values["Id"] = "DEFAULT"
+    values["Name"] = Name
 
-	cols := []string{"Id"}
-	opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc: true}
+    cols := []string{"Id"}
+    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
 
-	var app applicationData
+    var app applicationData
 
-	err := applications.InsertReturn(values, cols, &opts, &app)
-	if err != nil {
-		return -1, err
-	}
+    err := applications.InsertReturn(values, cols, &opts, &app)
+    if err != nil {
+        return -1, err
+    }
 
-	return app.Id, err
+    return app.Id, err
 }
 
 func GetApplicationName(Id int64) (string, error) {
-	var application applicationData
-	where := databases.Filter{"Id": Id}
-	var columns []string
+    var application applicationData
+    where := databases.Filter{"Id" : Id}
+    var columns []string
 
-	for k, _ := range schema {
-		columns = append(columns, k)
-	}
+    for k, _ := range schema {
+        columns = append(columns, k)
+    }
 
-	err := applications.SelectRow(columns, where, nil, &application)
+    err := applications.SelectRow(columns, where, nil, &application)
 
-	if err != nil {
-		return "", err
-	}
+    if err != nil {
+        return "", err
+    }
 
-	return application.Name, err
+    return application.Name, err
 }
 
 func GetApplicationId(Name string) (int64, error) {
-	var application applicationData
-	where := databases.Filter{"Name": Name}
-	var columns []string
+    var application applicationData
+    where := databases.Filter{"Name" : Name}
+    var columns []string
 
-	for k, _ := range schema {
-		columns = append(columns, k)
-	}
+    for k, _ := range schema {
+        columns = append(columns, k)
+    }
 
-	err := applications.SelectRow(columns, where, nil, &application)
+    err := applications.SelectRow(columns, where, nil, &application)
 
-	if err != nil {
-		return -1, err
-	}
+    if err != nil {
+        return -1, err
+    }
 
-	return application.Id, err
+    return application.Id, err
 }
