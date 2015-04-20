@@ -15,231 +15,245 @@
 package databases
 
 import (
-	"errors"
-	"reflect"
-	"sort"
-	"sync"
+    "sync"
+    "sort"
+    "errors"
+    "reflect"
 
-	"database/sql"
+    "database/sql"
 )
 
 var (
-	EmptyKeyError     = errors.New("databases: given key was empty string")
-	NoUpdateError     = errors.New("databases: no rows updated")
-	UnknownError      = errors.New("databases: unknown error")
-	KeyNotFoundError  = errors.New("databases: given key not found")
-	NoRowsError       = errors.New("databases: result was empty")
-	DuplicateKeyError = errors.New("databases: key already exists")
+    EmptyKeyError = errors.New("databases: given key was empty string")
+    NoUpdateError = errors.New("databases: no rows updated")
+    UnknownError = errors.New("databases: unknown error")
+    KeyNotFoundError = errors.New("databases: given key not found")
+    NoRowsError = errors.New("databases: result was empty")
+    DuplicateKeyError = errors.New("databases: key already exists")
 )
 
 type Table struct {
-	db       DBInterface
-	table    string
-	schema   Schema
-	compiler Compiler
-	mutex    *sync.Mutex
+    db DBInterface
+    table string
+    schema Schema
+    compiler Compiler
+    mutex *sync.Mutex
 }
 
 type SelectOptions struct {
-	Distinct bool
-	Top      int
-	OrderBy  []string
-	Desc     bool
+    Distinct bool
+    Top int
+    OrderBy []string
+    Desc bool
 }
 
-type Schema map[string]string
 type Filter map[string]interface{}
 
+/*
+    All compilers must support the following types:
+
+    Schema Type | Go Type
+    ------------+-----------------------
+    text        | string
+    integer     | int
+    bigint      | int64
+    boolean     | bool
+    datetime    | time.Time
+    json        | map[string]interface{}
+    serial      | int64
+*/
+type Schema map[string]string
+
 var (
-	defaultConnection DBInterface
+    defaultConnection DBInterface
 )
 
 func SetDefaultConnection(conn DBInterface) {
-	defaultConnection = conn
+    defaultConnection = conn
 }
 
 func DefaultConnection() DBInterface {
-	return defaultConnection
+    return defaultConnection
 }
 
 func DefaultSelectOptions() *SelectOptions {
-	return &SelectOptions{}
+    return &SelectOptions{}
 }
 
 func NewTable(db DBInterface, table string, schema Schema) *Table {
-	if db == nil {
-		db = defaultConnection
-	}
+    if db == nil {
+        db = defaultConnection
+    }
 
-	if len(schema) == 0 {
-		panic("No schema given to database")
-	}
+    if len(schema) == 0 {
+        panic("No schema given to database")
+    }
 
-	this := &Table{db, table, schema, db.Compiler(schema), nil}
-	return this
+    this := &Table{db, table, schema, db.Compiler(schema), nil}
+    return this
 }
 
 func NewLockingTable(db DBInterface, table string, schema Schema) *Table {
-	var this *Table
-	this = NewTable(db, table, schema)
-	this.mutex = &sync.Mutex{}
-	return this
+    var this *Table
+    this = NewTable(db, table, schema)
+    this.mutex = &sync.Mutex{}
+    return this
 }
 
 func (this *Table) Reload() {
-	this.drop()
-	this.init()
+    this.drop()
+    this.init()
 }
 
 func (this *Table) init() {
-	exec := this.compiler.CompileCreate(this.table)
-	this.db.Exec(exec)
+    exec := this.compiler.CompileCreate(this.table)
+    this.db.Exec(exec)
 }
 
 func (this *Table) drop() {
-	exec := this.compiler.CompileDrop(this.table)
-	this.db.Exec(exec)
+    exec := this.compiler.CompileDrop(this.table)
+    this.db.Exec(exec)
 }
 
 func (this *Table) allColumns() []string {
-	columns := make([]string, len(this.schema))
+    columns := make([]string, len(this.schema))
 
-	i := 0
-	for col, _ := range this.schema {
-		columns[i] = col
-		i += 1
-	}
+    i := 0
+    for col, _ := range this.schema {
+        columns[i] = col
+        i += 1
+    }
 
-	sort.Strings(columns)
-	return columns
+    sort.Strings(columns)
+    return columns
 }
 
 func (this *Table) Insert(values map[string]interface{}) error {
-	if this.mutex != nil {
-		this.mutex.Lock()
-		defer this.mutex.Unlock()
-	}
+    if this.mutex != nil {
+        this.mutex.Lock()
+        defer this.mutex.Unlock()
+    }
 
-	query, queryVals := this.compiler.CompileInsert(this.table, values)
-	res, err := this.db.Exec(query, queryVals...)
+    query, queryVals := this.compiler.CompileInsert(this.table, values)
+    res, err := this.db.Exec(query, queryVals...)
 
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        return err
+    }
 
-	cnt, err := res.RowsAffected()
-	if err == nil && cnt < 1 {
-		return NoUpdateError
-	}
+    cnt, err := res.RowsAffected()
+    if err == nil && cnt < 1 {
+        return NoUpdateError
+    }
 
-	return nil
+    return nil
 }
 
 func (this *Table) InsertReturn(values map[string]interface{}, cols []string, opts *SelectOptions, dest interface{}) error {
-	if this.mutex == nil {
-		panic("Only LockingTables can perform InsertReturns")
-	}
+    if this.mutex == nil {
+        panic("Only LockingTables can perform InsertReturns")
+    }
 
-	this.mutex.Lock()
-	defer this.mutex.Unlock()
+    this.mutex.Lock()
+    defer this.mutex.Unlock()
 
-	query, queryVals := this.compiler.CompileInsert(this.table, values)
-	res, err := this.db.Exec(query, queryVals...)
+    query, queryVals := this.compiler.CompileInsert(this.table, values)
+    res, err := this.db.Exec(query, queryVals...)
 
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        return err
+    }
 
-	cnt, err := res.RowsAffected()
-	if err == nil && cnt < 1 {
-		return NoUpdateError
-	}
+    cnt, err := res.RowsAffected()
+    if err == nil && cnt < 1 {
+        return NoUpdateError
+    }
 
-	return this.SelectRow(cols, values, opts, dest)
+    return this.SelectRow(cols, values, opts, dest)
 }
 
-func (this *Table) Delete(where Filter) error {
+func (this *Table) Delete(where Filter) (error) {
 
-	query, vals := this.compiler.CompileDelete(this.table, where)
-	res, err := this.db.Exec(query, vals...)
+    query, vals := this.compiler.CompileDelete(this.table, where)
+    res, err := this.db.Exec(query, vals...)
 
-	if err == nil {
-		cnt, err := res.RowsAffected()
+    if err == nil {
+        cnt, err := res.RowsAffected()
 
-		if err == nil && cnt < 1 {
-			return NoUpdateError
-		}
-	}
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
 
-	return err
+    return err
 }
 
-func (this *Table) Update(to map[string]interface{}, where Filter) error {
-	query, vals := this.compiler.CompileUpdate(this.table, to, where)
-	res, err := this.db.Exec(query, vals...)
+func (this *Table) Update(to map[string]interface{}, where Filter) (error) {
+    query, vals := this.compiler.CompileUpdate(this.table, to, where)
+    res, err := this.db.Exec(query, vals...)
 
-	if err == nil {
-		cnt, err := res.RowsAffected()
+    if err == nil {
+        cnt, err := res.RowsAffected()
 
-		if err == nil && cnt < 1 {
-			return NoUpdateError
-		}
-	}
+        if err == nil && cnt < 1 {
+            return NoUpdateError
+        }
+    }
 
-	return err
+    return err
 }
 
 func (this *Table) SelectRow(columns []string, where Filter, opts *SelectOptions, dest interface{}) error {
-	if len(columns) == 0 {
-		columns = this.allColumns()
-	}
+    if len(columns) == 0 {
+        columns = this.allColumns()
+    }
 
-	query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
-	row := this.db.QueryRow(query, queryVals...)
+    query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
+    row := this.db.QueryRow(query, queryVals...)
 
-	if row == nil {
-		return UnknownError
-	}
+    if row == nil {
+        return UnknownError
+    }
 
-	values := make([]interface{}, len(columns))
-	valuePtrs := make([]interface{}, len(values))
+    values := make([]interface{}, len(columns))
+    valuePtrs := make([]interface{}, len(values))
 
-	for i := 0; i < len(values); i++ {
-		valuePtrs[i] = &values[i]
-	}
+    for i := 0; i < len(values); i++ {
+        valuePtrs[i] = &values[i]
+    }
 
-	err := row.Scan(valuePtrs...)
+    err := row.Scan(valuePtrs...)
 
-	if err == sql.ErrNoRows {
-		return NoRowsError
-	}
+    if err == sql.ErrNoRows {
+        return NoRowsError
+    }
 
-	if err != nil {
-		return err
-	}
+    if err != nil {
+        return err
+    }
 
-	rv := reflect.ValueOf(dest).Elem()
-	for i, colName := range columns {
-		setVal := this.compiler.ConvertOutput(values[i], colName)
-		if setVal != nil {
-			rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
-		}
-	}
+    rv := reflect.ValueOf(dest).Elem()
+    for i, colName := range columns {
+        setVal := this.compiler.ConvertOutput(values[i], colName)
+        if setVal != nil {
+            rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+        }
+    }
 
-	return err
+    return err
 }
 
 func (this *Table) Select(columns []string, where Filter, opts *SelectOptions) (ScannerInterface, error) {
-	if len(columns) == 0 {
-		columns = this.allColumns()
-	}
+    if len(columns) == 0 {
+        columns = this.allColumns()
+    }
 
-	query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
-	rows, err := this.db.Query(query, queryVals...)
+    query, queryVals := this.compiler.CompileSelect(this.table, columns, where, opts)
+    rows, err := this.db.Query(query, queryVals...)
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
-	return &Scanner{*rows, this, columns}, nil
+    return &Scanner{*rows, this, columns}, nil
 }

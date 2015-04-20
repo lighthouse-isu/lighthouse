@@ -24,7 +24,8 @@ const (
 
 func NewPermission() Permission {
 	return Permission{
-		"Beacons": make(map[string]interface{}),
+		"Beacons" : make(map[string]interface{}),
+		"Applications" : make(map[string]interface{}),
 	}
 }
 
@@ -40,7 +41,7 @@ func (this *User) convertPermissionsFromDB() {
 			} else {
 				permSet[perm] = level.(int)
 			}
-		}
+		} 
 	}
 }
 
@@ -79,13 +80,13 @@ func (this *User) SetAuthLevel(field, key string, level int) {
 }
 
 func (this *User) CanViewUser(otherUser *User) bool {
-	return this.Email == otherUser.Email ||
-		this.AuthLevel > otherUser.AuthLevel
+    return this.Email == otherUser.Email || 
+    	this.AuthLevel > otherUser.AuthLevel
 }
 
 func (this *User) CanModifyUser(otherUser *User) bool {
-	return this.Email == otherUser.Email ||
-		this.AuthLevel > otherUser.AuthLevel
+    return this.Email == otherUser.Email || 
+    	this.AuthLevel > otherUser.AuthLevel
 }
 
 func (this *User) CanAccessBeacon(beaconAddress string) bool {
@@ -96,4 +97,32 @@ func (this *User) CanAccessBeacon(beaconAddress string) bool {
 func (this *User) CanModifyBeacon(beaconAddress string) bool {
 	level := this.GetAuthLevel("Beacons", beaconAddress)
 	return level >= ModifyAuthLevel
+}
+
+func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
+    user.SetAuthLevel("Beacons", beacon, level)
+    
+    to := map[string]interface{}{"Permissions" : user.Permissions}
+    where := map[string]interface{}{"Email" : user.Email}
+
+    return users.Update(to, where)
+}
+
+func (this *User) CanAccessApplication(name string) bool {
+	level := this.GetAuthLevel("Applications", name)
+	return level >= AccessAuthLevel
+}
+
+func (this *User) CanModifyApplication(name string) bool {
+	level := this.GetAuthLevel("Applications", name)
+	return level >= ModifyAuthLevel
+}
+
+func SetUserApplicationAuthLevel(user *User, name string, level int) error {
+    user.SetAuthLevel("Applications", name, level)
+    
+    to := map[string]interface{}{"Permissions" : user.Permissions}
+    where := map[string]interface{}{"Email" : user.Email}
+
+    return users.Update(to, where)
 }
