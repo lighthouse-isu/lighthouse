@@ -34,10 +34,10 @@ func Test_CreateContainer(t *testing.T) {
     assert.Equal(t, 1, len(table.Database),
         "Database should have new element after CreateContainer")
 
-    assert.Equal(t, 0, table.Database[0][table.Schema["Id"]],
+    assert.Equal(t, int64(0), table.Database[0][table.Schema["Id"]],
         "CreateContainer should auto-increment Id")
 
-    assert.Equal(t, 1, table.Database[0][table.Schema["AppId"]],
+    assert.Equal(t, int64(1), table.Database[0][table.Schema["AppId"]],
         "CreateContainer should set AppId")
 
     assert.Equal(t, "localhost", table.Database[0][table.Schema["DockerInstance"]],
