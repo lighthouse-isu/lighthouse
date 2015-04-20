@@ -20,79 +20,69 @@ import (
 )
 
 type MockScanner struct {
-	Rows        [][]interface{}
-	ColumnNames []string
-	Index       int
+	Rows [][]interface{}
+    ColumnNames []string
+    Index int
 
-	MockClose   func() error
-	MockColumns func() ([]string, error)
-	MockErr     func() error
-	MockNext    func() bool
-	MockScan    func(interface{}) error
+    MockClose   func()(error)
+    MockColumns func()([]string, error)
+    MockErr     func()(error)
+    MockNext 	func()(bool)
+    MockScan 	func(interface{})(error)
 }
 
-func (t *MockScanner) Close() (e error) {
-	if t.MockClose != nil {
-		return t.MockClose()
-	}
-	return
+func (t *MockScanner) Close()(e error) {
+    if t.MockClose != nil { return t.MockClose() }
+    return
 }
 
-func (t *MockScanner) Columns() (s []string, e error) {
-	if t.MockColumns != nil {
-		return t.MockColumns()
-	}
-	return
+func (t *MockScanner) Columns()(s []string, e error) {
+    if t.MockColumns != nil { return t.MockColumns() }
+    return
 }
 
-func (t *MockScanner) Err() (e error) {
-	if t.MockErr != nil {
-		return t.MockErr()
-	}
-	return
+func (t *MockScanner) Err()(e error) {
+    if t.MockErr != nil { return t.MockErr() }
+    return
 }
 
-func (t *MockScanner) Next() (b bool) {
-	if t.MockNext != nil {
-		return t.MockNext()
-	}
-	return
+func (t *MockScanner) Next()(b bool) {
+    if t.MockNext != nil { return t.MockNext() }
+    return
 }
 
-func (t *MockScanner) Scan(dest interface{}) (e error) {
-	if t.MockScan != nil {
-		return t.MockScan(dest)
-	}
-	return
+func (t *MockScanner) Scan(dest interface{})(e error) {
+    if t.MockScan != nil { return t.MockScan(dest) }
+    return
 }
 
 func CommonTestingScanner(rows [][]interface{}, columns []string) *MockScanner {
-	scanner := &MockScanner{Rows: rows, ColumnNames: columns, Index: -1}
+    scanner := &MockScanner{Rows: rows, ColumnNames: columns, Index: -1}
 
-	scanner.MockNext = func() bool {
-		scanner.Index += 1
-		return scanner.Index < len(scanner.Rows)
-	}
+    scanner.MockNext = func()(bool) {
+    	scanner.Index += 1
+        return scanner.Index < len(scanner.Rows)
+    }
 
-	scanner.MockColumns = func() ([]string, error) {
-		return scanner.ColumnNames, nil
-	}
+    scanner.MockColumns = func()([]string, error) {
+        return scanner.ColumnNames, nil
+    }
 
-	scanner.MockScan = func(dest interface{}) error {
+    scanner.MockScan = func(dest interface{})(error) {
 
-		if scanner.Index >= len(scanner.Rows) {
-			return errors.New("out of bounds")
-		}
+    	if scanner.Index >= len(scanner.Rows) {
+    		return errors.New("out of bounds")
+    	}
 
-		row := scanner.Rows[scanner.Index]
+        row := scanner.Rows[scanner.Index]
 
-		rv := reflect.ValueOf(dest).Elem()
-		for i, colName := range scanner.ColumnNames {
-			rv.FieldByName(colName).Set(reflect.ValueOf(row[i]))
-		}
+	    rv := reflect.ValueOf(dest).Elem()
+	    for i, colName := range scanner.ColumnNames {
+            rv.FieldByName(colName).Set(reflect.ValueOf(row[i]))
+	    }
 
-		return nil
-	}
+	    return nil
+    }
 
-	return scanner
+    return scanner
 }

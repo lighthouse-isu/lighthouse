@@ -15,159 +15,160 @@
 package auth
 
 import (
-	"fmt"
-	"io/ioutil"
-	"net/http"
-	"os"
-	"strings"
+    "os"
+    "fmt"
+    "strings"
+    "io/ioutil"
+    "net/http"
 
-	"crypto/rand"
-	"crypto/sha512"
+    "crypto/sha512"
+    "crypto/rand"
 
-	"encoding/hex"
-	"encoding/json"
+    "encoding/hex"
+    "encoding/json"
 
-	"github.com/gorilla/mux"
-
-	"github.com/lighthouse/lighthouse/databases"
-	"github.com/lighthouse/lighthouse/handlers"
-	"github.com/lighthouse/lighthouse/session"
+    "github.com/gorilla/mux"
+    
+    "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
 )
+
 
 var SECRET_HASH_KEY string
 
 func Init(reload bool) {
-	if users == nil { // defined in users.go
-		users = databases.NewTable(databases.DefaultConnection(), "users", schema)
-	}
+    if users == nil { // defined in users.go
+        users = databases.NewTable(databases.DefaultConnection(), "users", schema)
+    }
 
-	config := LoadAuthConfig()
-	SECRET_HASH_KEY = config.SecretKey
+    config := LoadAuthConfig()
+    SECRET_HASH_KEY = config.SecretKey
 
-	if reload {
-		users.Reload()
-		for _, admin := range config.Admins {
-			admin.convertPermissionsFromDB()
+    if reload {
+        users.Reload()
+        for _, admin := range config.Admins {
+            admin.convertPermissionsFromDB()
 
-			admin.Salt = GenerateSalt()
-			admin.Password = SaltPassword(admin.Password, admin.Salt)
+            admin.Salt = GenerateSalt()
+            admin.Password = SaltPassword(admin.Password, admin.Salt)
 
-			addUser(admin)
-		}
-	}
+            addUser(admin)
+        }
+    }
 }
 
 func SaltPassword(password, salt string) string {
-	key := fmt.Sprintf("%s:%s:%s", password, salt, SECRET_HASH_KEY)
+    key := fmt.Sprintf("%s:%s:%s", password, salt, SECRET_HASH_KEY)
 
-	sha := sha512.New()
-	sha.Write([]byte(key))
+    sha := sha512.New()
+    sha.Write([]byte(key))
 
-	return hex.EncodeToString(sha.Sum(nil))
+    return hex.EncodeToString(sha.Sum(nil))
 }
 
 func GenerateSalt() string {
-	salt := make([]byte, 16)
-	rand.Read(salt)
-	return hex.EncodeToString(salt)
+    salt := make([]byte, 16)
+    rand.Read(salt)
+    return hex.EncodeToString(salt)
 }
 
 type LoginForm struct {
-	Email    string
-	Password string
+    Email string
+    Password string
 }
 
 type AuthConfig struct {
-	Admins    []User
-	SecretKey string
+    Admins []User
+    SecretKey string
 }
 
-func LoadAuthConfig() *AuthConfig {
-	var fileName string
-	if _, err := os.Stat("./config/auth.json.dev"); !os.IsNotExist(err) {
-		fileName = "./config/auth.json.dev"
-	} else if _, err := os.Stat("/config/auth.json"); !os.IsNotExist(err) {
-		fileName = "/config/auth.json"
-	} else {
-		fileName = "./config/auth.json"
-	}
-	configFile, _ := ioutil.ReadFile(fileName)
+func LoadAuthConfig() *AuthConfig{
+    var fileName string
+    if _, err := os.Stat("./config/auth.json.dev"); !os.IsNotExist(err) {
+        fileName = "./config/auth.json.dev"
+    } else if _, err := os.Stat("/config/auth.json"); !os.IsNotExist(err) {
+        fileName = "/config/auth.json"
+    } else {
+        fileName = "./config/auth.json"
+    }
+    configFile, _ := ioutil.ReadFile(fileName)
 
-	var config AuthConfig
-	json.Unmarshal(configFile, &config)
-	return &config
+    var config AuthConfig
+    json.Unmarshal(configFile, &config)
+    return &config
 }
 
 func AuthMiddleware(h http.Handler, ignorePaths []string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, "/static") {
-			h.ServeHTTP(w, r)
-			return
-		}
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        if strings.HasPrefix(r.URL.Path, "/static") {
+            h.ServeHTTP(w, r)
+            return
+        }
 
-		for _, path := range ignorePaths {
-			if path == r.URL.Path {
-				h.ServeHTTP(w, r)
-				return
-			}
-		}
+        for _, path := range ignorePaths {
+            if path == r.URL.Path {
+                h.ServeHTTP(w, r)
+                return
+            }
+        }
 
-		if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
-			h.ServeHTTP(w, r)
-			return
-		}
+        if session.GetValueOrDefault(r, "auth", "logged_in", false).(bool) {
+            h.ServeHTTP(w, r)
+            return
+        }
 
-		if strings.HasPrefix(r.URL.Path, "/api") {
-			handlers.WriteError(w, 401, "auth", "not logged in")
-		} else {
-			http.Redirect(w, r, "/", http.StatusFound)
-		}
-	})
+        if strings.HasPrefix(r.URL.Path, "/api") {
+            handlers.WriteError(w, 401, "auth", "not logged in")
+        } else {
+            http.Redirect(w, r, "/", http.StatusFound)
+        }
+    })
 }
 
 func Handle(r *mux.Router) {
-	r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		loginForm := &LoginForm{}
-		body, _ := ioutil.ReadAll(r.Body)
-		json.Unmarshal(body, &loginForm)
+    r.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
+        loginForm := &LoginForm{}
+        body, _ := ioutil.ReadAll(r.Body)
+        json.Unmarshal(body, &loginForm)
 
-		var userOK, passwordOK bool
+        var userOK, passwordOK bool
 
-		user, err := GetUser(loginForm.Email)
-		userOK = err == nil
+        user, err := GetUser(loginForm.Email)
+        userOK = err == nil
 
-		if userOK {
-			password := SaltPassword(loginForm.Password, user.Salt)
-			passwordOK = password == user.Password
+        if userOK {
+            password := SaltPassword(loginForm.Password, user.Salt)
+            passwordOK = password == user.Password
 
-			session.SetValue(r, "auth", "logged_in", passwordOK)
-		}
+            session.SetValue(r, "auth", "logged_in", passwordOK)
+        }
 
-		if passwordOK {
-			session.SetValue(r, "auth", "email", user.Email)
-		}
+        if passwordOK {
+            session.SetValue(r, "auth", "email", user.Email)
+        }
 
-		session.Save("auth", r, w)
+        session.Save("auth", r, w)
 
-		if userOK && passwordOK {
-			w.WriteHeader(200)
-		} else {
-			handlers.WriteError(w, 401, "auth", "email or password incorrect")
-		}
-	}).Methods("POST")
+        if userOK && passwordOK {
+            w.WriteHeader(200)
+        } else {
+            handlers.WriteError(w, 401, "auth", "email or password incorrect")
+        }
+    }).Methods("POST")
 
-	r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
-		session.SetValue(r, "auth", "logged_in", false)
-		session.Save("auth", r, w)
-	}).Methods("GET")
+    r.HandleFunc("/logout", func(w http.ResponseWriter, r *http.Request) {
+        session.SetValue(r, "auth", "logged_in", false)
+        session.Save("auth", r, w)
+    }).Methods("GET")
 
-	userRoute := r.PathPrefix("/users").Subrouter()
+    userRoute := r.PathPrefix("/users").Subrouter()
 
-	userRoute.HandleFunc("/list", handleListUsers).Methods("GET")
+    userRoute.HandleFunc("/list", handleListUsers).Methods("GET")
 
-	userRoute.HandleFunc("/{Email}", handleGetUser).Methods("GET")
+    userRoute.HandleFunc("/{Email}", handleGetUser).Methods("GET")
 
-	userRoute.HandleFunc("/{Email}", handleUpdateUser).Methods("PUT")
+    userRoute.HandleFunc("/{Email}", handleUpdateUser).Methods("PUT")
 
-	userRoute.HandleFunc("/create", handleCreateUser).Methods("POST")
+    userRoute.HandleFunc("/create", handleCreateUser).Methods("POST")
 }
