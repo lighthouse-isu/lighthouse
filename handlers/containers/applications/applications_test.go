@@ -30,7 +30,7 @@ func Test_CreateApplication(t *testing.T) {
     assert.Equal(t, 1, len(table.Database),
         "Database should have new element after CreateApplication")
 
-    assert.Equal(t, 0, table.Database[0][table.Schema["Id"]],
+    assert.Equal(t, int64(0), table.Database[0][table.Schema["Id"]],
         "CreateApplication should auto-increment Id")
 
     assert.Equal(t, "Test", table.Database[0][table.Schema["Name"]],
