@@ -15,28 +15,28 @@
 package beacons
 
 import (
-	"testing"
+    "testing"
 
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"net/http/httptest"
+    "fmt"
+    "encoding/json"
+    "net/http"
+    "net/http/httptest"
+    "bytes"
 
-	"github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/assert"
 
-	"github.com/gorilla/mux"
+    "github.com/gorilla/mux"
 
-	"github.com/lighthouse/lighthouse/auth"
-	"github.com/lighthouse/lighthouse/beacons/aliases"
-	"github.com/lighthouse/lighthouse/databases"
-	"github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
 )
 
 func runHandlerTest(
-	method, endpoint string,
-	body interface{},
-	route string,
+	method, endpoint string, 
+	body interface{}, 
+	route string, 
 	handler func(w http.ResponseWriter, r *http.Request),
 ) *httptest.ResponseRecorder {
 
@@ -53,9 +53,9 @@ func runHandlerTest(
 
 	m := mux.NewRouter()
 	m.HandleFunc(route, handler)
-	m.ServeHTTP(w, r)
+    m.ServeHTTP(w, r)
 
-	return w
+    return w
 }
 
 func setupBeaconPermissions(beacon string, level int) {
@@ -85,17 +85,17 @@ func Test_HandleUpdateBeaconToken(t *testing.T) {
 	defer teardown()
 
 	beacons.Insert(map[string]interface{}{
-		"Address": "ADDR", "Token": "TOKEN",
+		"Address" : "ADDR", "Token" : "TOKEN",
 	})
 
 	setupBeaconPermissions("ADDR", 2)
 	w := runHandlerTest("PUT", "/ADDR", "TOKEN_PASS", "/{Endpoint}", handleUpdateBeaconToken)
 
-	assert.Equal(t, 200, w.Code)
+    assert.Equal(t, 200, w.Code)
 
-	var data beaconData
-	beacons.SelectRow(nil, nil, nil, &data)
-	assert.Equal(t, "TOKEN_PASS", data.Token)
+    var data beaconData
+    beacons.SelectRow(nil, nil, nil, &data)
+    assert.Equal(t, "TOKEN_PASS", data.Token)
 }
 
 func Test_HandleUpdateBeaconToken_Invalid(t *testing.T) {
@@ -131,21 +131,21 @@ func Test_HandleBeaconCreate(t *testing.T) {
 		fmt.Fprint(w, "[]")
 	}
 
-	defer setupServer(&vms).Close()
+    defer setupServer(&vms).Close()
 
-	body := map[string]interface{}{
-		"Address": "localhost:8080", "Alias": "ALIAS_PASS", "Token": "TOKEN_PASS",
-	}
+    body := map[string]interface{} {
+    	"Address" : "localhost:8080", "Alias" : "ALIAS_PASS", "Token" : "TOKEN_PASS",
+    }
 	w := runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 
-	assert.Equal(t, 200, w.Code)
+    assert.Equal(t, 200, w.Code)
 
-	alias, _ := aliases.GetAliasOf("localhost:8080")
-	assert.Equal(t, "ALIAS_PASS", alias)
+    alias, _ := aliases.GetAliasOf("localhost:8080")
+    assert.Equal(t, "ALIAS_PASS", alias)
 
-	var beacon beaconData
-	beacons.SelectRow(nil, nil, nil, &beacon)
-	assert.Equal(t, "localhost:8080", beacon.Address)
+    var beacon beaconData
+    beacons.SelectRow(nil, nil, nil, &beacon)
+    assert.Equal(t, "localhost:8080", beacon.Address)
 	assert.Equal(t, "TOKEN_PASS", beacon.Token)
 }
 
@@ -161,17 +161,17 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 	assert.Equal(t, 400, w.Code)
 
 	// No address
-	body = map[string]interface{}{"Address": "", "Alias": "ALIAS", "Token": ""}
+	body = map[string]interface{} {"Address" : "", "Alias" : "ALIAS", "Token" : ""}
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 400, w.Code)
 
 	// No alias
-	body = map[string]interface{}{"Address": "ADDR", "Alias": "", "Token": ""}
+	body = map[string]interface{} {"Address" : "ADDR", "Alias" : "", "Token" : ""}
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 400, w.Code)
 
 	// VMs request fails
-	body = map[string]interface{}{"Address": "ADDR", "Alias": "ALIAS", "Token": ""}
+	body = map[string]interface{} {"Address" : "ADDR", "Alias" : "ALIAS", "Token" : ""}
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 500, w.Code)
 	var beacon beaconData
@@ -179,11 +179,11 @@ func Test_HandleBeaconCreate_Invalid(t *testing.T) {
 	assert.Equal(t, databases.NoRowsError, err)
 
 	// Duplicate beacon
-	body = map[string]interface{}{"Address": "localhost:8080", "Token": ""}
+	body = map[string]interface{} {"Address" : "localhost:8080", "Token" : ""}
 	beacons.Insert(body)
 	body["Alias"] = "ALIAS"
 
-	defer setupServer(nil).Close()
+    defer setupServer(nil).Close()
 
 	w = runHandlerTest("POST", "/", body, "/", handleBeaconCreate)
 	assert.Equal(t, 400, w.Code)
@@ -195,7 +195,7 @@ func Test_HandleListBeacons(t *testing.T) {
 
 	// This is just a wrapper from getBeaconsList which is covered in helpers_test.go
 	w := runHandlerTest("GET", "/", nil, "/", handleListBeacons)
-	assert.Equal(t, 200, w.Code)
+    assert.Equal(t, 200, w.Code)
 }
 
 func Test_HandleListInstances(t *testing.T) {
@@ -204,5 +204,5 @@ func Test_HandleListInstances(t *testing.T) {
 
 	// This is just a wrapper from getInstancesList which is covered in helpers_test.go
 	w := runHandlerTest("GET", "/ADDR", nil, "/{Endpoint}", handleListInstances)
-	assert.Equal(t, 200, w.Code)
+    assert.Equal(t, 200, w.Code)
 }

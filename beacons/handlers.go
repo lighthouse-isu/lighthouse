@@ -15,189 +15,189 @@
 package beacons
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
+    "strconv"
 	"net/http"
-	"strconv"
+	"encoding/json"
+	"io/ioutil"
 
-	"github.com/gorilla/mux"
+    "github.com/gorilla/mux"
 
-	"github.com/lighthouse/lighthouse/auth"
-	"github.com/lighthouse/lighthouse/beacons/aliases"
-	"github.com/lighthouse/lighthouse/databases"
-	"github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/beacons/aliases"
+    "github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/handlers"
 )
 
 func getAddressOf(alias string) string {
-	address, err := aliases.GetAddressOf(alias)
-	if err != nil {
-		return alias
-	}
-	return address
+    address, err := aliases.GetAddressOf(alias)
+    if err != nil {
+        return alias
+    }
+    return address
 }
 
 func writeResponse(err error, w http.ResponseWriter) {
-	switch err {
-	case nil:
-		w.WriteHeader(http.StatusOK)
+    switch err {
+        case nil:
+            w.WriteHeader(http.StatusOK)
 
-	// Errors outside of package
-	case databases.KeyNotFoundError, databases.DuplicateKeyError,
-		databases.NoUpdateError, databases.EmptyKeyError:
-		handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
+        // Errors outside of package
+        case databases.KeyNotFoundError, databases.DuplicateKeyError,
+                databases.NoUpdateError, databases.EmptyKeyError:
+            handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
-	case TokenPermissionError:
-		handlers.WriteError(w, http.StatusForbidden, "beacons", err.Error())
+        case TokenPermissionError:
+            handlers.WriteError(w, http.StatusForbidden, "beacons", err.Error())
 
-	case NotEnoughParametersError, DuplicateBeaconError:
-		handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
+        case NotEnoughParametersError, DuplicateBeaconError:
+            handlers.WriteError(w, http.StatusBadRequest, "beacons", err.Error())
 
-	default:
-		handlers.WriteError(w, http.StatusInternalServerError, "beacons", err.Error())
-	}
+        default:
+            handlers.WriteError(w, http.StatusInternalServerError, "beacons", err.Error())
+    }    
 }
 
 func handleUpdateBeaconToken(w http.ResponseWriter, r *http.Request) {
-	var err error = nil
-	defer func() { writeResponse(err, w) }()
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
 
-	params, ok := handlers.GetEndpointParams(r, []string{"Beacon"})
+    params, ok := handlers.GetEndpointParams(r, []string{"Beacon"})
 
-	if ok == false || len(params) < 1 || params["Beacon"] == "" {
-		err = NotEnoughParametersError
-		return
-	}
+    if ok == false || len(params) < 1 || params["Beacon"] == "" {
+        err = NotEnoughParametersError
+        return
+    }
 
-	beacon := getAddressOf(params["Beacon"])
+    beacon := getAddressOf(params["Beacon"])
 
-	user := auth.GetCurrentUser(r)
+    user := auth.GetCurrentUser(r)
 
-	if !user.CanModifyBeacon(beacon) {
-		err = TokenPermissionError
-		return
-	}
+    if !user.CanModifyBeacon(beacon) {
+        err = TokenPermissionError
+        return
+    }
 
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return
-	}
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        return
+    }
 
-	var token string
+    var token string
 
-	err = json.Unmarshal(reqBody, &token)
-	if err != nil {
-		err = NotEnoughParametersError
-		return
-	}
+    err = json.Unmarshal(reqBody, &token)
+    if err != nil {
+        err = NotEnoughParametersError
+        return
+    }
 
-	to := map[string]interface{}{"Token": token}
-	where := map[string]interface{}{"Address": beacon}
-	err = beacons.Update(to, where)
+    to := map[string]interface{}{"Token" : token}
+    where := map[string]interface{}{"Address" : beacon}
+    err = beacons.Update(to, where)
 
-	return
+    return
 }
 
 func handleBeaconCreate(w http.ResponseWriter, r *http.Request) {
-	var err error = nil
-	defer func() { writeResponse(err, w) }()
+    var err error = nil
+    defer func() { writeResponse(err, w) }()
 
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		return
-	}
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        return
+    }
 
-	var beaconInfo struct {
-		Address string
-		Token   string
-		Alias   string
-	}
+    var beaconInfo struct {
+        Address string
+        Token string
+        Alias string
+    }
 
-	err = json.Unmarshal(reqBody, &beaconInfo)
-	if err != nil {
-		err = NotEnoughParametersError
-		return
-	}
+    err = json.Unmarshal(reqBody, &beaconInfo)
+    if err != nil {
+        err = NotEnoughParametersError
+        return
+    }
 
-	if beaconInfo.Address == "" || beaconInfo.Alias == "" {
-		err = NotEnoughParametersError
-		return
-	}
+    if beaconInfo.Address == "" || beaconInfo.Alias == "" {
+        err = NotEnoughParametersError
+        return
+    }
 
-	beacon := beaconData{beaconInfo.Address, beaconInfo.Token}
+    beacon := beaconData{beaconInfo.Address, beaconInfo.Token}
 
-	currentUser := auth.GetCurrentUser(r)
-	auth.SetUserBeaconAuthLevel(currentUser, beacon.Address, auth.OwnerAuthLevel)
+    currentUser := auth.GetCurrentUser(r)
+    auth.SetUserBeaconAuthLevel(currentUser, beacon.Address, auth.OwnerAuthLevel)
 
-	err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
-	if err != nil {
-		return
-	}
+    err = aliases.AddAlias(beaconInfo.Alias, beaconInfo.Address)
+    if err != nil {
+        return
+    }
 
-	err = addBeacon(beacon)
-	if err == databases.DuplicateKeyError {
-		err = DuplicateBeaconError
-	}
+    err = addBeacon(beacon)
+    if err == databases.DuplicateKeyError {
+        err = DuplicateBeaconError
+    }
 
-	if err != nil {
-		aliases.RemoveAlias(beaconInfo.Address)
-		return
-	}
+    if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
+        return
+    }
 
-	err = refreshVMListOf(beacon)
-	if err != nil {
-		aliases.RemoveAlias(beaconInfo.Address)
-		removeBeacon(beacon.Address)
-		return
-	}
+    err = refreshVMListOf(beacon)
+    if err != nil {
+        aliases.RemoveAlias(beaconInfo.Address)
+        removeBeacon(beacon.Address)
+        return
+    }
 
-	return
+    return
 }
 
 func handleListBeacons(w http.ResponseWriter, r *http.Request) {
-	user := auth.GetCurrentUser(r)
-	beacons, err := getBeaconsList(user)
+    user := auth.GetCurrentUser(r)
+    beacons, err := getBeaconsList(user)
 
-	var output []byte
-	if err == nil {
-		output, err = json.Marshal(beacons)
-	}
+    var output []byte
+    if err == nil {
+        output, err = json.Marshal(beacons)
+    } 
 
-	if err != nil {
-		writeResponse(err, w)
-	} else {
-		fmt.Fprint(w, string(output))
-	}
+    if err != nil {
+        writeResponse(err, w) 
+    } else {
+        fmt.Fprint(w, string(output))
+    }
 }
 
 func handleListInstances(w http.ResponseWriter, r *http.Request) {
-	beacon := mux.Vars(r)["Beacon"]
-	user := auth.GetCurrentUser(r)
+    beacon := mux.Vars(r)["Beacon"]
+    user := auth.GetCurrentUser(r)
 
-	refreshParam := r.URL.Query().Get("refresh")
-	refresh, ok := strconv.ParseBool(refreshParam)
+    refreshParam := r.URL.Query().Get("refresh")
+    refresh, ok := strconv.ParseBool(refreshParam)
 
-	instances, err := getInstancesList(beacon, user, refresh && (ok == nil))
-	var output []byte
+    instances, err := getInstancesList(beacon, user, refresh && (ok == nil))
+    var output []byte
 
-	if err == nil {
-		output, err = json.Marshal(instances)
-	}
+    if err == nil {
+        output, err = json.Marshal(instances)
+    } 
 
-	if err != nil {
-		writeResponse(err, w)
-	} else {
-		fmt.Fprint(w, string(output))
-	}
+    if err != nil {
+        writeResponse(err, w) 
+    } else {
+        fmt.Fprint(w, string(output))
+    }
 }
 
 func handleRefreshBeacon(w http.ResponseWriter, r *http.Request) {
-	beacon := mux.Vars(r)["Beacon"]
-	data, err := getBeaconData(beacon)
+    beacon := mux.Vars(r)["Beacon"]
+    data, err := getBeaconData(beacon)
 
-	if err == nil {
-		err = refreshVMListOf(data)
-	}
+    if err == nil {
+        err = refreshVMListOf(data)
+    }
 
-	writeResponse(err, w)
+    writeResponse(err, w) 
 }

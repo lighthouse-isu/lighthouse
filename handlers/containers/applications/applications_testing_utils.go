@@ -15,17 +15,17 @@
 package applications
 
 import (
-	"github.com/lighthouse/lighthouse/databases"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 func SetupCustomTestingTable(table *databases.MockTable) {
-	applications = table
+    applications = table
 }
 
 func SetupTestingTable() {
-	applications = databases.CommonTestingTable(schema) // schema defined in applications.go
+    applications = databases.CommonTestingTable(schema) // schema defined in applications.go
 }
 
 func TeardownTestingTable() {
-	applications = nil
+    applications = nil
 }
