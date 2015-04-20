@@ -75,10 +75,10 @@ func Test_GetContainerById(t *testing.T) {
     var container Container
     GetContainerById(containerId, &container)
 
-    assert.Equal(t, 0, container.Id,
+    assert.Equal(t, int64(0), container.Id,
         "Container ID should match ID in database.")
 
-    assert.Equal(t, 1, container.AppId,
+    assert.Equal(t, int64(1), container.AppId,
         "Container application should match application in database.")
 
     assert.Equal(t, "localhost", container.DockerInstance,
@@ -103,13 +103,13 @@ func Test_containerCreate_Passed(t *testing.T) {
     ret := containerCreate(info)
 
     assert.Nil(t, ret)
-    assert.Equal(t, 0, info.HandlerData["ContainerCreate"])
+    assert.Equal(t, int64(0), info.HandlerData["ContainerCreate"])
 
     var container Container
     err := GetContainerById(info.HandlerData["ContainerCreate"].(int64), &container)
     assert.Nil(t, err)
-    assert.Equal(t, 0, container.Id)
-    assert.Equal(t, 0, container.AppId)
+    assert.Equal(t, int64(0), container.Id)
+    assert.Equal(t, int64(0), container.AppId)
     assert.Equal(t, "HOST_PASSED", container.DockerInstance)
     assert.Equal(t, "NAME_PASSED", container.Name)
 
