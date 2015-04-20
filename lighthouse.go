@@ -26,8 +26,7 @@ import (
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/handlers/docker"
-    "github.com/lighthouse/lighthouse/handlers/containers"
-    "github.com/lighthouse/lighthouse/handlers/containers/applications"
+    "github.com/lighthouse/lighthouse/handlers/applications"
 	"github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/databases"
     "github.com/lighthouse/lighthouse/databases/postgres"
@@ -87,7 +86,6 @@ func init() {
     auth.Init(*databasesReload)
     beacons.Init(*databasesReload)
     aliases.Init(*databasesReload)
-    containers.Init(*databasesReload)
     applications.Init(*databasesReload)
 }
 
@@ -108,6 +106,7 @@ func main() {
     docker.Handle(versionRouter.PathPrefix("/d").Subrouter())
     beacons.Handle(versionRouter.PathPrefix("/beacons").Subrouter())
     aliases.Handle(versionRouter.PathPrefix("/aliases").Subrouter())
+    applications.Handle(versionRouter.PathPrefix("/applications").Subrouter())
     auth.Handle(versionRouter)
 
     ignoreURLs := []string{

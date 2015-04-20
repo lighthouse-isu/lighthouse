@@ -120,11 +120,7 @@ func (this *postgresCompiler) CompileCreate(table string) string {
     var cols []string
 
     for col, colType := range this.schema {
-        // JSON type doesn't have an equality operator which breaks queries
-        if strings.Contains(colType, "json") {
-            colType = "text"
-        }
-
+        colType = convertDatatype(colType)
         cols = append(cols, fmt.Sprintf("%s %s", col, colType))
     }
 
@@ -297,7 +293,7 @@ func (this *postgresCompiler) CompileSelect(table string, cols []string, where d
 
             buffer.WriteString(fmt.Sprintf("%s = ($%d)", col, i + 1))
 
-            whereVals[i] = val
+            whereVals[i] = this.ConvertInput(val, col)
         }
     }
 
@@ -348,9 +344,28 @@ func (this *postgresCompiler) ConvertOutput(orig interface{}, col string) interf
         return read
     }
 
-    if strings.Contains(colType, "int") {
+    if strings.Contains(colType, "bigint") {
+        return orig.(int64)
+    }
+
+    if strings.Contains(colType, "integer") {
         return int(orig.(int64))
     }
     
     return orig
+}
+
+func convertDatatype(colType string) string {
+    conversions := map[string]string {
+        "json" : "text",
+        "datetime" : "timestamp",
+    }
+
+    for basicType, postgresType := range conversions {
+        if strings.Contains(colType, basicType) {
+            return strings.Replace(colType, basicType, postgresType, 1)
+        }
+    }
+
+    return colType
 }
