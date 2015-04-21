@@ -15,45 +15,45 @@
 package databases
 
 import (
-    "reflect"
-    "database/sql"
+	"database/sql"
+	"reflect"
 )
 
 type Scanner struct {
 	sql.Rows
-    table *Table
-    columns []string
+	table   *Table
+	columns []string
 }
 
 func (this *Scanner) Next() bool {
-    if !this.Rows.Next() {
-        this.Rows.Close()
-        return false
-    }
+	if !this.Rows.Next() {
+		this.Rows.Close()
+		return false
+	}
 
-    return true
+	return true
 }
 
 func (this *Scanner) Scan(dest interface{}) error {
 	row := make([]interface{}, len(this.columns))
-    rowPtrs := make([]interface{}, len(this.columns))
+	rowPtrs := make([]interface{}, len(this.columns))
 
-    for i := 0; i < len(row); i++ {
-        rowPtrs[i] = &row[i]
-    }
+	for i := 0; i < len(row); i++ {
+		rowPtrs[i] = &row[i]
+	}
 
 	err := this.Rows.Scan(rowPtrs...)
-    if err != nil {
-        return err
-    }
+	if err != nil {
+		return err
+	}
 
-    rv := reflect.ValueOf(dest).Elem()
-    for i, colName := range this.columns {
-        setVal := this.table.compiler.ConvertOutput(row[i], colName)
-        if setVal != nil {
-            rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
-        }
-    }
+	rv := reflect.ValueOf(dest).Elem()
+	for i, colName := range this.columns {
+		setVal := this.table.compiler.ConvertOutput(row[i], colName)
+		if setVal != nil {
+			rv.FieldByName(colName).Set(reflect.ValueOf(setVal))
+		}
+	}
 
-    return nil
+	return nil
 }

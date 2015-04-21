@@ -15,32 +15,32 @@
 package applications
 
 import (
-    "testing"
+	"testing"
 
-    "fmt"
-    "time"
-    "bytes"
-    "errors"
-    "strings"
-    "net/http"
-    "net/http/httptest"
+	"bytes"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"time"
 
-    "github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/assert"
 
-    "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/handlers/batch"
+	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/databases"
+	"github.com/lighthouse/lighthouse/handlers/batch"
 )
 
 func Test_AddApplication_New(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
-	keyApp := applicationData {
-		Id : 0,
-		Name : "TestApp", 
-		CurrentDeployment : -1,
-		Instances : []string{"instance"},
+	keyApp := applicationData{
+		Id:                0,
+		Name:              "TestApp",
+		CurrentDeployment: -1,
+		Instances:         []string{"instance"},
 	}
 
 	retApp, err := addApplication("TestApp", []string{"instance"})
@@ -55,14 +55,14 @@ func Test_AddApplication_New(t *testing.T) {
 }
 
 func Test_AddApplication_Dup(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
-	app := applicationData {
-		Id : 0,
-		Name : "TestApp",
-		CurrentDeployment : -1,
-		Instances : []string{"instance"},
+	app := applicationData{
+		Id:                0,
+		Name:              "TestApp",
+		CurrentDeployment: -1,
+		Instances:         []string{"instance"},
 	}
 
 	applications.Insert(makeDatabaseEntryFor(app))
@@ -73,14 +73,14 @@ func Test_AddApplication_Dup(t *testing.T) {
 }
 
 func Test_AddDeployment(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
-	key := deploymentData {
-		Id : 0,
-		AppId : 314, 
-		Command : map[string]interface{}{"Image" : "image"},
-		Creator : "user",
+	key := deploymentData{
+		Id:      0,
+		AppId:   314,
+		Command: map[string]interface{}{"Image": "image"},
+		Creator: "user",
 	}
 
 	retDeploy, err := addDeployment(key.AppId, key.Command, key.Creator)
@@ -101,12 +101,12 @@ func Test_RemoveApplication(t *testing.T) {
 	err := errors.New("TestError")
 
 	applications = &databases.MockTable{
-		MockDelete: func(where databases.Filter)(error) {
+		MockDelete: func(where databases.Filter) error {
 			assert.Equal(t, int64(42), where["Id"])
 			return err
 		},
 	}
-	
+
 	retErr := removeApplication(42)
 	assert.Equal(t, err, retErr)
 
@@ -117,12 +117,12 @@ func Test_RemoveDeployment(t *testing.T) {
 	err := errors.New("TestError")
 
 	deployments = &databases.MockTable{
-		MockDelete: func(where databases.Filter)(error) {
+		MockDelete: func(where databases.Filter) error {
 			assert.Equal(t, int64(42), where["Id"])
 			return err
 		},
 	}
-	
+
 	retErr := removeDeployment(42)
 	assert.Equal(t, err, retErr)
 
@@ -130,32 +130,32 @@ func Test_RemoveDeployment(t *testing.T) {
 }
 
 func Test_StartStopApplication_Normal(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
-    auth.CreateUser("email", "", "")
-    user, _ := auth.GetUser("email")
+	auth.CreateUser("email", "", "")
+	user, _ := auth.GetUser("email")
 
 	type testCase struct {
-		Id int64 // Valid app is Id 0
+		Id            int64 // Valid app is Id 0
 		ControlStatus int
-		TestFunc func(*auth.User, int64, http.ResponseWriter)error
+		TestFunc      func(*auth.User, int64, http.ResponseWriter) error
 	}
 
 	type testResult struct {
 		FinalState bool
-		AppError error // Only if applications make the error, not batch
-		Requests []string
+		AppError   error // Only if applications make the error, not batch
+		Requests   []string
 	}
 
-	tests := map[*testCase]testResult {
-		&testCase{0, 200, startApplication} : testResult{true,  nil, []string{"start"}},
-		&testCase{1, -1,  startApplication} : testResult{false, UnknownApplicationError, []string{}},
-		&testCase{0, 500, startApplication} : testResult{false, nil, []string{"start", "stop"}},
+	tests := map[*testCase]testResult{
+		&testCase{0, 200, startApplication}: testResult{true, nil, []string{"start"}},
+		&testCase{1, -1, startApplication}:  testResult{false, UnknownApplicationError, []string{}},
+		&testCase{0, 500, startApplication}: testResult{false, nil, []string{"start", "stop"}},
 
-		&testCase{0, 200, stopApplication}  : testResult{false, nil, []string{"stop"}},
-		&testCase{1, -1,  stopApplication}  : testResult{true,  UnknownApplicationError, []string{}},
-		&testCase{0, 500, stopApplication}  : testResult{true,  nil, []string{"stop", "start"}},
+		&testCase{0, 200, stopApplication}: testResult{false, nil, []string{"stop"}},
+		&testCase{1, -1, stopApplication}:  testResult{true, UnknownApplicationError, []string{}},
+		&testCase{0, 500, stopApplication}: testResult{true, nil, []string{"stop", "start"}},
 	}
 
 	for c, res := range tests {
@@ -171,7 +171,7 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 
 		SetupTestingTable()
 		insts, servers := batch.SetupServers(testInst, controlInst)
-		app := applicationData{Id : 0, Instances : insts}
+		app := applicationData{Id: 0, Instances: insts}
 		applications.Insert(makeDatabaseEntryFor(app))
 
 		err := c.TestFunc(user, c.Id, httptest.NewRecorder())
@@ -192,11 +192,11 @@ func Test_StartStopApplication_Normal(t *testing.T) {
 }
 
 func Test_SetApplicationStateTo_Unknown(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
 	auth.CreateUser("email", "", "")
-    user, _ := auth.GetUser("email")
+	user, _ := auth.GetUser("email")
 
 	_, servers := batch.SetupServers(nil)
 	defer batch.ShutdownServers(servers)
@@ -206,14 +206,14 @@ func Test_SetApplicationStateTo_Unknown(t *testing.T) {
 }
 
 func Test_GetApplicationList(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
 	auth.CreateUser("email", "", "")
 	user, _ := auth.GetUser("email")
 
 	acc, _ := addApplication("ACC", []string{"Insts1"})
-			  addApplication("BAD", []string{"Insts2"})
+	addApplication("BAD", []string{"Insts2"})
 	own, _ := addApplication("OWN", []string{"Insts3"})
 	mod, _ := addApplication("MOD", []string{"Insts4"})
 
@@ -230,15 +230,15 @@ func Test_GetApplicationList(t *testing.T) {
 }
 
 func Test_GetApplicationHistory_OK(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
 	auth.CreateUser("email", "", "")
 	user, _ := auth.GetUser("email")
 
 	app, _ := addApplication("APP", nil)
 
-	cmd := map[string]interface{}{"Image" : "test"}
+	cmd := map[string]interface{}{"Image": "test"}
 	ds := make([]deploymentData, 3)
 
 	ds[0], _ = addDeployment(0, cmd, "otheruser")
@@ -246,11 +246,11 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 	ds[2], _ = addDeployment(0, cmd, "otheruser")
 	addDeployment(1, cmd, "email")
 
-	tests := map[int][]deploymentData {
-		-1 : []deploymentData{},
-		auth.AccessAuthLevel : ds,
-		auth.ModifyAuthLevel : ds,
-		auth.OwnerAuthLevel : ds,
+	tests := map[int][]deploymentData{
+		-1:                   []deploymentData{},
+		auth.AccessAuthLevel: ds,
+		auth.ModifyAuthLevel: ds,
+		auth.OwnerAuthLevel:  ds,
 	}
 
 	for level, key := range tests {
@@ -261,9 +261,9 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 		assert.Equal(t, len(key), len(list))
 
 		for i, deploy := range key {
-			assert.Equal(t, deploy.Id, list[2 - i]["Id"])
-			assert.Equal(t, deploy.Creator, list[2 - i]["Creator"])
-			assert.Equal(t, deploy.Date, list[2 - i]["Date"])
+			assert.Equal(t, deploy.Id, list[2-i]["Id"])
+			assert.Equal(t, deploy.Creator, list[2-i]["Creator"])
+			assert.Equal(t, deploy.Date, list[2-i]["Date"])
 		}
 	}
 }
@@ -273,34 +273,34 @@ func Test_GetRevertDeployment(t *testing.T) {
 	defer TeardownTestingTable()
 
 	type testCase struct {
-		App int64
+		App    int64
 		Target int64
 	}
 
 	type testResult struct {
 		Deploy deploymentData
-		Error error
+		Error  error
 	}
 
-	cmd := map[string]interface{}{"Image" : "test"}
+	cmd := map[string]interface{}{"Image": "test"}
 	d0, _ := addDeployment(0, cmd, "")
 	d1, _ := addDeployment(0, cmd, "")
-		     addDeployment(1, cmd, "")
+	addDeployment(1, cmd, "")
 	d3, _ := addDeployment(0, cmd, "")
 	dFail := deploymentData{}
 
 	tests := map[testCase]testResult{
-		testCase{0, 0} : testResult{d0, nil},
-		testCase{0, 1} : testResult{d1, nil},
-		testCase{0, 2} : testResult{dFail, DeploymentMismatchError},
-		testCase{0, 3} : testResult{d3, nil},
-		testCase{0, 4} : testResult{dFail, UnknownDeploymentError},
-		testCase{1, 0} : testResult{dFail, DeploymentMismatchError},
+		testCase{0, 0}: testResult{d0, nil},
+		testCase{0, 1}: testResult{d1, nil},
+		testCase{0, 2}: testResult{dFail, DeploymentMismatchError},
+		testCase{0, 3}: testResult{d3, nil},
+		testCase{0, 4}: testResult{dFail, UnknownDeploymentError},
+		testCase{1, 0}: testResult{dFail, DeploymentMismatchError},
 
-		testCase{0, -1} : testResult{d1, nil},
-		testCase{0, -2} : testResult{d0, nil},
-		testCase{0, -3} : testResult{dFail, NotEnoughDeploymentsError},
-		testCase{2, -1} : testResult{dFail, UnknownApplicationError},
+		testCase{0, -1}: testResult{d1, nil},
+		testCase{0, -2}: testResult{d0, nil},
+		testCase{0, -3}: testResult{dFail, NotEnoughDeploymentsError},
+		testCase{2, -1}: testResult{dFail, UnknownApplicationError},
 	}
 
 	for c, r := range tests {
@@ -311,60 +311,60 @@ func Test_GetRevertDeployment(t *testing.T) {
 }
 
 func Test_DoDeployment(t *testing.T) {
-    setup()
-    defer teardown()
+	setup()
+	defer teardown()
 
 	auth.CreateUser("email", "", "")
 	user, _ := auth.GetUser("email")
-	
+
 	type testCase struct {
 		Deploy *deploymentData
-		Start bool
-		Pull bool
+		Start  bool
+		Pull   bool
 	}
 
 	type testResult struct {
-		Requests []int 
-		FailureStep int 
+		Requests    []int
+		FailureStep int
 	}
 
 	type Request struct {
 		Method string
-		Dest string
+		Dest   string
 	}
 
-	requestList := []Request {
-		Request{"POST",   "/images/create?fromImage=test"},               // 0
-		Request{"POST",   "/containers/create?name=TestApp_tmp"},         // 1
-		Request{"DELETE", "/containers/TestApp_tmp?force=true"},          // 2
-		Request{"DELETE", "/containers/TestApp?force=true"},              // 3
-		Request{"POST",   "/containers/TestApp_tmp/rename?name=TestApp"}, // 4
-		Request{"POST",   "/containers/TestApp/start"},                   // 5
+	requestList := []Request{
+		Request{"POST", "/images/create?fromImage=test"},               // 0
+		Request{"POST", "/containers/create?name=TestApp_tmp"},         // 1
+		Request{"DELETE", "/containers/TestApp_tmp?force=true"},        // 2
+		Request{"DELETE", "/containers/TestApp?force=true"},            // 3
+		Request{"POST", "/containers/TestApp_tmp/rename?name=TestApp"}, // 4
+		Request{"POST", "/containers/TestApp/start"},                   // 5
 	}
 
-	cmd := map[string]interface{}{"Image" : "test"}
+	cmd := map[string]interface{}{"Image": "test"}
 	dNormal := &deploymentData{42, 0, cmd, "email", time.Now()}
 	dNoImage := &deploymentData{42, 0, map[string]interface{}{}, "email", time.Now()}
 
 	tests := map[testCase]testResult{
 		// Success cases
-		testCase{dNormal, true, true}   : testResult{[]int{0, 1, 3, 4, 5}, -1}, 
-		testCase{dNormal, false, true}  : testResult{[]int{0, 1, 3, 4}, -1},
-		testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, -1}, 
-		testCase{dNormal, false, false} : testResult{[]int{1, 3, 4}, -1}, 
+		testCase{dNormal, true, true}:   testResult{[]int{0, 1, 3, 4, 5}, -1},
+		testCase{dNormal, false, true}:  testResult{[]int{0, 1, 3, 4}, -1},
+		testCase{dNormal, true, false}:  testResult{[]int{1, 3, 4, 5}, -1},
+		testCase{dNormal, false, false}: testResult{[]int{1, 3, 4}, -1},
 
 		// Failure cases
-		testCase{dNoImage, false, true} : testResult{[]int{}, 0}, // Bad command
-		testCase{dNormal, false, true}  : testResult{[]int{0}, 0}, // Bad pull
-		testCase{dNormal, false, false} : testResult{[]int{1, 2}, 0}, // Bad create
-		testCase{dNormal, false, false} : testResult{[]int{1, 3}, 1}, // Bad delete
-		testCase{dNormal, false, false} : testResult{[]int{1, 3, 4, 2}, 2}, // Bad rename
-		testCase{dNormal, true, false}  : testResult{[]int{1, 3, 4, 5}, 3}, // Bad start
+		testCase{dNoImage, false, true}: testResult{[]int{}, 0},           // Bad command
+		testCase{dNormal, false, true}:  testResult{[]int{0}, 0},          // Bad pull
+		testCase{dNormal, false, false}: testResult{[]int{1, 2}, 0},       // Bad create
+		testCase{dNormal, false, false}: testResult{[]int{1, 3}, 1},       // Bad delete
+		testCase{dNormal, false, false}: testResult{[]int{1, 3, 4, 2}, 2}, // Bad rename
+		testCase{dNormal, true, false}:  testResult{[]int{1, 3, 4, 5}, 3}, // Bad start
 	}
 
 	for c, res := range tests {
 		SetupTestingTable()
-		
+
 		errorMsg := fmt.Sprintf("Test case %v with result %v", c, res)
 
 		i := 0
@@ -383,7 +383,7 @@ func Test_DoDeployment(t *testing.T) {
 				w.WriteHeader(500)
 			} else {
 				w.WriteHeader(200)
-			}			
+			}
 
 			i += 1
 		}
@@ -418,14 +418,14 @@ func Test_ConvertInstanceList(t *testing.T) {
 		List interface{}
 	}
 
-	tests := map[*testCase][]string {
-		&testCase{nil} : []string{},
-		&testCase{"WRONG TYPE"} : nil,
-		&testCase{[]string{"Test"}} : []string{"Test"},
-		&testCase{[]string{}} : []string{},
-		&testCase{[]interface{}{"Test"}} : []string{"Test"},
-		&testCase{[]interface{}{}} : []string{},
-		&testCase{[]interface{}{"OK", 2,}} : nil,
+	tests := map[*testCase][]string{
+		&testCase{nil}:                    []string{},
+		&testCase{"WRONG TYPE"}:           nil,
+		&testCase{[]string{"Test"}}:       []string{"Test"},
+		&testCase{[]string{}}:             []string{},
+		&testCase{[]interface{}{"Test"}}:  []string{"Test"},
+		&testCase{[]interface{}{}}:        []string{},
+		&testCase{[]interface{}{"OK", 2}}: nil,
 	}
 
 	for test, key := range tests {
@@ -439,22 +439,22 @@ func Test_ConvertInstanceList(t *testing.T) {
 func Test_InterpretDeleteContainer(t *testing.T) {
 	type testCase struct {
 		Code int
-		Err error
+		Err  error
 	}
 
 	type testResult struct {
 		Status string
-		Code int
+		Code   int
 	}
 
-	tests := map[testCase]testResult {
-		testCase{-1, errors.New("")} : testResult{"Error", 500},
-		testCase{200, nil} : testResult{"OK", 200},
-		testCase{299, nil} : testResult{"OK", 299},
-		testCase{404, nil} : testResult{"Warning", 404},
-		testCase{300, nil} : testResult{"Error", 300},
-		testCase{400, nil} : testResult{"Error", 400},
-		testCase{500, nil} : testResult{"Error", 500},
+	tests := map[testCase]testResult{
+		testCase{-1, errors.New("")}: testResult{"Error", 500},
+		testCase{200, nil}:           testResult{"OK", 200},
+		testCase{299, nil}:           testResult{"OK", 299},
+		testCase{404, nil}:           testResult{"Warning", 404},
+		testCase{300, nil}:           testResult{"Error", 300},
+		testCase{400, nil}:           testResult{"Error", 400},
+		testCase{500, nil}:           testResult{"Error", 500},
 	}
 
 	for test, key := range tests {
@@ -470,12 +470,12 @@ func Test_InterpretPullImage(t *testing.T) {
 	type testCase struct {
 		Code int
 		Body []byte
-		Err error
+		Err  error
 	}
 
 	type testResult struct {
 		Status string
-		Code int
+		Code   int
 	}
 
 	noBody := []byte(``)
@@ -483,16 +483,16 @@ func Test_InterpretPullImage(t *testing.T) {
 	errorBody := []byte(`{"error": "An Error"}`)
 	mixedBody := append(successBody, errorBody...)
 
-	tests := map[*testCase]testResult {
+	tests := map[*testCase]testResult{
 		// Basics
-		&testCase{-1, nil, errors.New("")} : testResult{"Error", 500},
-		&testCase{200, noBody, nil} : testResult{"OK", 200},
-		&testCase{500, noBody, nil} : testResult{"Error", 500},
+		&testCase{-1, nil, errors.New("")}: testResult{"Error", 500},
+		&testCase{200, noBody, nil}:        testResult{"OK", 200},
+		&testCase{500, noBody, nil}:        testResult{"Error", 500},
 
 		// Parsing body
-		&testCase{200, successBody, nil} : testResult{"OK", 200},
-		&testCase{200, errorBody, nil} : testResult{"Error", 500},
-		&testCase{200, mixedBody, nil} : testResult{"Error", 500},
+		&testCase{200, successBody, nil}: testResult{"OK", 200},
+		&testCase{200, errorBody, nil}:   testResult{"Error", 500},
+		&testCase{200, mixedBody, nil}:   testResult{"Error", 500},
 	}
 
 	for test, key := range tests {

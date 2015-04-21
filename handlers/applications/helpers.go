@@ -15,57 +15,57 @@
 package applications
 
 import (
-    "io"
-	"fmt"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
-    "encoding/json"
 
 	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/databases"
 	"github.com/lighthouse/lighthouse/handlers/batch"
-    "github.com/lighthouse/lighthouse/databases"
 )
 
 func addApplication(name string, instances []string) (applicationData, error) {
-	values := map[string]interface{} {
-        "Name" : name,
-        "Instances" : instances,
-        "CurrentDeployment" : int64(-1),
-    }
+	values := map[string]interface{}{
+		"Name":              name,
+		"Instances":         instances,
+		"CurrentDeployment": int64(-1),
+	}
 
-    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc: true}
+	opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc: true}
 
-    var app applicationData
-    err := applications.InsertReturn(values, nil, &opts, &app)
+	var app applicationData
+	err := applications.InsertReturn(values, nil, &opts, &app)
 
-    app.Instances, _ = convertInstanceList(app.Instances)
+	app.Instances, _ = convertInstanceList(app.Instances)
 
-    return app, err
+	return app, err
 }
 
 func addDeployment(app int64, cmd interface{}, email string) (deploymentData, error) {
-	values := map[string]interface{} {
-        "AppId" : app,
-        "Command" : cmd,
-        "Creator" : email,
-    }
+	values := map[string]interface{}{
+		"AppId":   app,
+		"Command": cmd,
+		"Creator": email,
+	}
 
-    opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc : true}
+	opts := databases.SelectOptions{Top: 1, OrderBy: []string{"Id"}, Desc: true}
 
-    var deploy deploymentData
-    err := deployments.InsertReturn(values, nil, &opts, &deploy)
+	var deploy deploymentData
+	err := deployments.InsertReturn(values, nil, &opts, &deploy)
 
-    return deploy, err
+	return deploy, err
 }
 
 func removeApplication(app int64) error {
-    where := databases.Filter{"Id" : app}
-    return applications.Delete(where)
+	where := databases.Filter{"Id": app}
+	return applications.Delete(where)
 }
 
 func removeDeployment(deploy int64) error {
-    where := databases.Filter{"Id" : deploy}
-    return deployments.Delete(where)
+	where := databases.Filter{"Id": deploy}
+	return deployments.Delete(where)
 }
 
 func startApplication(user *auth.User, app int64, w http.ResponseWriter) error {
@@ -80,10 +80,10 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
 	deploy := batch.NewProcessor(user, w, app.Instances.([]string))
 
 	if pullImages {
-        image, ok := deployment.Command["Image"]
-        if !ok || image == "" {
-            return NotEnoughParametersError, false
-        }
+		image, ok := deployment.Command["Image"]
+		if !ok || image == "" {
+			return NotEnoughParametersError, false
+		}
 
 		pullTarget := fmt.Sprintf("images/create?fromImage=%s", image)
 		err := deploy.Do("Pulling required image", "POST", nil, pullTarget, interpretPullImage)
@@ -115,7 +115,7 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
 		// In a weird state where some containers have the temp name and some have the real name
 		batchDeleteContainersByName(deploy, app.Name, true)
 		batchDeleteContainersByName(deploy.FailureProcessor(), tmpName, true)
-		
+
 		return nil, false
 	}
 
@@ -128,34 +128,34 @@ func doDeployment(user *auth.User, app applicationData, deployment deploymentDat
 		}
 	}
 
-	to := map[string]interface{} {"CurrentDeployment" : deployment.Id}
-	where := databases.Filter{"Id" : app.Id}
+	to := map[string]interface{}{"CurrentDeployment": deployment.Id}
+	where := databases.Filter{"Id": app.Id}
 	applications.Update(to, where)
 
 	return nil, true
 }
 
 func getApplicationList(user *auth.User) ([]applicationData, error) {
-    scanner, err := applications.Select(nil, nil, nil)
-    if err != nil {
-        return nil, err
-    }
+	scanner, err := applications.Select(nil, nil, nil)
+	if err != nil {
+		return nil, err
+	}
 
-    apps := make([]applicationData, 0)
-    var app applicationData
+	apps := make([]applicationData, 0)
+	var app applicationData
 
-    for scanner.Next() {
-        err = scanner.Scan(&app)
-        if err != nil {
-	        return nil, err
-	    }
+	for scanner.Next() {
+		err = scanner.Scan(&app)
+		if err != nil {
+			return nil, err
+		}
 
-        if user.CanAccessApplication(app.Name) {
-            apps = append(apps, app)
-        }
-    }
-   
-    return apps, nil
+		if user.CanAccessApplication(app.Name) {
+			apps = append(apps, app)
+		}
+	}
+
+	return apps, nil
 }
 
 func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]interface{}, error) {
@@ -164,32 +164,32 @@ func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]i
 	}
 
 	cols := []string{"Id", "Creator", "Date", "Command"}
-	where := databases.Filter{"AppId" : app.Id}
+	where := databases.Filter{"AppId": app.Id}
 	opts := databases.SelectOptions{OrderBy: []string{"Id"}, Desc: true}
-    scanner, err := deployments.Select(cols, where, &opts)
+	scanner, err := deployments.Select(cols, where, &opts)
 
-    if err != nil {
-        return nil, err
-    }
+	if err != nil {
+		return nil, err
+	}
 
-    deploys := make([]map[string]interface{}, 0)
-    var deploy deploymentData
+	deploys := make([]map[string]interface{}, 0)
+	var deploy deploymentData
 
-    for scanner.Next() {
-        err = scanner.Scan(&deploy)
-        if err != nil {
-	        return nil, err
-	    }
+	for scanner.Next() {
+		err = scanner.Scan(&deploy)
+		if err != nil {
+			return nil, err
+		}
 
-	    deploys = append(deploys, map[string]interface{}{
-            "Id" : deploy.Id,
-            "Creator" : deploy.Creator,
-            "Date" : deploy.Date,
-            "Image" : deploy.Command["Image"],
-        })
-    }
-   
-    return deploys, nil
+		deploys = append(deploys, map[string]interface{}{
+			"Id":      deploy.Id,
+			"Creator": deploy.Creator,
+			"Date":    deploy.Date,
+			"Image":   deploy.Command["Image"],
+		})
+	}
+
+	return deploys, nil
 }
 
 func setApplicationStateTo(user *auth.User, id int64, state bool, w http.ResponseWriter) error {
@@ -203,11 +203,11 @@ func setApplicationStateTo(user *auth.User, id int64, state bool, w http.Respons
 	if state == false {
 		target = fmt.Sprintf("containers/%s/stop", app.Name)
 		rollback = fmt.Sprintf("containers/%s/start", app.Name)
-        msg = "Stopping application"
+		msg = "Stopping application"
 	} else {
 		target = fmt.Sprintf("containers/%s/start", app.Name)
 		rollback = fmt.Sprintf("containers/%s/stop", app.Name)
-        msg = "Starting application"
+		msg = "Starting application"
 	}
 
 	w.WriteHeader(200)
@@ -228,7 +228,7 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	var err error
 
 	if target >= 0 {
-		where := databases.Filter{"Id" : target}
+		where := databases.Filter{"Id": target}
 		err = deployments.SelectRow(nil, where, nil, &deployment)
 
 		if err == databases.NoRowsError {
@@ -241,11 +241,11 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 	} else {
 		priorCnt := int(-1 * target)
 
-		where := databases.Filter{"AppId" : app}
-		opts := &databases.SelectOptions {
-			OrderBy : []string{"Id"},
-			Top : priorCnt + 1,
-			Desc : true,
+		where := databases.Filter{"AppId": app}
+		opts := &databases.SelectOptions{
+			OrderBy: []string{"Id"},
+			Top:     priorCnt + 1,
+			Desc:    true,
 		}
 
 		scan, err := deployments.Select(nil, where, opts)
@@ -270,12 +270,12 @@ func getRevertDeployment(app int64, target int64) (deploymentData, error) {
 }
 
 func batchDeleteContainersByName(proc *batch.Processor, name string, isRollback bool) error {
-    var msg string
-    if isRollback {
-        msg = "Rolling back"
-    } else {
-        msg = "Deleting old containers"
-    }
+	var msg string
+	if isRollback {
+		msg = "Rolling back"
+	} else {
+		msg = "Deleting old containers"
+	}
 
 	deleteTarget := fmt.Sprintf("containers/%s?force=true", name)
 	return proc.Do(msg, "DELETE", nil, deleteTarget, interpretDeleteContainer)
@@ -320,7 +320,7 @@ func interpretDeleteContainer(code int, body io.Reader, err error) (batch.Result
 	case code == 404:
 		return batch.Result{"Warning", "Container did not exist", code}, nil
 
-	case 200 <= code && code <= 299: 
+	case 200 <= code && code <= 299:
 		return batch.Result{"OK", "", code}, nil
 
 	default:
@@ -329,31 +329,31 @@ func interpretDeleteContainer(code int, body io.Reader, err error) (batch.Result
 }
 
 func interpretPullImage(code int, body io.Reader, err error) (batch.Result, error) {
-    if err != nil {
-        return batch.Result{"Error", err.Error(), 500}, err
-    }
+	if err != nil {
+		return batch.Result{"Error", err.Error(), 500}, err
+	}
 
-    if code == 500 {
-        return batch.Result{"Error", "Docker internal error", 500}, errors.New("Image pull returned code 500")
-    }
+	if code == 500 {
+		return batch.Result{"Error", "Docker internal error", 500}, errors.New("Image pull returned code 500")
+	}
 
-    var errorCheck = struct {
-        Error string `json:"error"`
-    }{}
+	var errorCheck = struct {
+		Error string `json:"error"`
+	}{}
 
-    decoder := json.NewDecoder(body)
+	decoder := json.NewDecoder(body)
 
-    for {
-        err := decoder.Decode(&errorCheck)
+	for {
+		err := decoder.Decode(&errorCheck)
 
-        if err == io.EOF {
-            return batch.Result{"OK", "", code}, nil
-        } else if err != nil {
-            return batch.Result{"Error", err.Error(), 500}, err
-        }
+		if err == io.EOF {
+			return batch.Result{"OK", "", code}, nil
+		} else if err != nil {
+			return batch.Result{"Error", err.Error(), 500}, err
+		}
 
-        if errorCheck.Error != "" {
-            return batch.Result{"Error", errorCheck.Error, 500}, errors.New(errorCheck.Error)
-        }
-    }
+		if errorCheck.Error != "" {
+			return batch.Result{"Error", errorCheck.Error, 500}, errors.New(errorCheck.Error)
+		}
+	}
 }

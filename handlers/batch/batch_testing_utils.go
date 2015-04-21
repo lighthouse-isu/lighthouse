@@ -16,10 +16,10 @@ package batch
 
 import (
 	"fmt"
-	"strings"
 	"net"
 	"net/http"
-    "net/http/httptest"
+	"net/http/httptest"
+	"strings"
 )
 
 var nextPortNumber = 8080
@@ -31,23 +31,23 @@ func ShutdownServers(servers []*httptest.Server) {
 }
 
 func SetupServers(handlers ...func(http.ResponseWriter, *http.Request)) ([]string, []*httptest.Server) {
-    addresses := make([]string, len(handlers))
-    servers := make([]*httptest.Server, len(handlers))
+	addresses := make([]string, len(handlers))
+	servers := make([]*httptest.Server, len(handlers))
 
-    for i, f := range handlers {
-    	if f == nil {
-	        f = func(http.ResponseWriter, *http.Request) {}
-	    }
+	for i, f := range handlers {
+		if f == nil {
+			f = func(http.ResponseWriter, *http.Request) {}
+		}
 
-	    // Start a new test server to listen for requests from the tests
-	    server := httptest.NewUnstartedServer(http.HandlerFunc(f))
-	    server.Listener, _ = net.Listen("tcp", fmt.Sprintf("localhost:%d", nextPortNumber))
-	    server.Start()
+		// Start a new test server to listen for requests from the tests
+		server := httptest.NewUnstartedServer(http.HandlerFunc(f))
+		server.Listener, _ = net.Listen("tcp", fmt.Sprintf("localhost:%d", nextPortNumber))
+		server.Start()
 
-	    addresses[i] = strings.Replace(server.URL, "http://", "", 1)
-	    servers[i] = server
-	    nextPortNumber++
-    }
+		addresses[i] = strings.Replace(server.URL, "http://", "", 1)
+		servers[i] = server
+		nextPortNumber++
+	}
 
 	return addresses, servers
 }
