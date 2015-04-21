@@ -15,17 +15,13 @@
 FROM google/golang:latest
 
 MAINTAINER lighthouse
+RUN apt-get update -y && apt-get install -y unzip
 
 WORKDIR /gopath/src/github.com/lighthouse/lighthouse
 
-RUN go get github.com/gorilla/mux \
-           github.com/gorilla/sessions \
-           github.com/gorilla/securecookie \
-           github.com/lib/pq \
-           code.google.com/p/goauth2/oauth \
-           code.google.com/p/google-api-go-client/compute/v1
-
 ADD . /gopath/src/github.com/lighthouse/lighthouse/
 RUN go get github.com/lighthouse/lighthouse
+
+RUN curl -O -L https://github.com/lighthouse/harbor/releases/download/v1.0-rc0/harbor-v1.0-rc0.zip && unzip -o harbor-v1.0-rc0.zip
 
 ENTRYPOINT ["/gopath/bin/lighthouse"]
