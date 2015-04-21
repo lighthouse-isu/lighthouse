@@ -84,10 +84,10 @@ func Test_Exec(t *testing.T) {
 	assert.Nil(t, err)
 
 	id, _ := res.LastInsertId()
-	assert.Equal(t, 42, id)
+	assert.Equal(t, int64(42), id)
 
 	cnt, _ := res.RowsAffected()
-	assert.Equal(t, 73, cnt)
+	assert.Equal(t, int64(73), cnt)
 }
 
 func Test_CompileCreate(t *testing.T) {
