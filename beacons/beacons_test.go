@@ -24,6 +24,7 @@ import (
     "github.com/gorilla/mux"
     "github.com/stretchr/testify/assert"
     "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 func Test_GetBeaconAddress_Found(t *testing.T) {
@@ -162,8 +163,8 @@ func Test_Handle(t *testing.T) {
 }
 
 func Test_Init(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
+    databases.SetupTestingDefaultConnection()
+    defer databases.TeardownTestingDefaultConnection()
 
     // Basically just making sure this doesn't panic...
     Init(true)

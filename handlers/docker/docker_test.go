@@ -27,10 +27,26 @@ import (
 
     "github.com/stretchr/testify/assert"
 
+    "github.com/lighthouse/lighthouse/auth"
+    "github.com/lighthouse/lighthouse/session"
     "github.com/lighthouse/lighthouse/beacons"
     "github.com/lighthouse/lighthouse/beacons/aliases"
     "github.com/lighthouse/lighthouse/handlers"
 )
+
+func setup() string {
+    beacons.SetupTestingTable()
+    aliases.SetupTestingTable()
+    auth.SetupTestingTable()
+    auth.CreateUser("email", "", "")
+    return "email"
+}
+
+func teardown() {
+    beacons.TeardownTestingTable()
+    aliases.TeardownTestingTable()
+    auth.TeardownTestingTable()
+}
 
 /*
     These tests verify the functionality of dockerRequestHandler.go. In order to
@@ -65,8 +81,8 @@ func SetupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
     Purpose: GET and DELETE requests
 */
 func Test_DockerRequestHandler_GET(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(200)
@@ -77,6 +93,7 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -96,8 +113,8 @@ func Test_DockerRequestHandler_GET(t *testing.T) {
     Tests docker request forwarding requests with query params
 */
 func Test_DockerRequestHandler_query_params(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(200)
@@ -112,6 +129,7 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/?test=pass", nil)
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"/?test=pass", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -132,8 +150,8 @@ func Test_DockerRequestHandler_query_params(t *testing.T) {
     Purpose: POST and PUT requests
 */
 func Test_DockerRequestHandler_POST(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     testBody := []byte(`{"Payload" : { "TestBody" : 1 } }`)
     testPayload := map[string]interface{}{"TestBody" : 1}
@@ -153,6 +171,7 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("POST", "/", bytes.NewBuffer(testBody))
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"", "localhost:8080", &handlers.RequestBody{testPayload}, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -173,11 +192,12 @@ func Test_DockerRequestHandler_POST(t *testing.T) {
     Purpose: Ensuring that we handle either bad endpoints, or bad URLS
 */
 func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -196,8 +216,8 @@ func Test_DockerRequestHandler_BadEndpoint(t *testing.T) {
     Purpose: Ensuring that we forward remote error correctly
 */
 func Test_DockerRequestHandler_ServerError(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(504)
@@ -208,6 +228,7 @@ func Test_DockerRequestHandler_ServerError(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -226,8 +247,8 @@ func Test_DockerRequestHandler_ServerError(t *testing.T) {
     Purpose: Ensuring that we forward remote error correctly
 */
 func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
-    beacons.SetupTestingTable()
-    defer beacons.TeardownTestingTable()
+    email := setup()
+    defer teardown()
 
     h :=  func(w http.ResponseWriter, r *http.Request) {
         w.WriteHeader(200)
@@ -238,6 +259,7 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
 
     w := httptest.NewRecorder()
     r, _ := http.NewRequest("GET", "/", nil)
+    session.SetValue(r, "auth", "email", email)
     info := handlers.HandlerInfo{"", "localhost:8080", nil, r, nil}
 
     err := DockerRequestHandler(w, info)
@@ -253,8 +275,8 @@ func Test_DockerRequestHandler_NilResponseBody(t *testing.T) {
     Purpose: To add ensure Handler get valid data.
 */
 func Test_GetHandlerInfo(t *testing.T) {
-    aliases.SetupTestingTable()
-    defer aliases.TeardownTestingTable()
+    setup()
+    defer teardown()
 
     aliases.AddAlias("TestHost", "AliasHost")
 

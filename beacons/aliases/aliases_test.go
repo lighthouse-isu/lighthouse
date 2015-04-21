@@ -296,8 +296,8 @@ func Test_Handle(t *testing.T) {
 }
 
 func Test_Init(t *testing.T) {
-    SetupTestingTable()
-    defer TeardownTestingTable()
+    databases.SetupTestingDefaultConnection()
+    defer databases.TeardownTestingDefaultConnection()
 
     // Basically just making sure this doesn't panic...
     Init(true)
