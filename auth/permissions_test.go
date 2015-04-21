@@ -32,7 +32,7 @@ func Test_GetAuthLevel(t *testing.T) {
 	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
-		"GOOD": 1,
+		"GOOD" : 1,
 	}
 
 	user.Permissions["Beacons"] = beaconPerms
@@ -101,9 +101,9 @@ func Test_CanAccessBeacon(t *testing.T) {
 	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
-		"access": AccessAuthLevel,
-		"modify": ModifyAuthLevel,
-		"owner":  OwnerAuthLevel,
+		"access" : AccessAuthLevel,
+		"modify" : ModifyAuthLevel,
+		"owner" : OwnerAuthLevel,
 	}
 
 	user.Permissions["Beacons"] = beaconPerms
@@ -119,9 +119,9 @@ func Test_CanModifyBeacon(t *testing.T) {
 	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
-		"access": AccessAuthLevel,
-		"modify": ModifyAuthLevel,
-		"owner":  OwnerAuthLevel,
+		"access" : AccessAuthLevel,
+		"modify" : ModifyAuthLevel,
+		"owner" : OwnerAuthLevel,
 	}
 
 	user.Permissions["Beacons"] = beaconPerms
