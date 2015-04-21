@@ -55,7 +55,7 @@ func Test_GetRequestBody_Normal(t *testing.T) {
     assert.NotNil(t, outBody,
         "GetResponseBody should not return nil on non-nil body")
 
-    key := map[string]interface{}{"TestPayload":1}
+    key := map[string]interface{}{"TestPayload":float64(1)}
 
     assert.Equal(t, &RequestBody{key}, outBody,
         "GetResponseBody did not extract body correctly")
@@ -72,7 +72,7 @@ func Test_GetRequestBody_ExtraPayload(t *testing.T) {
     assert.NotNil(t, outBody,
         "GetResponseBody should not return nil on non-nil body")
 
-    key := map[string]interface{}{"TestPayload":1}
+    key := map[string]interface{}{"TestPayload":float64(1)}
 
     assert.Equal(t, &RequestBody{key}, outBody,
         "GetResponseBody did not extract Payload correctly with an extra field")
