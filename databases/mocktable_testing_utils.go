@@ -15,325 +15,339 @@
 package databases
 
 import (
-    "fmt"
-    "sort"
-    "time"
-    "reflect"
-    "strings"
+	"fmt"
+	"reflect"
+	"sort"
+	"strings"
+	"time"
 )
 
 /*
-    The purpose of MockTable is to be able to create custom mocks for datatbases
-    that can be directly used in a database.Database
+   The purpose of MockTable is to be able to create custom mocks for datatbases
+   that can be directly used in a database.Database
 */
 
 type MockTable struct {
-    Database [][]interface{}
-    Schema map[string]int
-    lastUpdateRow int64
+	Database      [][]interface{}
+	Schema        map[string]int
+	lastUpdateRow int64
 
-    MockInsert       func(map[string]interface{})(error)
-    MockInsertReturn func(map[string]interface{}, []string, *SelectOptions, interface{})(error)
-    MockDelete       func(Filter)(error)
-    MockUpdate       func(map[string]interface{}, Filter)(error)
-    MockSelectRow    func([]string, Filter, *SelectOptions, interface{})(error)
-    MockSelect       func([]string, Filter, *SelectOptions)(ScannerInterface, error)
+	MockInsert       func(map[string]interface{}) error
+	MockInsertReturn func(map[string]interface{}, []string, *SelectOptions, interface{}) error
+	MockDelete       func(Filter) error
+	MockUpdate       func(map[string]interface{}, Filter) error
+	MockSelectRow    func([]string, Filter, *SelectOptions, interface{}) error
+	MockSelect       func([]string, Filter, *SelectOptions) (ScannerInterface, error)
 
-    MockReload       func()
+	MockReload func()
 }
 
-func (t *MockTable) Insert(v map[string]interface{})(e error) {
-    if t.MockInsert != nil { return t.MockInsert(v) }
-    return
+func (t *MockTable) Insert(v map[string]interface{}) (e error) {
+	if t.MockInsert != nil {
+		return t.MockInsert(v)
+	}
+	return
 }
 
-func (t *MockTable) InsertReturn(v map[string]interface{}, c []string, o *SelectOptions, d interface{})(e error) {
-    if t.MockInsertReturn != nil { return t.MockInsertReturn(v, c, o, d) }
-    return
+func (t *MockTable) InsertReturn(v map[string]interface{}, c []string, o *SelectOptions, d interface{}) (e error) {
+	if t.MockInsertReturn != nil {
+		return t.MockInsertReturn(v, c, o, d)
+	}
+	return
 }
 
-func (t *MockTable) Delete(w Filter)(e error) {
-    if t.MockDelete != nil { return t.MockDelete(w) }
-    return
+func (t *MockTable) Delete(w Filter) (e error) {
+	if t.MockDelete != nil {
+		return t.MockDelete(w)
+	}
+	return
 }
 
-func (t *MockTable) Update(to map[string]interface{}, w Filter)(e error) {
-    if t.MockUpdate != nil { return t.MockUpdate(to, w) }
-    return
+func (t *MockTable) Update(to map[string]interface{}, w Filter) (e error) {
+	if t.MockUpdate != nil {
+		return t.MockUpdate(to, w)
+	}
+	return
 }
 
-func (t *MockTable) SelectRow(c []string, w Filter, opts *SelectOptions, d interface{})(e error) {
-    if t.MockSelectRow != nil { return t.MockSelectRow(c, w, opts, d) }
-    return
+func (t *MockTable) SelectRow(c []string, w Filter, opts *SelectOptions, d interface{}) (e error) {
+	if t.MockSelectRow != nil {
+		return t.MockSelectRow(c, w, opts, d)
+	}
+	return
 }
 
-func (t *MockTable) Select(c []string, w Filter, opts *SelectOptions)(s ScannerInterface, e error) {
-    if t.MockSelect != nil { return t.MockSelect(c, w, opts) }
-    return
+func (t *MockTable) Select(c []string, w Filter, opts *SelectOptions) (s ScannerInterface, e error) {
+	if t.MockSelect != nil {
+		return t.MockSelect(c, w, opts)
+	}
+	return
 }
 
 func (t *MockTable) Reload() {
-    if t.MockReload != nil { t.MockReload() }
-    return
+	if t.MockReload != nil {
+		t.MockReload()
+	}
+	return
 }
 
 func CommonTestingTable(schema Schema) *MockTable {
-    table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
+	table := &MockTable{Database: make([][]interface{}, 0), Schema: make(map[string]int), lastUpdateRow: 0}
 
-    uniqueCols := []int{}
-    serialCols := []int{}
-    dateCols := []int{}
+	uniqueCols := []int{}
+	serialCols := []int{}
+	dateCols := []int{}
 
-    i := 0
-    for k, t := range schema {
-        table.Schema[k] = i
+	i := 0
+	for k, t := range schema {
+		table.Schema[k] = i
 
-        colType := strings.ToLower(t)
+		colType := strings.ToLower(t)
 
-        if strings.Contains(colType, "unique") {
-            uniqueCols = append(uniqueCols, i)
-        }
-        if strings.Contains(colType, "serial") {
-            serialCols = append(serialCols, i)
-        }
-        if strings.Contains(colType, "datetime") {
-            dateCols = append(dateCols, i)
-        }
+		if strings.Contains(colType, "unique") {
+			uniqueCols = append(uniqueCols, i)
+		}
+		if strings.Contains(colType, "serial") {
+			serialCols = append(serialCols, i)
+		}
+		if strings.Contains(colType, "datetime") {
+			dateCols = append(dateCols, i)
+		}
 
-        i += 1
-    }
+		i += 1
+	}
 
-    table.MockInsert = func(values map[string]interface{}) error {
-        addition := make([]interface{}, len(table.Schema))
+	table.MockInsert = func(values map[string]interface{}) error {
+		addition := make([]interface{}, len(table.Schema))
 
-        for k, orig := range values {
-            addition[table.Schema[k]] = orig
-        }
+		for k, orig := range values {
+			addition[table.Schema[k]] = orig
+		}
 
-        for _, col := range serialCols {
-            addition[col] = table.lastUpdateRow
-        }
+		for _, col := range serialCols {
+			addition[col] = table.lastUpdateRow
+		}
 
-        for _, col := range dateCols {
-            addition[col] = time.Now()
-        }
+		for _, col := range dateCols {
+			addition[col] = time.Now()
+		}
 
-        for _, row := range table.Database {
-            for _, col := range uniqueCols {
-                if reflect.DeepEqual(row[col], addition[col]) {
-                    return DuplicateKeyError
-                }
-            }
-        }
+		for _, row := range table.Database {
+			for _, col := range uniqueCols {
+				if reflect.DeepEqual(row[col], addition[col]) {
+					return DuplicateKeyError
+				}
+			}
+		}
 
-        table.lastUpdateRow++
-        table.Database = append(table.Database, addition)
+		table.lastUpdateRow++
+		table.Database = append(table.Database, addition)
 
-        return nil
-    }
+		return nil
+	}
 
-    table.MockInsertReturn = func(values map[string]interface{}, cols []string, opts *SelectOptions, dest interface{}) error {
-        
-        err := table.MockInsert(values)
-        if err != nil {
-            return err
-        }
+	table.MockInsertReturn = func(values map[string]interface{}, cols []string, opts *SelectOptions, dest interface{}) error {
 
-        return table.MockSelectRow(cols, values, opts, dest)
-    }
+		err := table.MockInsert(values)
+		if err != nil {
+			return err
+		}
 
-    table.MockDelete = func(where Filter)(error) {
-        updated := false
-        var toDelete []int
+		return table.MockSelectRow(cols, values, opts, dest)
+	}
 
-        i := 0
-        for _, row := range table.Database {
-            applies := true
-            for col, val := range where {
-                if row[table.Schema[col]] != val {
-                    applies = false
-                    break
-                }
-            }
+	table.MockDelete = func(where Filter) error {
+		updated := false
+		var toDelete []int
 
-            if applies {
-                toDelete = append(toDelete, i)
-                updated = true
-            }
+		i := 0
+		for _, row := range table.Database {
+			applies := true
+			for col, val := range where {
+				if row[table.Schema[col]] != val {
+					applies = false
+					break
+				}
+			}
 
-            i = i + 1
-        }
+			if applies {
+				toDelete = append(toDelete, i)
+				updated = true
+			}
 
-        //cut the appropriate rows from the database
-        for _, rowId := range toDelete {
-            copy(table.Database[rowId:], table.Database[rowId+1:])
-            for j, end := len(table.Database) - 1, len(table.Database); j < end; j++ {
-                table.Database[j] = nil
-            }
-            table.Database = table.Database[:len(table.Database) - 1]
-        }
+			i = i + 1
+		}
 
-        if !updated {
-            return NoUpdateError
-        }
+		//cut the appropriate rows from the database
+		for _, rowId := range toDelete {
+			copy(table.Database[rowId:], table.Database[rowId+1:])
+			for j, end := len(table.Database)-1, len(table.Database); j < end; j++ {
+				table.Database[j] = nil
+			}
+			table.Database = table.Database[:len(table.Database)-1]
+		}
 
-        return nil
-    }
+		if !updated {
+			return NoUpdateError
+		}
 
-    table.MockUpdate = func(to map[string]interface{}, where Filter)(error) {
-        updated := false
-        for _, row := range table.Database {
+		return nil
+	}
 
-            applies := true
-            for col, val := range where {
-                if row[table.Schema[col]] != val {
-                    applies = false
-                    break
-                }
-            }
+	table.MockUpdate = func(to map[string]interface{}, where Filter) error {
+		updated := false
+		for _, row := range table.Database {
 
-            if applies {
-                for col, val := range to {
-                    row[table.Schema[col]] = val
-                }
-                updated = true
-            }
-        }
+			applies := true
+			for col, val := range where {
+				if row[table.Schema[col]] != val {
+					applies = false
+					break
+				}
+			}
 
-        if !updated {
-            return NoUpdateError
-        }
+			if applies {
+				for col, val := range to {
+					row[table.Schema[col]] = val
+				}
+				updated = true
+			}
+		}
 
-        return nil
-    }
+		if !updated {
+			return NoUpdateError
+		}
 
-    table.MockSelectRow = func(cols []string, where Filter, opts *SelectOptions, dest interface{})(error) {
-        if opts == nil {
-            opts = &SelectOptions{Top : 1}
-        }
+		return nil
+	}
 
-        scanner, err := table.MockSelect(cols, where, opts)
+	table.MockSelectRow = func(cols []string, where Filter, opts *SelectOptions, dest interface{}) error {
+		if opts == nil {
+			opts = &SelectOptions{Top: 1}
+		}
 
-        if err != nil {
-            return err
-        }
+		scanner, err := table.MockSelect(cols, where, opts)
 
-        if !scanner.Next() {
-            return NoRowsError
-        }
+		if err != nil {
+			return err
+		}
 
-        scanner.Scan(dest)
-        return nil
-    }
+		if !scanner.Next() {
+			return NoRowsError
+		}
 
-    table.MockSelect = func(cols []string, where Filter, opts *SelectOptions)(ScannerInterface, error) {
+		scanner.Scan(dest)
+		return nil
+	}
 
-        if opts == nil {
-            opts = &SelectOptions{}
-        }
+	table.MockSelect = func(cols []string, where Filter, opts *SelectOptions) (ScannerInterface, error) {
 
-        if cols == nil {
-            cols = make([]string, len(table.Schema))
-            for col, i := range table.Schema {
-                cols[i] = col
-            }
-        }
+		if opts == nil {
+			opts = &SelectOptions{}
+		}
 
-        entries := make([][]interface{}, 0)
+		if cols == nil {
+			cols = make([]string, len(table.Schema))
+			for col, i := range table.Schema {
+				cols[i] = col
+			}
+		}
 
-        for _, row := range table.Database {
+		entries := make([][]interface{}, 0)
 
-            applies := true
-            for col, val := range where {
-                if !reflect.DeepEqual(row[table.Schema[col]], val) {
-                    applies = false
-                    break
-                }
-            }
+		for _, row := range table.Database {
 
-            newEntry := make([]interface{}, len(cols))
-            for i, col := range cols {
-                newEntry[i] = row[table.Schema[col]]
-            }
+			applies := true
+			for col, val := range where {
+				if !reflect.DeepEqual(row[table.Schema[col]], val) {
+					applies = false
+					break
+				}
+			}
 
-            if applies && opts.Distinct {
-                for _, oldEntry := range entries {
-                    if reflect.DeepEqual(newEntry, oldEntry) {
-                        applies = false
-                        break
-                    }
-                }
-            }
+			newEntry := make([]interface{}, len(cols))
+			for i, col := range cols {
+				newEntry[i] = row[table.Schema[col]]
+			}
 
-            if applies {
-                entries = append(entries, newEntry)
-            }
-        }
+			if applies && opts.Distinct {
+				for _, oldEntry := range entries {
+					if reflect.DeepEqual(newEntry, oldEntry) {
+						applies = false
+						break
+					}
+				}
+			}
 
-        if opts.OrderBy != nil {
-            if opts.Desc {
-                sort.Sort(sort.Reverse(rowSorter{entries, cols, opts.OrderBy}))
-            } else {
-                sort.Sort(rowSorter{entries, cols, opts.OrderBy})
-            }
-        }
-        
-        if opts.Top > 0 && len(entries) >= opts.Top {
-            entries = entries[:opts.Top]
-        }
+			if applies {
+				entries = append(entries, newEntry)
+			}
+		}
 
-        return CommonTestingScanner(entries, cols), nil
-    }
+		if opts.OrderBy != nil {
+			if opts.Desc {
+				sort.Sort(sort.Reverse(rowSorter{entries, cols, opts.OrderBy}))
+			} else {
+				sort.Sort(rowSorter{entries, cols, opts.OrderBy})
+			}
+		}
 
-    return table
+		if opts.Top > 0 && len(entries) >= opts.Top {
+			entries = entries[:opts.Top]
+		}
+
+		return CommonTestingScanner(entries, cols), nil
+	}
+
+	return table
 }
 
 type rowSorter struct {
-    arr [][]interface{}
-    rowCols []string
-    sortBy []string
-} 
-
-func (this rowSorter) Len() int { 
-    return len(this.arr) 
+	arr     [][]interface{}
+	rowCols []string
+	sortBy  []string
 }
 
-func (this rowSorter) Swap(i, j int) { 
-    this.arr[i], this.arr[j] = this.arr[j], this.arr[i] 
+func (this rowSorter) Len() int {
+	return len(this.arr)
+}
+
+func (this rowSorter) Swap(i, j int) {
+	this.arr[i], this.arr[j] = this.arr[j], this.arr[i]
 }
 
 func (this rowSorter) Less(i, j int) bool {
-    row1, row2 := this.arr[i], this.arr[j]
+	row1, row2 := this.arr[i], this.arr[j]
 
-    for _, col := range this.sortBy {
-        idx := 0
-        for this.rowCols[idx] != col {
-            idx++
-        }
+	for _, col := range this.sortBy {
+		idx := 0
+		for this.rowCols[idx] != col {
+			idx++
+		}
 
-        if less(row1[idx], row2[idx]) {
-            return true
-        }
-    }
+		if less(row1[idx], row2[idx]) {
+			return true
+		}
+	}
 
-    return false
+	return false
 }
 
 func less(left, right interface{}) bool {
-    switch t := left.(type) {
-    case int:
-        return left.(int) < right.(int)
-    case int32:
-        return left.(int32) < right.(int32)
-    case int64:
-        return left.(int64) < right.(int64)
-    case float32:
-        return left.(float32) < right.(float32)
-    case float64:
-        return left.(float64) < right.(float64)
-    case string:
-        return left.(string) < right.(string)
-    default:
-        panic(fmt.Sprintf("Tried to sort with unsupported type %T", t))
-    }
+	switch t := left.(type) {
+	case int:
+		return left.(int) < right.(int)
+	case int32:
+		return left.(int32) < right.(int32)
+	case int64:
+		return left.(int64) < right.(int64)
+	case float32:
+		return left.(float32) < right.(float32)
+	case float64:
+		return left.(float64) < right.(float64)
+	case string:
+		return left.(string) < right.(string)
+	default:
+		panic(fmt.Sprintf("Tried to sort with unsupported type %T", t))
+	}
 }

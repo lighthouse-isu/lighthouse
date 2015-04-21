@@ -15,44 +15,44 @@
 package batch
 
 import (
-	"io"
-	"sync"
-	"errors"
-	"runtime"
-	"net/http"
-	"io/ioutil"
 	"encoding/json"
+	"errors"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"runtime"
+	"sync"
 
 	"github.com/lighthouse/lighthouse/auth"
 	"github.com/lighthouse/lighthouse/handlers/docker"
 )
 
 type Processor struct {
-	writer http.ResponseWriter
+	writer    http.ResponseWriter
 	instances []string
-	failures []string
-	user *auth.User
+	failures  []string
+	user      *auth.User
 	writeLock sync.Mutex
 }
 
 type Result struct {
-	Status string
+	Status  string
 	Message string
-	Code int
+	Code    int
 }
 
 type progressUpdate struct {
-	Status string
-	Method string
+	Status   string
+	Method   string
 	Endpoint string
-	Message string
-	Code int
+	Message  string
+	Code     int
 	Instance string
-	Item int
-	Total int
+	Item     int
+	Total    int
 }
 
-type ResponseInterpreter func(int, io.Reader, error)(Result, error)
+type ResponseInterpreter func(int, io.Reader, error) (Result, error)
 
 func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []string) *Processor {
 	return &Processor{writer, instances, []string{}, user, sync.Mutex{}}
@@ -60,13 +60,13 @@ func NewProcessor(user *auth.User, writer http.ResponseWriter, instances []strin
 
 func (this *Processor) Do(action, method string, body interface{}, endpoint string, interpret ResponseInterpreter) error {
 	var (
-		completed = []string{}
+		completed           = []string{}
 		errorToReport error = nil
-		total = len(this.instances)
-		requests = sync.WaitGroup{}
-		channels = sync.WaitGroup{}
-		queue = make(chan string, 1)
-		failQueue = make(chan string, 1)
+		total               = len(this.instances)
+		requests            = sync.WaitGroup{}
+		channels            = sync.WaitGroup{}
+		queue               = make(chan string, 1)
+		failQueue           = make(chan string, 1)
 	)
 
 	if interpret == nil {
@@ -131,7 +131,7 @@ func (this *Processor) Do(action, method string, body interface{}, endpoint stri
 }
 
 func (this *Processor) FailureProcessor() *Processor {
-	return NewProcessor(this.user, this.writer, this.failures);
+	return NewProcessor(this.user, this.writer, this.failures)
 }
 
 func Finalize(w http.ResponseWriter) {
@@ -142,15 +142,15 @@ func Finalize(w http.ResponseWriter) {
 }
 
 func (this *Processor) writeUpdate(res Result, method, endpoint, instance string, progress, total int) {
-	update := progressUpdate {
-		Status : res.Status, 
-		Method : method,
-		Endpoint : endpoint,
-		Message : res.Message, 
-		Code : res.Code, 
-		Instance : instance, 
-		Item : progress, 
-		Total : total,
+	update := progressUpdate{
+		Status:   res.Status,
+		Method:   method,
+		Endpoint: endpoint,
+		Message:  res.Message,
+		Code:     res.Code,
+		Instance: instance,
+		Item:     progress,
+		Total:    total,
 	}
 
 	this.writeLock.Lock()
@@ -187,10 +187,10 @@ func interpretResponseDefault(code int, body io.Reader, err error) (Result, erro
 	}
 
 	switch {
-	case 200 <= code && code <= 299: 
+	case 200 <= code && code <= 299:
 		return Result{"OK", string(msg), code}, nil
 
-	case 300 <= code && code <= 399: 
+	case 300 <= code && code <= 399:
 		return Result{"Warning", string(msg), code}, nil
 
 	default:

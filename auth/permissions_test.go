@@ -32,7 +32,7 @@ func Test_GetAuthLevel(t *testing.T) {
 	user.Permissions = NewPermission()
 
 	beaconPerms := map[string]interface{}{
-		"GOOD" : 1,
+		"GOOD": 1,
 	}
 
 	user.Permissions["Beacons"] = beaconPerms
@@ -101,9 +101,9 @@ func Test_CanModifyAndAccessResource(t *testing.T) {
 	user.Permissions = NewPermission()
 
 	perms := map[string]interface{}{
-		"access" : AccessAuthLevel,
-		"modify" : ModifyAuthLevel,
-		"owner" : OwnerAuthLevel,
+		"access": AccessAuthLevel,
+		"modify": ModifyAuthLevel,
+		"owner":  OwnerAuthLevel,
 	}
 
 	type testFuncs struct {
@@ -111,9 +111,9 @@ func Test_CanModifyAndAccessResource(t *testing.T) {
 		Modify func(name string) bool
 	}
 
-	tests := map[string]testFuncs {
-		"Beacons" : testFuncs{user.CanAccessBeacon, user.CanModifyBeacon},
-		"Applications" : testFuncs{user.CanAccessApplication, user.CanModifyApplication},
+	tests := map[string]testFuncs{
+		"Beacons":      testFuncs{user.CanAccessBeacon, user.CanModifyBeacon},
+		"Applications": testFuncs{user.CanAccessApplication, user.CanModifyApplication},
 	}
 
 	for res, funcs := range tests {
@@ -133,33 +133,33 @@ func Test_CanModifyAndAccessResource(t *testing.T) {
 
 func Test_SetUserResourceAuthLevel(t *testing.T) {
 	setup()
-    defer teardown()
+	defer teardown()
 
-    perms := NewPermission()
-    perms["Beacons"] = map[string]interface{}{"OVERWRITE" : 0}
+	perms := NewPermission()
+	perms["Beacons"] = map[string]interface{}{"OVERWRITE": 0}
 
-    keyPerms := map[string]interface{}{
-        "OVERWRITE" : 1, "NEW": 2,
-    }
+	keyPerms := map[string]interface{}{
+		"OVERWRITE": 1, "NEW": 2,
+	}
 
-    user := &User{Email: "EMAIL", Permissions: perms,}
+	user := &User{Email: "EMAIL", Permissions: perms}
 
-    addUsers(*user)
+	addUsers(*user)
 
-    tests := map[string]func(user *User, name string, level int)error {
-    	"Beacons" : SetUserBeaconAuthLevel,
-    	"Applications" : SetUserApplicationAuthLevel,
-    }
+	tests := map[string]func(user *User, name string, level int) error{
+		"Beacons":      SetUserBeaconAuthLevel,
+		"Applications": SetUserApplicationAuthLevel,
+	}
 
-    for res, f := range tests {
-    	perms[res] = map[string]interface{}{"OVERWRITE" : 0}
+	for res, f := range tests {
+		perms[res] = map[string]interface{}{"OVERWRITE": 0}
 
-    	f(user, "OVERWRITE", 1)
-	    f(user, "NEW", 2)
+		f(user, "OVERWRITE", 1)
+		f(user, "NEW", 2)
 
-	    cols := []string{"Permissions"}
-	    users.SelectRow(cols, nil, nil, user)
+		cols := []string{"Permissions"}
+		users.SelectRow(cols, nil, nil, user)
 
-	    assert.Equal(t, keyPerms, user.Permissions[res])
-    }
+		assert.Equal(t, keyPerms, user.Permissions[res])
+	}
 }

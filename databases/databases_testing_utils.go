@@ -15,8 +15,8 @@
 package databases
 
 import (
-    "database/sql"
-    "github.com/DATA-DOG/go-sqlmock"
+	"database/sql"
+	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func SetupTestingDefaultConnection() {
@@ -28,48 +28,48 @@ func TeardownTestingDefaultConnection() {
 }
 
 type testDatabase struct {
-    sql.DB
+	sql.DB
 }
 
 func (this *testDatabase) Compiler(schema Schema) Compiler {
-    return &testCompiler{}
+	return &testCompiler{}
 }
 
-type testCompiler struct {}
+type testCompiler struct{}
 
-func (t *testCompiler) ConvertInput(o interface{}, c string) (interface{}) { 
-    return o 
+func (t *testCompiler) ConvertInput(o interface{}, c string) interface{} {
+	return o
 }
 
-func (t *testCompiler) ConvertOutput(o interface{}, c string) (interface{}) { 
-    return o 
+func (t *testCompiler) ConvertOutput(o interface{}, c string) interface{} {
+	return o
 }
 
-func (t *testCompiler) CompileCreate(tab string) (string) {
-    return "CREATE"
+func (t *testCompiler) CompileCreate(tab string) string {
+	return "CREATE"
 }
 
-func (t *testCompiler) CompileDrop(tab string) (string) {
-    return "DROP"
+func (t *testCompiler) CompileDrop(tab string) string {
+	return "DROP"
 }
 
 func (t *testCompiler) CompileInsert(tab string, val map[string]interface{}) (string, []interface{}) {
-    return "INSERT", []interface{}{}
+	return "INSERT", []interface{}{}
 }
 
 func (t *testCompiler) CompileDelete(tab string, f Filter) (string, []interface{}) {
-    return "DELETE", []interface{}{}
+	return "DELETE", []interface{}{}
 }
 
 func (t *testCompiler) CompileUpdate(tab string, to map[string]interface{}, w Filter) (string, []interface{}) {
-    return "UPDATE", []interface{}{}
+	return "UPDATE", []interface{}{}
 }
 
 func (t *testCompiler) CompileSelect(tab string, c []string, f Filter, o *SelectOptions) (string, []interface{}) {
-    return "SELECT", []interface{}{}
+	return "SELECT", []interface{}{}
 }
 
 func testDB() DBInterface {
-    db, _ := sqlmock.New()
-    return &testDatabase{*db}
+	db, _ := sqlmock.New()
+	return &testDatabase{*db}
 }

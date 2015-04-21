@@ -29,3 +29,14 @@ then
 else
 	$HOME/gopath/bin/goveralls -coverprofile=no_utils.cov -service=travis-ci
 fi
+
+toFmt=$(gofmt -l .)
+if [[ $toFmt != "" ]]
+then
+	echo "Unformatted files:"
+	for file in $toFmt 
+	do
+		echo $file
+	done
+	exit 1
+fi

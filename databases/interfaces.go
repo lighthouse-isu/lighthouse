@@ -15,50 +15,50 @@
 package databases
 
 import (
-    "database/sql"
-    "database/sql/driver"
+	"database/sql"
+	"database/sql/driver"
 )
 
 type DBInterface interface {
-    Begin() (*sql.Tx, error)
-    Close() error
-    Driver() driver.Driver
-    Exec(string, ...interface{}) (sql.Result, error)
-    Ping() error
-    Prepare(string) (*sql.Stmt, error)
-    Query(string, ...interface{}) (*sql.Rows, error)
-    QueryRow(string, ...interface{}) *sql.Row
-    SetMaxIdleConns(int)
+	Begin() (*sql.Tx, error)
+	Close() error
+	Driver() driver.Driver
+	Exec(string, ...interface{}) (sql.Result, error)
+	Ping() error
+	Prepare(string) (*sql.Stmt, error)
+	Query(string, ...interface{}) (*sql.Rows, error)
+	QueryRow(string, ...interface{}) *sql.Row
+	SetMaxIdleConns(int)
 
-    Compiler(Schema) Compiler
+	Compiler(Schema) Compiler
 }
 
 type TableInterface interface {
-    Insert(map[string]interface{})(error)
-    InsertReturn(map[string]interface{}, []string, *SelectOptions, interface{})(error)
-    Delete(Filter) (error)
-    Update(map[string]interface{}, Filter)(error)
-    SelectRow([]string, Filter, *SelectOptions, interface{})(error)
-    Select([]string, Filter, *SelectOptions)(ScannerInterface, error)
-    Reload()
+	Insert(map[string]interface{}) error
+	InsertReturn(map[string]interface{}, []string, *SelectOptions, interface{}) error
+	Delete(Filter) error
+	Update(map[string]interface{}, Filter) error
+	SelectRow([]string, Filter, *SelectOptions, interface{}) error
+	Select([]string, Filter, *SelectOptions) (ScannerInterface, error)
+	Reload()
 }
 
 type ScannerInterface interface {
-	Close()(error)
-    Columns()([]string, error)
-    Err()(error)
-    Next()(bool)
-    Scan(dest interface{})(error)
+	Close() error
+	Columns() ([]string, error)
+	Err() error
+	Next() bool
+	Scan(dest interface{}) error
 }
 
 type Compiler interface {
-    ConvertInput(interface{}, string) interface{}
-    ConvertOutput(interface{}, string) interface{}
+	ConvertInput(interface{}, string) interface{}
+	ConvertOutput(interface{}, string) interface{}
 
-    CompileCreate(string) (string)
-    CompileDrop(string) (string)
-    CompileInsert(string, map[string]interface{}) (string, []interface{})
-    CompileDelete(string, Filter) (string, []interface{})
-    CompileUpdate(string, map[string]interface{}, Filter) (string, []interface{})
-    CompileSelect(string, []string, Filter, *SelectOptions) (string, []interface{})
+	CompileCreate(string) string
+	CompileDrop(string) string
+	CompileInsert(string, map[string]interface{}) (string, []interface{})
+	CompileDelete(string, Filter) (string, []interface{})
+	CompileUpdate(string, map[string]interface{}, Filter) (string, []interface{})
+	CompileSelect(string, []string, Filter, *SelectOptions) (string, []interface{})
 }

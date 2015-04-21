@@ -15,28 +15,28 @@
 package applications
 
 import (
-    "github.com/lighthouse/lighthouse/databases"
+	"github.com/lighthouse/lighthouse/databases"
 
-    "github.com/lighthouse/lighthouse/beacons"
-    "github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/beacons"
 )
 
 func SetupTestingTable() {
-    applications = databases.CommonTestingTable(appSchema) // defined in applications.go
-    deployments = databases.CommonTestingTable(deploySchema) // defined in applications.go
+	applications = databases.CommonTestingTable(appSchema)   // defined in applications.go
+	deployments = databases.CommonTestingTable(deploySchema) // defined in applications.go
 }
 
 func TeardownTestingTable() {
-    applications = nil
-    deployments = nil
+	applications = nil
+	deployments = nil
 }
 
 func makeDatabaseEntryFor(app applicationData) map[string]interface{} {
-	return map[string]interface{} {
-		"Id" : app.Id,
-		"CurrentDeployment" : app.CurrentDeployment,
-		"Name" : app.Name,
-	    "Instances" : app.Instances,
+	return map[string]interface{}{
+		"Id":                app.Id,
+		"CurrentDeployment": app.CurrentDeployment,
+		"Name":              app.Name,
+		"Instances":         app.Instances,
 	}
 }
 

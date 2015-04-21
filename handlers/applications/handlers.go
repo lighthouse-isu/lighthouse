@@ -16,37 +16,37 @@ package applications
 
 import (
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
-	"strconv"
-	"sort"
-	"math"
 	"fmt"
+	"io/ioutil"
+	"math"
+	"net/http"
+	"sort"
+	"strconv"
 
 	"github.com/gorilla/mux"
 
 	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/databases"
 	"github.com/lighthouse/lighthouse/handlers"
 	"github.com/lighthouse/lighthouse/handlers/batch"
-	"github.com/lighthouse/lighthouse/databases"
 )
 
 func getBoolParamOrDefault(r *http.Request, param string, def bool) bool {
-    val := r.URL.Query().Get(param)
-    ret, err := strconv.ParseBool(val)
-    if err != nil {
-    	return def
-    }
-    return ret
+	val := r.URL.Query().Get(param)
+	ret, err := strconv.ParseBool(val)
+	if err != nil {
+		return def
+	}
+	return ret
 }
 
 func getInt64ParamOrDefault(r *http.Request, param string, def int64) int64 {
-    val := r.URL.Query().Get(param)
-    ret, err := strconv.ParseInt(val, 10, 64)
-    if err != nil {
-    	return def
-    }
-    return int64(ret)
+	val := r.URL.Query().Get(param)
+	ret, err := strconv.ParseInt(val, 10, 64)
+	if err != nil {
+		return def
+	}
+	return int64(ret)
 }
 
 func getAppIdByIdentifier(identifier string) (int64, error) {
@@ -66,14 +66,14 @@ func writeError(w http.ResponseWriter, err error) {
 		return
 	}
 
-	code, ok := map[error]int {
-		UnknownApplicationError : 404,
-		UnknownDeploymentError : 404,
-		DeploymentMismatchError : 400,
-		NotEnoughDeploymentsError : 400,
-		NotEnoughParametersError : 400,
-		ApplicationPermissionError : 403,
-		databases.NoUpdateError : 400,
+	code, ok := map[error]int{
+		UnknownApplicationError:    404,
+		UnknownDeploymentError:     404,
+		DeploymentMismatchError:    400,
+		NotEnoughDeploymentsError:  400,
+		NotEnoughParametersError:   400,
+		ApplicationPermissionError: 403,
+		databases.NoUpdateError:    400,
 	}[err]
 
 	if !ok {
@@ -105,28 +105,28 @@ func getDifferenceOf(orig, remove []string) []string {
 
 		i++
 	}
-	
+
 	return ret
 }
 
 func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
-   	var err error
+	var err error
 	defer func() { writeError(w, err) }()
 
 	w.Header().Set("Content-Type", "application/json")
 
-    start := getBoolParamOrDefault(r, "start", false)
-    pull := getBoolParamOrDefault(r, "forcePull", false)
-    user := auth.GetCurrentUser(r)
+	start := getBoolParamOrDefault(r, "start", false)
+	pull := getBoolParamOrDefault(r, "forcePull", false)
+	user := auth.GetCurrentUser(r)
 
-    body, err := ioutil.ReadAll(r.Body)
+	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return
 	}
 
 	create := struct {
-		Name string
-		Command map[string]interface{}
+		Name      string
+		Command   map[string]interface{}
 		Instances []interface{}
 	}{}
 
@@ -147,34 +147,34 @@ func handleCreateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	application, err := addApplication(create.Name, instanceList)
-    if err != nil {
-    	return
-    }
+	if err != nil {
+		return
+	}
 
-    deployment, err := addDeployment(application.Id, create.Command, user.Email)
-    if err != nil {
-    	removeApplication(application.Id)
-        return
-    }
+	deployment, err := addDeployment(application.Id, create.Command, user.Email)
+	if err != nil {
+		removeApplication(application.Id)
+		return
+	}
 
-    deployErr, ok := doDeployment(user, application, deployment, start, pull, w)
-    if !ok {
-        removeDeployment(deployment.Id)
-        removeApplication(application.Id)
+	deployErr, ok := doDeployment(user, application, deployment, start, pull, w)
+	if !ok {
+		removeDeployment(deployment.Id)
+		removeApplication(application.Id)
 
-        if deployErr == NotEnoughParametersError {
-        	err = NotEnoughParametersError
-        	return
-        }
-    } else {
-    	auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
-    }
+		if deployErr == NotEnoughParametersError {
+			err = NotEnoughParametersError
+			return
+		}
+	} else {
+		auth.SetUserApplicationAuthLevel(user, application.Name, auth.OwnerAuthLevel)
+	}
 
-    batch.Finalize(w)
+	batch.Finalize(w)
 }
 
 func handleListApplications(w http.ResponseWriter, r *http.Request) {
-   	var err error
+	var err error
 	defer func() { writeError(w, err) }()
 
 	apps, err := getApplicationList(auth.GetCurrentUser(r))
@@ -191,7 +191,7 @@ func handleListApplications(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetApplicationHistory(w http.ResponseWriter, r *http.Request) {
-   	var err error
+	var err error
 	defer func() { writeError(w, err) }()
 
 	countParam := getInt64ParamOrDefault(r, "count", math.MaxInt32)
@@ -202,7 +202,7 @@ func handleGetApplicationHistory(w http.ResponseWriter, r *http.Request) {
 
 	count := int(countParam)
 
-    id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
+	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
 	if err != nil {
 		return
 	}
@@ -232,7 +232,7 @@ func handleGetApplicationHistory(w http.ResponseWriter, r *http.Request) {
 func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() { writeError(w, err) }()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 
 	user := auth.GetCurrentUser(r)
@@ -259,7 +259,7 @@ func handleStartApplication(w http.ResponseWriter, r *http.Request) {
 func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 	var err error
 	defer func() { writeError(w, err) }()
-	
+
 	w.Header().Set("Content-Type", "application/json")
 
 	user := auth.GetCurrentUser(r)
@@ -284,16 +284,16 @@ func handleStopApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
-   	var err error
+	var err error
 	defer func() { writeError(w, err) }()
 
 	w.Header().Set("Content-Type", "application/json")
 
 	target := getInt64ParamOrDefault(r, "target", -1)
-    pull := getBoolParamOrDefault(r, "forcePull", false)
-    user := auth.GetCurrentUser(r)
+	pull := getBoolParamOrDefault(r, "forcePull", false)
+	user := auth.GetCurrentUser(r)
 
-    id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
+	id, err := getAppIdByIdentifier(mux.Vars(r)["Id"])
 	if err != nil {
 		return
 	}
@@ -308,8 +308,8 @@ func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    deploy, err := getRevertDeployment(id, target)
-    if err != nil {
+	deploy, err := getRevertDeployment(id, target)
+	if err != nil {
 		return
 	}
 
@@ -318,7 +318,7 @@ func handleRevertApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
-   	var err error
+	var err error
 	defer func() { writeError(w, err) }()
 
 	w.Header().Set("Content-Type", "application/json")
@@ -348,8 +348,8 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 
 	update := struct {
 		Command map[string]interface{}
-		Add []interface{}
-		Remove []interface{}
+		Add     []interface{}
+		Remove  []interface{}
 	}{}
 
 	err = json.Unmarshal(body, &update)
@@ -368,13 +368,13 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	var deployment deploymentData
 
 	// Prep latest deployment in case of instance addition or a restart
-	where := databases.Filter{"Id" : app.CurrentDeployment}
-    err = deployments.SelectRow(nil, where, nil, &deployment)
+	where := databases.Filter{"Id": app.CurrentDeployment}
+	err = deployments.SelectRow(nil, where, nil, &deployment)
 	if err != nil {
 		return
 	}
 
-	willDeploy := restart || len(update.Command) > 0 
+	willDeploy := restart || len(update.Command) > 0
 
 	if len(addList) > 0 || len(removeList) > 0 {
 		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
@@ -383,8 +383,8 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 			app.Instances = append(app.Instances.([]string), addList...)
 		}
 
-		to := map[string]interface{}{"Instances" : app.Instances}
-		where := databases.Filter{"Id" : app.Id}
+		to := map[string]interface{}{"Instances": app.Instances}
+		where := databases.Filter{"Id": app.Id}
 		err = applications.Update(to, where)
 		if err != nil {
 			return
@@ -408,7 +408,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 		proc := batch.NewProcessor(user, w, removeList)
 		batchDeleteContainersByName(proc, app.Name, false)
 	}
-	
+
 	if willDeploy {
 		doDeployment(user, appToDeploy, deployment, false, true, w)
 	}

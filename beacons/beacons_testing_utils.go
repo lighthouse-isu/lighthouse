@@ -15,53 +15,53 @@
 package beacons
 
 import (
-    "net"
-    "net/http"
-    "net/http/httptest"
+	"net"
+	"net/http"
+	"net/http/httptest"
 
-    "github.com/lighthouse/lighthouse/databases"
-    "github.com/lighthouse/lighthouse/auth"
-    "github.com/lighthouse/lighthouse/beacons/aliases"
+	"github.com/lighthouse/lighthouse/auth"
+	"github.com/lighthouse/lighthouse/beacons/aliases"
+	"github.com/lighthouse/lighthouse/databases"
 )
 
 func SetupTestingTable() {
 	// schemas defined in beacons.go
-    beacons = databases.CommonTestingTable(beaconSchema) 
-    instances = databases.CommonTestingTable(instanceSchema)
+	beacons = databases.CommonTestingTable(beaconSchema)
+	instances = databases.CommonTestingTable(instanceSchema)
 }
 
 func TeardownTestingTable() {
-    beacons = nil
-    instances = nil
+	beacons = nil
+	instances = nil
 }
 
 func setup() {
-    SetupTestingTable()
-    auth.SetupTestingTable()
-    aliases.SetupTestingTable()
+	SetupTestingTable()
+	auth.SetupTestingTable()
+	aliases.SetupTestingTable()
 }
 
 func teardown() {
-    TeardownTestingTable()
-    auth.TeardownTestingTable()
-    aliases.TeardownTestingTable()
+	TeardownTestingTable()
+	auth.TeardownTestingTable()
+	aliases.TeardownTestingTable()
 }
 
 func setupServer(f *func(http.ResponseWriter, *http.Request)) *httptest.Server {
 
-    // Handler function, defaults to an empty func
-    var useFunc func(http.ResponseWriter, *http.Request)
+	// Handler function, defaults to an empty func
+	var useFunc func(http.ResponseWriter, *http.Request)
 
-    if f != nil {
-        useFunc = *f
-    } else {
-        useFunc = func(http.ResponseWriter, *http.Request) {}
-    }
+	if f != nil {
+		useFunc = *f
+	} else {
+		useFunc = func(http.ResponseWriter, *http.Request) {}
+	}
 
-    // Start a new test server to listen for requests from the tests
-    server := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
-    server.Listener, _= net.Listen("tcp", ":8080")
-    server.Start()
+	// Start a new test server to listen for requests from the tests
+	server := httptest.NewUnstartedServer(http.HandlerFunc(useFunc))
+	server.Listener, _ = net.Listen("tcp", ":8080")
+	server.Start()
 
-    return server
+	return server
 }

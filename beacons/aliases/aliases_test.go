@@ -17,10 +17,10 @@ package aliases
 import (
 	"testing"
 
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"encoding/json"
-	"bytes"
 
 	"github.com/gorilla/mux"
 
@@ -33,7 +33,7 @@ func setup() (table databases.TableInterface, teardown func()) {
 	SetupTestingTable()
 	table = aliases
 	teardown = TeardownTestingTable
-	return 
+	return
 }
 
 func Test_AddAlias(t *testing.T) {
@@ -59,8 +59,8 @@ func Test_UpdateAlias(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS_FAIL",
-		"Address" : "ADDRESS",
+		"Alias":   "ALIAS_FAIL",
+		"Address": "ADDRESS",
 	}
 
 	table.Insert(alias)
@@ -83,8 +83,8 @@ func Test_SetAlias(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS_OVERWRITE",
-		"Address" : "ADDRESS_OVERWRITE",
+		"Alias":   "ALIAS_OVERWRITE",
+		"Address": "ADDRESS_OVERWRITE",
 	}
 
 	table.Insert(alias)
@@ -114,8 +114,8 @@ func Test_RemoveAlias(t *testing.T) {
 	defer teardown()
 
 	table.Insert(map[string]interface{}{
-		"Alias" : "ALIAS",
-		"Address" : "ADDRESS",
+		"Alias":   "ALIAS",
+		"Address": "ADDRESS",
 	})
 
 	RemoveAlias("ADDRESS")
@@ -126,14 +126,13 @@ func Test_RemoveAlias(t *testing.T) {
 	assert.Equal(t, databases.NoRowsError, err)
 }
 
-
 func Test_GetAddressOf(t *testing.T) {
 	table, teardown := setup()
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS",
-		"Address" : "ADDRESS",
+		"Alias":   "ALIAS",
+		"Address": "ADDRESS",
 	}
 
 	table.Insert(alias)
@@ -156,8 +155,8 @@ func Test_GetAliasOf(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS",
-		"Address" : "ADDRESS",
+		"Alias":   "ALIAS",
+		"Address": "ADDRESS",
 	}
 
 	table.Insert(alias)
@@ -180,8 +179,8 @@ func Test_HandleUpdateAlias_Existing(t *testing.T) {
 	defer teardown()
 
 	alias := map[string]interface{}{
-		"Alias" : "ALIAS_FAIL",
-		"Address" : "ADDRESS",
+		"Alias":   "ALIAS_FAIL",
+		"Address": "ADDRESS",
 	}
 
 	table.Insert(alias)
@@ -263,42 +262,42 @@ func Test_HandleUpdateAlias_BadJSON(t *testing.T) {
 }
 
 func tryHandleTest(t *testing.T, r *http.Request, m *mux.Router) {
-    defer func() { recover() }()
+	defer func() { recover() }()
 
-    w := httptest.NewRecorder()
-    m.ServeHTTP(w, r)
+	w := httptest.NewRecorder()
+	m.ServeHTTP(w, r)
 
-    // This won't run during a panic(), but we can't panic during a 404
-    if http.StatusNotFound == w.Code {
-        t.Log(r.URL.Path)
-        t.Fail()
-    }
+	// This won't run during a panic(), but we can't panic during a 404
+	if http.StatusNotFound == w.Code {
+		t.Log(r.URL.Path)
+		t.Fail()
+	}
 }
 
 func Test_Handle(t *testing.T) {
-    r := mux.NewRouter()
-    Handle(r)
+	r := mux.NewRouter()
+	Handle(r)
 
-    routes := []struct {
-        Method string
-        Endpoint string
-    } {
-        {"PUT", "/ADDR"},
-    }
+	routes := []struct {
+		Method   string
+		Endpoint string
+	}{
+		{"PUT", "/ADDR"},
+	}
 
-    for _, route := range routes {
-        m := route.Method
-        e := route.Endpoint
+	for _, route := range routes {
+		m := route.Method
+		e := route.Endpoint
 
-        req, _ := http.NewRequest(m, e, bytes.NewBuffer([]byte("")))
-        tryHandleTest(t, req, r)
-    }
+		req, _ := http.NewRequest(m, e, bytes.NewBuffer([]byte("")))
+		tryHandleTest(t, req, r)
+	}
 }
 
 func Test_Init(t *testing.T) {
-    databases.SetupTestingDefaultConnection()
-    defer databases.TeardownTestingDefaultConnection()
+	databases.SetupTestingDefaultConnection()
+	defer databases.TeardownTestingDefaultConnection()
 
-    // Basically just making sure this doesn't panic...
-    Init(true)
+	// Basically just making sure this doesn't panic...
+	Init(true)
 }
