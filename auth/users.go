@@ -15,312 +15,312 @@
 package auth
 
 import (
-	"encoding/json"
-	"errors"
-	"fmt"
-	"io/ioutil"
-	"net/http"
+    "fmt"
+    "errors"
+    "net/http"
+    "io/ioutil"
+    "encoding/json"
 
-	"github.com/gorilla/mux"
+    "github.com/gorilla/mux"
 
-	"github.com/lighthouse/lighthouse/databases"
-	"github.com/lighthouse/lighthouse/handlers"
-	"github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/handlers"
+    "github.com/lighthouse/lighthouse/session"
+    "github.com/lighthouse/lighthouse/databases"
 )
 
 const (
-	DefaultAuthLevel    = 0
-	CreateUserAuthLevel = 1
+    DefaultAuthLevel = 0
+    CreateUserAuthLevel = 1
 )
 
 var (
-	UserAccessError = errors.New("User does not exist or current permission too low")
+    UserAccessError = errors.New("User does not exist or current permission too low")
 )
 
 type User struct {
-	Email       string
-	Salt        string
-	Password    string
-	AuthLevel   int
-	Permissions Permission
+    Email string
+    Salt string
+    Password string
+    AuthLevel int
+    Permissions Permission
 }
 
 var users databases.TableInterface
 
-var schema = databases.Schema{
-	"Email":       "text UNIQUE PRIMARY KEY",
-	"Salt":        "text",
-	"Password":    "text",
-	"AuthLevel":   "int",
-	"Permissions": "json",
+var schema = databases.Schema {
+    "Email" : "text UNIQUE PRIMARY KEY",
+    "Salt" : "text",
+    "Password" : "text",
+    "AuthLevel" : "int",
+    "Permissions" : "json",
 }
 
 func CreateUser(email, salt, password string) error {
-	return createUserWithAuthLevel(email, salt, password, DefaultAuthLevel)
-}
+    return createUserWithAuthLevel(email, salt, password, DefaultAuthLevel)
+}   
 
 func createUserWithAuthLevel(email, salt, password string, level int) error {
-	return addUser(User{email, salt, password, level, NewPermission()})
+    return addUser(User{email, salt, password, level, NewPermission()})
 }
 
 func addUser(user User) error {
-	entry := map[string]interface{}{
-		"Email":       user.Email,
-		"Salt":        user.Salt,
-		"Password":    user.Password,
-		"AuthLevel":   user.AuthLevel,
-		"Permissions": user.Permissions,
-	}
+    entry := map[string]interface{}{
+        "Email" : user.Email,
+        "Salt" : user.Salt,
+        "Password" : user.Password,
+        "AuthLevel" : user.AuthLevel,
+        "Permissions" : user.Permissions,
+    }
 
-	err := users.Insert(entry)
-	return err
+    err := users.Insert(entry)
+    return err
 }
 
 func GetUser(email string) (*User, error) {
-	user := &User{}
-	where := databases.Filter{"Email": email}
-	err := users.SelectRow(nil, where, nil, user)
+    user := &User{}
+    where := databases.Filter{"Email" : email}
+    err := users.SelectRow(nil, where, nil, user)
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
-	user.convertPermissionsFromDB()
+    user.convertPermissionsFromDB()
 
-	return user, nil
+    return user, nil
 }
 
 func GetCurrentUser(r *http.Request) *User {
-	email := session.GetValueOrDefault(r, "auth", "email", "").(string)
-	user, _ := GetUser(email)
-	return user
+    email := session.GetValueOrDefault(r, "auth", "email", "").(string)
+    user, _ := GetUser(email)
+    return user
 }
 
 func SetUserBeaconAuthLevel(user *User, beacon string, level int) error {
-	user.SetAuthLevel("Beacons", beacon, level)
+    user.SetAuthLevel("Beacons", beacon, level)
+    
+    to := map[string]interface{}{"Permissions" : user.Permissions}
+    where := map[string]interface{}{"Email" : user.Email}
 
-	to := map[string]interface{}{"Permissions": user.Permissions}
-	where := map[string]interface{}{"Email": user.Email}
-
-	return users.Update(to, where)
+    return users.Update(to, where)
 }
 
 func writeResponse(w http.ResponseWriter, code int, err error) {
-	if err == nil {
-		w.WriteHeader(code)
-	} else {
-		handlers.WriteError(w, code, "users", err.Error())
-	}
+    if err == nil {
+        w.WriteHeader(code)
+    } else {
+        handlers.WriteError(w, code, "users", err.Error())
+    }
 }
 
 func handleListUsers(w http.ResponseWriter, r *http.Request) {
-	currentUser := GetCurrentUser(r)
-	userList, err := getAllUsers(currentUser)
+    currentUser := GetCurrentUser(r)
+    userList, err := getAllUsers(currentUser)
 
-	var userJson []byte
-	if err == nil {
-		userJson, err = json.Marshal(userList)
-	}
+    var userJson []byte
+    if err == nil {
+        userJson, err = json.Marshal(userList)
+    }
 
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, err)
-		return
-	}
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, err) 
+        return
+    }
 
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, string(userJson))
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprintf(w, string(userJson))
 }
 
 func handleGetUser(w http.ResponseWriter, r *http.Request) {
-	reqEmail := mux.Vars(r)["Email"]
-	reqUser, err := GetUser(reqEmail)
+    reqEmail := mux.Vars(r)["Email"]
+    reqUser, err := GetUser(reqEmail)
 
-	if err != nil {
-		writeResponse(w, http.StatusNotFound, UserAccessError)
-		return
-	}
+    if err != nil {
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
+        return
+    }
 
-	currentUser := GetCurrentUser(r)
+    currentUser := GetCurrentUser(r)
 
-	if !currentUser.CanViewUser(reqUser) {
-		writeResponse(w, http.StatusNotFound, UserAccessError)
-		return
-	}
+    if !currentUser.CanViewUser(reqUser) {
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
+        return
+    }
 
-	userInfo := struct {
-		Email       string
-		AuthLevel   int
-		Permissions Permission
-	}{
-		reqUser.Email, reqUser.AuthLevel, reqUser.Permissions,
-	}
+    userInfo := struct {
+        Email string
+        AuthLevel int
+        Permissions Permission
+    }{
+        reqUser.Email, reqUser.AuthLevel, reqUser.Permissions,
+    }
+    
+    userJson, err := json.Marshal(userInfo)
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, UserAccessError) 
+        return
+    }
 
-	userJson, err := json.Marshal(userInfo)
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, UserAccessError)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, string(userJson))
+    w.WriteHeader(http.StatusOK)
+    fmt.Fprint(w, string(userJson))
 }
 
 func handleUpdateUser(w http.ResponseWriter, r *http.Request) {
-	reqEmail := mux.Vars(r)["Email"]
-	reqUser, err := GetUser(reqEmail)
+    reqEmail := mux.Vars(r)["Email"]
+    reqUser, err := GetUser(reqEmail)
 
-	if err != nil {
-		writeResponse(w, http.StatusNotFound, UserAccessError)
-		return
-	}
+    if err != nil {
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
+        return
+    }
 
-	currentUser := GetCurrentUser(r)
+    currentUser := GetCurrentUser(r)
 
-	if !currentUser.CanViewUser(reqUser) {
-		writeResponse(w, http.StatusNotFound, UserAccessError)
-		return
-	}
+    if !currentUser.CanViewUser(reqUser) {
+        writeResponse(w, http.StatusNotFound, UserAccessError) 
+        return
+    }
 
-	if !currentUser.CanModifyUser(reqUser) {
-		writeResponse(w, http.StatusForbidden, UserAccessError)
-		return
-	}
+    if !currentUser.CanModifyUser(reqUser) {
+        writeResponse(w, http.StatusForbidden, UserAccessError)
+        return
+    }
 
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, err)
-		return
-	}
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, err)
+        return
+    }
 
-	values, code := parseUserUpdateRequest(currentUser, reqUser, reqBody)
-	if code != http.StatusOK {
-		writeResponse(w, code, errors.New("could not update user"))
-		return
-	}
+    values, code := parseUserUpdateRequest(currentUser, reqUser, reqBody)
+    if code != http.StatusOK {
+        writeResponse(w, code, errors.New("could not update user"))
+        return
+    }
 
-	where := map[string]interface{}{"Email": reqEmail}
-	err = users.Update(values, where)
+    where := map[string]interface{}{"Email" : reqEmail}
+    err = users.Update(values, where)
 
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, err)
-		return
-	}
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, err)
+        return
+    }
 
-	w.WriteHeader(http.StatusOK)
+    w.WriteHeader(http.StatusOK)
 }
 
 func handleCreateUser(w http.ResponseWriter, r *http.Request) {
-	currentUser := GetCurrentUser(r)
+    currentUser := GetCurrentUser(r)
 
-	if currentUser.AuthLevel < CreateUserAuthLevel {
-		writeResponse(w, http.StatusForbidden, UserAccessError)
-		return
-	}
+    if currentUser.AuthLevel < CreateUserAuthLevel {
+        writeResponse(w, http.StatusForbidden, UserAccessError)
+        return
+    }
 
-	reqBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		writeResponse(w, http.StatusInternalServerError, UserAccessError)
-		return
-	}
+    reqBody, err := ioutil.ReadAll(r.Body)
+    if err != nil {
+        writeResponse(w, http.StatusInternalServerError, UserAccessError)
+        return
+    }
 
-	var userInfo struct {
-		Email    string
-		Password string
-	}
+    var userInfo struct {
+        Email string
+        Password string
+    }
 
-	err = json.Unmarshal(reqBody, &userInfo)
-	if err != nil {
-		writeResponse(w, http.StatusBadRequest, err)
-		return
-	}
+    err = json.Unmarshal(reqBody, &userInfo)
+    if err != nil {
+        writeResponse(w, http.StatusBadRequest, err)
+        return
+    }
 
-	salt := GenerateSalt()
-	saltedPassword := SaltPassword(userInfo.Password, salt)
+    salt := GenerateSalt()
+    saltedPassword := SaltPassword(userInfo.Password, salt)
 
-	err = CreateUser(userInfo.Email, salt, saltedPassword)
-	if err != nil {
-		writeResponse(w, http.StatusBadRequest, err)
-		return
-	}
+    err = CreateUser(userInfo.Email, salt, saltedPassword)
+    if err != nil {
+        writeResponse(w, http.StatusBadRequest, err)
+        return
+    }
 
-	w.WriteHeader(http.StatusOK)
+    w.WriteHeader(http.StatusOK)
 }
 
 func getAllUsers(currentUser *User) ([]string, error) {
-	cols := []string{"Email", "AuthLevel"}
-	userRows, err := users.Select(cols, nil, nil)
+    cols := []string{"Email", "AuthLevel"}
+    userRows, err := users.Select(cols, nil, nil)
 
-	if err != nil {
-		return nil, err
-	}
+    if err != nil {
+        return nil, err
+    }
 
-	list := make([]string, 0)
-	var user User
+    list := make([]string, 0)
+    var user User
 
-	for userRows.Next() {
-		err = userRows.Scan(&user)
+    for userRows.Next() {
+        err = userRows.Scan(&user)
 
-		if err != nil {
-			return nil, err
-		}
+        if err != nil {
+            return nil, err
+        }
 
-		if currentUser.CanViewUser(&user) {
-			list = append(list, user.Email)
-		}
-	}
+        if currentUser.CanViewUser(&user) {
+            list = append(list, user.Email)
+        }
+    }
 
-	return list, nil
+    return list, nil
 }
 
 func parseUserUpdateRequest(curUser, modUser *User, updateJSON []byte) (map[string]interface{}, int) {
+    
+    updates := struct {
+        AuthLevel int           `json:omitempty`
+        Password string         `json:omitempty`
+        Beacons map[string]int  `json:omitempty`
+    }{
+        AuthLevel: modUser.AuthLevel, 
+        Password: modUser.Password,
+    }
 
-	updates := struct {
-		AuthLevel int            `json:omitempty`
-		Password  string         `json:omitempty`
-		Beacons   map[string]int `json:omitempty`
-	}{
-		AuthLevel: modUser.AuthLevel,
-		Password:  modUser.Password,
-	}
+    err := json.Unmarshal(updateJSON, &updates)
+    if err != nil {
+        return nil, http.StatusBadRequest
+    }
 
-	err := json.Unmarshal(updateJSON, &updates)
-	if err != nil {
-		return nil, http.StatusBadRequest
-	}
+    updateValues := make(map[string]interface{})
 
-	updateValues := make(map[string]interface{})
+    if updates.AuthLevel != modUser.AuthLevel {
+        if updates.AuthLevel < DefaultAuthLevel {
+            return nil, http.StatusBadRequest
+        }
 
-	if updates.AuthLevel != modUser.AuthLevel {
-		if updates.AuthLevel < DefaultAuthLevel {
-			return nil, http.StatusBadRequest
-		}
+        if updates.AuthLevel > curUser.AuthLevel {
+            return nil, http.StatusForbidden
+        }
 
-		if updates.AuthLevel > curUser.AuthLevel {
-			return nil, http.StatusForbidden
-		}
+        updateValues["AuthLevel"] = updates.AuthLevel
+    }
+    
+    if updates.Password != modUser.Password {
+        updateValues["Password"] = SaltPassword(updates.Password, modUser.Salt)
+    }
 
-		updateValues["AuthLevel"] = updates.AuthLevel
-	}
+    updateValues["Permissions"] = modUser.Permissions
 
-	if updates.Password != modUser.Password {
-		updateValues["Password"] = SaltPassword(updates.Password, modUser.Salt)
-	}
+    if  updates.Beacons != nil {
+        for beacon, level := range updates.Beacons {
 
-	updateValues["Permissions"] = modUser.Permissions
+            permitted := curUser.CanModifyBeacon(beacon) && 
+                level <= curUser.GetAuthLevel("Beacons", beacon)
 
-	if updates.Beacons != nil {
-		for beacon, level := range updates.Beacons {
+            if permitted {
+                modUser.SetAuthLevel("Beacons", beacon, level)
+            } else {
+                return nil, http.StatusForbidden
+            }
+        }
+    }    
 
-			permitted := curUser.CanModifyBeacon(beacon) &&
-				level <= curUser.GetAuthLevel("Beacons", beacon)
-
-			if permitted {
-				modUser.SetAuthLevel("Beacons", beacon, level)
-			} else {
-				return nil, http.StatusForbidden
-			}
-		}
-	}
-
-	return updateValues, http.StatusOK
+    return updateValues, http.StatusOK
 }
