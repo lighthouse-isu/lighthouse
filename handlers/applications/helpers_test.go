@@ -269,7 +269,7 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 			assert.Equal(t, deploy.Date, data["Date"])
 			assert.Equal(t, cmd["Image"], data["Image"])
 			assert.Equal(t, cmd, data["Command"])
-			assert.Equal(t, len(key) - i, data["Version"])
+			assert.Equal(t, len(key)-i, data["Version"])
 		}
 	}
 }
