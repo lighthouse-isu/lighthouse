@@ -186,7 +186,13 @@ func getApplicationHistory(user *auth.User, app applicationData) ([]map[string]i
 			"Creator": deploy.Creator,
 			"Date":    deploy.Date,
 			"Image":   deploy.Command["Image"],
+			"Command": deploy.Command,
 		})
+	}
+
+	versionCnt := len(deploys)
+	for i, deploy := range deploys {
+		deploy["Version"] = versionCnt - i
 	}
 
 	return deploys, nil

@@ -241,9 +241,10 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 	cmd := map[string]interface{}{"Image": "test"}
 	ds := make([]deploymentData, 3)
 
-	ds[0], _ = addDeployment(0, cmd, "otheruser")
-	ds[1], _ = addDeployment(0, cmd, "email")
+	// Deployments are returned in reverse order (latest first)
 	ds[2], _ = addDeployment(0, cmd, "otheruser")
+	ds[1], _ = addDeployment(0, cmd, "email")
+	ds[0], _ = addDeployment(0, cmd, "otheruser")
 	addDeployment(1, cmd, "email")
 
 	tests := map[int][]deploymentData{
@@ -255,15 +256,20 @@ func Test_GetApplicationHistory_OK(t *testing.T) {
 
 	for level, key := range tests {
 		user.SetAuthLevel("Applications", "APP", level)
-		list, err := getApplicationHistory(user, app)
+		res, err := getApplicationHistory(user, app)
 
 		assert.Nil(t, err)
-		assert.Equal(t, len(key), len(list))
+		assert.Equal(t, len(key), len(res))
 
 		for i, deploy := range key {
-			assert.Equal(t, deploy.Id, list[2-i]["Id"])
-			assert.Equal(t, deploy.Creator, list[2-i]["Creator"])
-			assert.Equal(t, deploy.Date, list[2-i]["Date"])
+			data := res[i]
+
+			assert.Equal(t, deploy.Id, data["Id"])
+			assert.Equal(t, deploy.Creator, data["Creator"])
+			assert.Equal(t, deploy.Date, data["Date"])
+			assert.Equal(t, cmd["Image"], data["Image"])
+			assert.Equal(t, cmd, data["Command"])
+			assert.Equal(t, len(key)-i, data["Version"])
 		}
 	}
 }
