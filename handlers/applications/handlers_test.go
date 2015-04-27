@@ -24,9 +24,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
-	"sort"
 
 	"github.com/gorilla/mux"
 
@@ -513,7 +513,7 @@ func Test_HandleUpdateApplication(t *testing.T) {
 	testApp, _ := GetApplicationById(app.Id)
 	sort.Strings(finalInsts)
 	sort.Strings(testApp.Instances.([]string))
-	
+
 	assert.Equal(t, finalInsts, testApp.Instances)
 	assert.Equal(t, dep.Id+1, testApp.CurrentDeployment)
 

@@ -81,7 +81,7 @@ func (this *Processor) Do(action, method string, body interface{}, endpoint stri
 			defer requests.Done()
 
 			resp, err := runBatchRequest(this.user, method, inst, endpoint, body)
-			
+
 			var result Result
 
 			if resp != nil {
