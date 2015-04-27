@@ -364,10 +364,8 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var appToDeploy applicationData = app
-	var deployment deploymentData
-
 	// Prep latest deployment in case of instance addition or a restart
+	var deployment deploymentData
 	where := databases.Filter{"Id": app.CurrentDeployment}
 	err = deployments.SelectRow(nil, where, nil, &deployment)
 	if err != nil {
@@ -379,8 +377,24 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	if len(addList) > 0 || len(removeList) > 0 {
 		app.Instances = getDifferenceOf(app.Instances.([]string), removeList)
 
+		// Ensure no duplicate instances
 		if len(addList) > 0 {
-			app.Instances = append(app.Instances.([]string), addList...)
+			uniqueInsts := make(map[string]bool)
+
+			for _, inst := range app.Instances.([]string) {
+				uniqueInsts[inst] = true
+			}
+
+			for _, inst := range addList {
+				uniqueInsts[inst] = true
+			}
+
+			app.Instances = make([]string, len(uniqueInsts))
+			i := 0
+			for inst, _ := range uniqueInsts {
+				app.Instances.([]string)[i] = inst
+				i += 1
+			}
 		}
 
 		to := map[string]interface{}{"Instances": app.Instances}
@@ -400,7 +414,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 
 	if len(addList) > 0 && !willDeploy {
 		// Only want to update the net instances
-		appToDeploy.Instances = addList
+		app.Instances = addList
 		willDeploy = true
 	}
 
@@ -410,7 +424,7 @@ func handleUpdateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if willDeploy {
-		doDeployment(user, appToDeploy, deployment, false, true, w)
+		doDeployment(user, app, deployment, restart, true, w)
 	}
 
 	batch.Finalize(w)

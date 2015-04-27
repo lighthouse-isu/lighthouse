@@ -81,12 +81,20 @@ func (this *Processor) Do(action, method string, body interface{}, endpoint stri
 			defer requests.Done()
 
 			resp, err := runBatchRequest(this.user, method, inst, endpoint, body)
-			result, err := interpret(resp.StatusCode, resp.Body, err)
+			
+			var result Result
 
-			// Make sure the response is complete before ending
-			if err == nil {
-				ioutil.ReadAll(resp.Body)
-				resp.Body.Close()
+			if resp != nil {
+				result, err = interpret(resp.StatusCode, resp.Body, err)
+
+				// Make sure the response is complete before ending
+				if err == nil {
+					ioutil.ReadAll(resp.Body)
+					resp.Body.Close()
+				}
+
+			} else {
+				result, err = interpret(500, nil, err)
 			}
 
 			this.writeUpdate(result, method, endpoint, inst, itemNumber, total)
