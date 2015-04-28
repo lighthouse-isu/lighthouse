@@ -197,7 +197,7 @@ func refreshVMListOf(beacon beaconData) error {
 	req.Header.Set(HEADER_TOKEN_KEY, beacon.Token)
 
 	client := http.Client{
-		Timeout: time.Duration(3 * time.Second),
+		Timeout: time.Duration(15 * time.Second),
 	}
 
 	resp, err := client.Do(req)

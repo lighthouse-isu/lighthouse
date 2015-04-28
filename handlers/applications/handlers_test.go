@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -510,6 +511,9 @@ func Test_HandleUpdateApplication(t *testing.T) {
 	assert.Equal(t, 200, w.Code)
 
 	testApp, _ := GetApplicationById(app.Id)
+	sort.Strings(finalInsts)
+	sort.Strings(testApp.Instances.([]string))
+
 	assert.Equal(t, finalInsts, testApp.Instances)
 	assert.Equal(t, dep.Id+1, testApp.CurrentDeployment)
 
