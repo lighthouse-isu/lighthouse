@@ -22,6 +22,6 @@ WORKDIR /gopath/src/github.com/lighthouse/lighthouse
 ADD . /gopath/src/github.com/lighthouse/lighthouse/
 RUN go get github.com/lighthouse/lighthouse
 
-RUN curl -O -L https://github.com/lighthouse/harbor/releases/download/v1.0-rc0/harbor-v1.0-rc0.zip && unzip -o harbor-v1.0-rc0.zip
+RUN curl -O -L https://github.com/lighthouse/harbor/releases/download/v1.1.0/harbor-v1.1.0.zip && unzip -o harbor-v1.1.0.zip
 
 ENTRYPOINT ["/gopath/bin/lighthouse"]
